@@ -38,7 +38,7 @@ function schedulePoll(date, version) {
   clearTimeout(pollTimer);
   pollTimer = setTimeout(() => {
     if (version === requestVersion && ($('#ppgDate').value || today) === date) load({ silent: true });
-  }, pollCount++ < 16 ? 1500 : 4000);
+  }, payload?.providerQueue?.coolingDown ? 5000 : (pollCount++ < 16 ? 1500 : 4000));
 }
 
 async function load({ silent = false } = {}) {
@@ -47,7 +47,7 @@ async function load({ silent = false } = {}) {
   clearTimeout(pollTimer);
   if (!silent) {
     pollCount = 0;
-    $('#ppgGrid').innerHTML = '<div class="route-empty"><h3>Starting venue PPG analysis…</h3><p>The page will update automatically while team histories are processed.</p></div>';
+    $('#ppgGrid').innerHTML = '<div class="route-empty apex-soft-pulse"><span class="apex-loader-dot" aria-hidden="true"></span><h3>Starting venue PPG analysis…</h3><p>The page will update automatically while team histories are processed.</p></div>';
   }
   try {
     const data = await fetchJson(`/api/ppg-route-board?date=${encodeURIComponent(date)}`);
@@ -78,19 +78,30 @@ function render() {
     }
     if (!payload.complete) {
       const progress = payload.progress || {};
-      $('#ppgGrid').innerHTML = `<div class="route-empty"><h3>Analysing venue PPG…</h3><p>${Number(progress.processed || payload.summary?.analysed || 0)} of ${Number(progress.total || payload.summary?.fixtures || 0)} fixtures processed. This page updates automatically.</p></div>`;
+      const queue = payload.providerQueue || progress.providerQueue || {};
+      const cooling = Boolean(queue.coolingDown || progress.stage === 'RATE_LIMIT_COOLDOWN');
+      const seconds = Math.max(1, Math.ceil(Number(queue.retryInMs || 0) / 1000));
+      const title = cooling ? 'Provider cooldown active…' : 'Analysing venue PPG…';
+      const detail = cooling
+        ? `API-Football reached the subscription minute limit. PPG will resume automatically${Number(queue.retryInMs) > 0 ? ` in about ${seconds}s` : ''}. ${Number(progress.processed || 0)} fixtures are already complete.`
+        : `${Number(progress.processed || payload.summary?.analysed || 0)} of ${Number(progress.total || payload.summary?.fixtures || 0)} fixtures processed. This page updates automatically.`;
+      $('#ppgGrid').innerHTML = `<div class="route-empty apex-soft-pulse"><span class="apex-loader-dot" aria-hidden="true"></span><h3>${esc(title)}</h3><p>${esc(detail)}</p></div>`;
       return;
     }
     $('#ppgGrid').innerHTML = `<div class="route-empty"><h3>No qualifying PPG picks</h3><p>${esc(payload.warning || 'The fixtures fall outside the locked PPG routes, lack a five-match split, or the required market is unavailable.')}</p></div>`;
     return;
   }
-  const progressBanner = !payload.complete ? `<div class="route-progress">Venue analysis continues in the background · ${Number(payload.progress?.processed || payload.summary?.analysed || 0)}/${Number(payload.progress?.total || payload.summary?.fixtures || 0)}</div>` : '';
-  $('#ppgGrid').innerHTML = progressBanner + rows.map(item => {
+  const queue = payload.providerQueue || payload.progress?.providerQueue || {};
+  const progressLabel = queue.coolingDown
+    ? `Provider cooldown · ${Number(payload.progress?.processed || 0)}/${Number(payload.progress?.total || 0)} completed`
+    : `Venue analysis continues in the background · ${Number(payload.progress?.processed || payload.summary?.analysed || 0)}/${Number(payload.progress?.total || payload.summary?.fixtures || 0)}`;
+  const progressBanner = !payload.complete ? `<div class="route-progress apex-progress-glow">${esc(progressLabel)}</div>` : '';
+  $('#ppgGrid').innerHTML = progressBanner + rows.map((item, index) => {
     const fixture = item.fixture || {};
     const engine = item.engine || {};
     const selection = engine.selection || {};
     const route = (engine.routes || []).find(candidate => candidate.id === selection.routeId) || {};
-    return `<article class="route-pick-card ppg-pick-card">
+    return `<article class="route-pick-card ppg-pick-card apex-soft-reveal" style="--reveal-index:${index}">
       <div class="route-pick-head">
         <div><h2>${esc(fixture.home?.name)} vs ${esc(fixture.away?.name)}</h2><p>${esc(fixture.league?.country || 'International')} · ${esc(fixture.league?.name || 'League')} · ${esc(kickoff(fixture.kickoff))}</p></div>
         <span class="decision-pill ${String(selection.decision || '').toLowerCase()}">${esc(selection.decision || engine.decision || 'FIRE')}</span>

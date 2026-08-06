@@ -1,4 +1,4 @@
-# Betynz v5.0.9 architecture
+# Betynz v5.0.10 architecture
 
 ```text
 API-Football
@@ -18,3 +18,7 @@ API-Football
 The application is deployed from one repository through one Render web service and one root `render.yaml`.
 
 PPG and Apex share cached venue-history inputs but analyse them independently. PPG applies its specialist venue-split rules. Apex requires several independent evidence families and cannot qualify from PPG alone.
+
+## Rate protection
+
+The provider layer uses one priority queue and rolling minute budget. It detects rate-limit messages even when the upstream HTTP status is 200, honours reset headers, applies a global cooldown and resumes deferred engine enrichment without converting it into a final no-pick result.

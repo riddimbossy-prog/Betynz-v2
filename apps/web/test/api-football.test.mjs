@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import {
   apiFootballConfigured,
+  apiFootballRequest,
+  apiFootballRateState,
   fixtureMatchScore,
   matchApiFootballFixture,
   enrichApiFootballVisuals,
@@ -270,4 +272,44 @@ test('API-Football alone supplies daily fixtures, paginated odds, live scores, r
   assert.equal(normalized.rawSource, 'API_FOOTBALL');
   assert.equal(normalized.league.logo, 'https://img.test/league.png');
   assert.equal(normalized.availableMarketCount >= 7, true);
+});
+
+
+test('API-Football 200-body minute-limit errors enter cooldown and retry automatically', async t => {
+  let calls = 0;
+  const { server, base } = await listen((req, res) => {
+    calls += 1;
+    res.setHeader('content-type', 'application/json');
+    if (calls === 1) {
+      return res.end(JSON.stringify({ response: [], errors: { requests: 'Too many requests. You have exceeded the limit of requests per minute of your subscription.' } }));
+    }
+    return res.end(JSON.stringify({ response: [{ ok: true }], errors: [] }));
+  });
+  t.after(() => server.close());
+
+  const keys = [
+    'API_FOOTBALL_KEY','API_FOOTBALL_BASE_URL','API_FOOTBALL_KEY_HEADER','API_FOOTBALL_RETRIES',
+    'API_FOOTBALL_RATE_LIMIT_RETRIES','API_FOOTBALL_RATE_LIMIT_COOLDOWN_MS','API_FOOTBALL_REQUESTS_PER_MINUTE',
+    'API_FOOTBALL_REQUEST_CONCURRENCY','API_FOOTBALL_REQUEST_MIN_INTERVAL_MS'
+  ];
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  Object.assign(process.env, {
+    API_FOOTBALL_KEY: 'rate-key',
+    API_FOOTBALL_BASE_URL: base,
+    API_FOOTBALL_KEY_HEADER: 'x-apisports-key',
+    API_FOOTBALL_RETRIES: '0',
+    API_FOOTBALL_RATE_LIMIT_RETRIES: '2',
+    API_FOOTBALL_RATE_LIMIT_COOLDOWN_MS: '50',
+    API_FOOTBALL_REQUESTS_PER_MINUTE: '600',
+    API_FOOTBALL_REQUEST_CONCURRENCY: '1',
+    API_FOOTBALL_REQUEST_MIN_INTERVAL_MS: '0'
+  });
+  t.after(() => restoreEnv(previous));
+
+  const body = await apiFootballRequest('/rate-limit-recovery', { test: Date.now() }, 1);
+  assert.equal(body.response[0].ok, true);
+  assert.equal(calls, 2);
+  const state = apiFootballRateState();
+  assert.ok(state.rateLimitCount >= 1);
+  assert.equal(typeof state.queueDepth, 'number');
 });

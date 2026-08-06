@@ -1,20 +1,21 @@
-# Start here — Betynz v5.0.9
+# Start here — Betynz v5.0.10
 
-## Existing installation
+## Upgrade from v5.0.9
 
-1. Back up your current Render and Supabase values.
-2. In Supabase SQL Editor, run `apps/web/sql/014_five_engine_ppg_apex.sql`.
-3. In the local GitHub repository, keep the hidden `.git` folder and delete the other old files.
-4. Copy every file from the extracted v5.0.9 folder into the repository root.
-5. Commit: `Betynz v5.0.9 five-engine logo edition`.
-6. Push to GitHub.
-7. In Render choose **Manual Deploy → Clear build cache & deploy**.
-8. Open `/api/health` and confirm version `5.0.9` and all five engine codes.
-9. Hard-refresh the website with `Ctrl + Shift + R`.
+No Supabase migration is required.
+
+1. Back up the current Render environment values.
+2. In the local GitHub repository, keep the hidden `.git` folder and delete the other old files.
+3. Copy every file from the extracted v5.0.10 folder into the repository root.
+4. Commit: `Betynz v5.0.10 adaptive API rate recovery`.
+5. Push to GitHub.
+6. In Render choose **Manual Deploy → Clear build cache & deploy**.
+7. Open `/api/health` and confirm version `5.0.10`, five engine codes and a `providerQueue` object.
+8. Hard-refresh the website with `Ctrl + Shift + R`.
 
 ## New Supabase project
 
-Run `apps/web/sql/001_market_route_fresh.sql` once instead of the upgrade migration.
+Run `apps/web/sql/001_market_route_fresh.sql` once. Do not run migration `014` first on a blank project.
 
 ## Required football secret
 
@@ -22,7 +23,19 @@ Run `apps/web/sql/001_market_route_fresh.sql` once instead of the upgrade migrat
 API_FOOTBALL_KEY=YOUR_DIRECT_API_SPORTS_KEY
 ```
 
-Keep the Supabase URL, anon key and service-role key server-side in Render. Do not upload secrets to GitHub.
+The included `render.yaml` adds conservative production defaults:
+
+```env
+API_FOOTBALL_ENRICH_CONCURRENCY=2
+API_FOOTBALL_REQUEST_CONCURRENCY=1
+API_FOOTBALL_REQUEST_MIN_INTERVAL_MS=750
+API_FOOTBALL_REQUESTS_PER_MINUTE=8
+API_FOOTBALL_RATE_LIMIT_RETRIES=6
+API_FOOTBALL_RATE_LIMIT_COOLDOWN_MS=65000
+API_FOOTBALL_ENGINE_HISTORY_TTL_SECONDS=43200
+```
+
+These values keep all daily fixtures while pacing the statistics work. Increase `API_FOOTBALL_REQUESTS_PER_MINUTE` only when the subscription explicitly supports a higher minute limit.
 
 ## Expected engine list
 

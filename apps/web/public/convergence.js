@@ -32,14 +32,14 @@ function schedulePoll(date, version) {
   clearTimeout(pollTimer);
   pollTimer = setTimeout(() => {
     if (version === requestVersion && ($('#convergenceDate').value || today) === date) load({ silent: true });
-  }, pollCount++ < 16 ? 1500 : 4000);
+  }, payload?.providerQueue?.coolingDown ? 5000 : (pollCount++ < 16 ? 1500 : 4000));
 }
 
 async function load({ silent = false } = {}) {
   const date = $('#convergenceDate').value || today;
   const version = ++requestVersion;
   clearTimeout(pollTimer);
-  if (!silent) $('#convergenceGrid').innerHTML = '<div class="route-empty"><h3>Starting four-block analysis…</h3><p>The page will update automatically while venue histories are processed.</p></div>';
+  if (!silent) $('#convergenceGrid').innerHTML = '<div class="route-empty apex-soft-pulse"><span class="apex-loader-dot" aria-hidden="true"></span><h3>Starting four-block analysis…</h3><p>The page will update automatically while venue histories are processed.</p></div>';
   try {
     const data = await fetchJson(`/api/convergence-route-board?date=${encodeURIComponent(date)}`);
     if (version !== requestVersion) return;
@@ -69,19 +69,30 @@ function render() {
     }
     if (!payload.complete) {
       const progress = payload.progress || {};
-      $('#convergenceGrid').innerHTML = `<div class="route-empty"><h3>Building convergence evidence…</h3><p>${Number(progress.processed || payload.summary?.analysed || 0)} of ${Number(progress.total || payload.summary?.fixtures || 0)} fixtures processed. This page updates automatically.</p></div>`;
+      const queue = payload.providerQueue || progress.providerQueue || {};
+      const cooling = Boolean(queue.coolingDown || progress.stage === 'RATE_LIMIT_COOLDOWN');
+      const seconds = Math.max(1, Math.ceil(Number(queue.retryInMs || 0) / 1000));
+      const title = cooling ? 'Provider cooldown active…' : 'Building convergence evidence…';
+      const detail = cooling
+        ? `API-Football reached the subscription minute limit. Convergence will resume automatically${Number(queue.retryInMs) > 0 ? ` in about ${seconds}s` : ''}. ${Number(progress.processed || 0)} fixtures are already complete.`
+        : `${Number(progress.processed || payload.summary?.analysed || 0)} of ${Number(progress.total || payload.summary?.fixtures || 0)} fixtures processed. This page updates automatically.`;
+      $('#convergenceGrid').innerHTML = `<div class="route-empty apex-soft-pulse"><span class="apex-loader-dot" aria-hidden="true"></span><h3>${esc(title)}</h3><p>${esc(detail)}</p></div>`;
       return;
     }
     $('#convergenceGrid').innerHTML = `<div class="route-empty"><h3>No qualifying convergence picks</h3><p>${esc(payload.warning || 'No market received enough agreement across attack, defence, venue and market evidence.')}</p></div>`;
     return;
   }
-  const progressBanner = !payload.complete ? `<div class="route-progress">Four-block analysis continues · ${Number(payload.progress?.processed || payload.summary?.analysed || 0)}/${Number(payload.progress?.total || payload.summary?.fixtures || 0)}</div>` : '';
-  $('#convergenceGrid').innerHTML = progressBanner + rows.map(item => {
+  const queue = payload.providerQueue || payload.progress?.providerQueue || {};
+  const progressLabel = queue.coolingDown
+    ? `Provider cooldown · ${Number(payload.progress?.processed || 0)}/${Number(payload.progress?.total || 0)} completed`
+    : `Four-block analysis continues · ${Number(payload.progress?.processed || payload.summary?.analysed || 0)}/${Number(payload.progress?.total || payload.summary?.fixtures || 0)}`;
+  const progressBanner = !payload.complete ? `<div class="route-progress apex-progress-glow">${esc(progressLabel)}</div>` : '';
+  $('#convergenceGrid').innerHTML = progressBanner + rows.map((item, index) => {
     const fixture = item.fixture || {};
     const engine = item.engine || {};
     const selection = engine.selection || {};
     const candidate = (engine.candidates || []).find(row => row.id === selection.routeId) || {};
-    return `<article class="route-pick-card convergence-pick-card">
+    return `<article class="route-pick-card convergence-pick-card apex-soft-reveal" style="--reveal-index:${index}">
       <div class="route-pick-head">
         <div><h2>${esc(fixture.home?.name)} vs ${esc(fixture.away?.name)}</h2><p>${esc(fixture.league?.country || 'International')} · ${esc(fixture.league?.name || 'League')} · ${esc(kickoff(fixture.kickoff))}</p></div>
         <span class="decision-pill ${String(selection.decision || '').toLowerCase()}">${esc(selection.decision || 'FIRE')}</span>

@@ -25,3 +25,64 @@ test('engine HTTP routes return progress immediately while histories continue in
   started=Date.now(); const consensus=await(await fetch(`http://127.0.0.1:${port}/api/consensus-picks?from=${date}&days=1`)).json(); assert.ok(Date.now()-started<1000); assert.equal(consensus.complete,false);
   const end=Date.now()+8000; while((!apex.complete||!market.complete)&&Date.now()<end){await pause(250); if(!apex.complete) apex=await(await fetch(`http://127.0.0.1:${port}/api/apex-intelligence-board?date=${date}`)).json(); if(!market.complete) market=await(await fetch(`http://127.0.0.1:${port}/api/market-route-board?date=${date}`)).json();} assert.equal(apex.complete,true); assert.equal(apex.failed,false); assert.equal(market.complete,true); assert.equal(market.failed,false);
 });
+
+test('engine analysis survives API-Football minute-limit body errors and completes after cooldown', async t => {
+  const port = await freePort();
+  const apiPort = await freePort();
+  const date = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+  const kickoff = `${date}T18:00:00Z`;
+  const scheduled = row({ id: 9401, date: kickoff, homeId: 111, awayId: 222, home: 'Rate Home', away: 'Rate Away' });
+  const homeHistory = Array.from({ length: 5 }, (_, i) => row({ id: 9500 + i, date: `2025-02-0${i + 1}T12:00:00Z`, homeId: 111, awayId: 500 + i, home: 'Rate Home', away: `RH${i}`, status: 'FT', hg: 2, ag: 0 }));
+  const awayHistory = Array.from({ length: 5 }, (_, i) => row({ id: 9600 + i, date: `2025-02-0${i + 1}T13:00:00Z`, homeId: 600 + i, awayId: 222, home: `RA${i}`, away: 'Rate Away', status: 'FT', hg: 2, ag: 0 }));
+  let leagueCalls = 0;
+  const api = createServer((req, res) => {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    res.setHeader('content-type', 'application/json');
+    const send = response => res.end(JSON.stringify({ response, errors: [], paging: { current: 1, total: 1 } }));
+    if (url.pathname === '/fixtures' && url.searchParams.get('date') === date) return send([scheduled]);
+    if (url.pathname === '/odds') return send([odds(9401)]);
+    if (url.pathname === '/fixtures' && url.searchParams.get('league') === '55') {
+      leagueCalls += 1;
+      if (leagueCalls === 1) return res.end(JSON.stringify({ response: [], errors: { requests: 'Too many requests. You have exceeded the limit of requests per minute of your subscription.' } }));
+      return send([...homeHistory, ...awayHistory]);
+    }
+    return send([]);
+  });
+  await new Promise((resolve, reject) => { api.listen(apiPort, '127.0.0.1', resolve); api.on('error', reject); });
+  t.after(() => api.close());
+
+  const child = spawn(process.execPath, ['src/server.mjs'], {
+    cwd: new URL('..', import.meta.url),
+    env: {
+      ...process.env,
+      PORT: String(port),
+      NODE_ENV: 'test',
+      AUTO_SETTLEMENT_ENABLED: 'false',
+      API_FOOTBALL_KEY: 'rate-key',
+      API_FOOTBALL_BASE_URL: `http://127.0.0.1:${apiPort}/`,
+      API_FOOTBALL_RETRIES: '0',
+      API_FOOTBALL_RATE_LIMIT_RETRIES: '2',
+      API_FOOTBALL_RATE_LIMIT_COOLDOWN_MS: '50',
+      API_FOOTBALL_REQUESTS_PER_MINUTE: '600',
+      API_FOOTBALL_REQUEST_CONCURRENCY: '1',
+      API_FOOTBALL_REQUEST_MIN_INTERVAL_MS: '0',
+      API_FOOTBALL_ENGINE_LEAGUE_HISTORY: 'true',
+      SUPABASE_URL: '', SUPABASE_ANON_KEY: '', SUPABASE_SERVICE_ROLE_KEY: ''
+    },
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  t.after(() => child.kill('SIGTERM'));
+  await waitFor(`http://127.0.0.1:${port}/api/health`);
+
+  let apex = await (await fetch(`http://127.0.0.1:${port}/api/apex-intelligence-board?date=${date}`)).json();
+  const end = Date.now() + 7000;
+  while (!apex.complete && Date.now() < end) {
+    await pause(200);
+    apex = await (await fetch(`http://127.0.0.1:${port}/api/apex-intelligence-board?date=${date}`)).json();
+  }
+  assert.equal(apex.complete, true);
+  assert.equal(apex.failed, false);
+  assert.equal(apex.summary.analysed, 1);
+  assert.ok(leagueCalls >= 2);
+  assert.ok(Number(apex.providerQueue?.rateLimitCount || 0) >= 1);
+});

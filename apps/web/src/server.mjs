@@ -33,6 +33,7 @@ import { buildAgreementPerformance, buildCalibrationReport } from './lib/calibra
 import {
   apiFootballConfigured,
   apiFootballPublicConfig,
+  apiFootballRateState,
   enrichApiFootballStatsBoard,
   enrichApiFootballVisuals,
   getApiFootballFixtureBoard,
@@ -47,7 +48,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.9';
+const APP_VERSION = '5.0.10';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const APEX_INTELLIGENCE_CODE = 'APEX_INTELLIGENCE';
@@ -120,7 +121,7 @@ async function loadApiFootballMedia(kind, id) {
       const keyValue = String(process.env.API_FOOTBALL_KEY || '');
       const headers = {
         accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'user-agent': 'Betynz-Media-Proxy/5.0.9'
+        'user-agent': 'Betynz-Media-Proxy/5.0.10'
       };
       if (keyValue) headers[keyHeader] = keyValue;
       const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
@@ -635,18 +636,24 @@ function responseSummary(items = [], eligible = 0, processed = 0) {
 
 function progressiveEngineResponse({ date, engine, items, processed, total, complete = false, failed = false, warning = null, enrichmentSource = 'API_FOOTBALL_VENUE_HISTORY' }) {
   const all = [...items.values()].filter(Boolean).sort((a, b) => new Date(a.fixture?.kickoff || 0) - new Date(b.fixture?.kickoff || 0));
+  const providerQueue = apiFootballRateState();
   const progress = {
-    stage: failed ? 'FAILED' : complete ? 'COMPLETE' : 'VENUE_HISTORY',
+    stage: failed ? 'FAILED' : complete ? 'COMPLETE' : providerQueue.coolingDown ? 'RATE_LIMIT_COOLDOWN' : 'VENUE_HISTORY',
     processed,
     total,
-    percent: total ? Math.round(processed / total * 100) : 100
+    percent: total ? Math.round(processed / total * 100) : 100,
+    providerQueue
   };
+  const queueWarning = providerQueue.coolingDown
+    ? 'API-Football reached the subscription minute limit. Analysis is paused safely and will resume automatically.'
+    : null;
   return {
     date,
     engine,
     source: 'API_FOOTBALL',
     enrichmentSource,
-    warning,
+    warning: warning || queueWarning,
+    providerQueue,
     qualified: all.filter(item => item?.engine?.selection),
     all,
     summary: responseSummary(all, total, processed),
@@ -705,30 +712,37 @@ async function getStatsRouteBoards(date) {
     if (eligibleFixtures.length) {
       enrichment = await enrichPrimaryStatsAndVisuals(date, eligibleFixtures, {
         onFixture: result => {
+          const deferred = Boolean(result?.enrichment?.deferred);
           const stats = result?.stats?.homeSplit || result?.stats?.awaySplit
             ? { homeSplit: result.stats?.homeSplit || null, awaySplit: result.stats?.awaySplit || null, source: result.stats?.source || 'API_FOOTBALL' }
             : null;
           const id = String(result?.id || '');
-          if (id) {
+          if (id && !deferred) {
             marketMap.set(id, routeItem(result, stats, analyzeMarketRoute));
             ppgMap.set(id, routeItem(result, stats, analyzePpgRoute));
             apexMap.set(id, routeItem(result, stats, analyzeApexIntelligence));
             convergenceMap.set(id, routeItem(result, stats, analyzeConvergence));
             momentumMap.set(id, routeItem(result, stats, analyzeMomentumStreak));
           }
-          processed += 1;
-          publish({ warning: enrichment.warning || board.warning || null, enrichmentSource: enrichment.enrichmentSource || 'API_FOOTBALL_VENUE_HISTORY' });
+          if (!deferred) processed += 1;
+          publish({
+            warning: deferred
+              ? 'API-Football minute-limit cooldown is active. Remaining fixtures are queued automatically.'
+              : enrichment.warning || board.warning || null,
+            enrichmentSource: enrichment.enrichmentSource || 'API_FOOTBALL_VENUE_HISTORY'
+          });
         }
       });
     }
 
-    processed = total;
+    const analysisComplete = !enrichment.rateLimited;
+    if (analysisComplete) processed = total;
     const result = publish({
-      complete: true,
+      complete: analysisComplete,
       warning: enrichment.warning || board.warning || null,
       enrichmentSource: enrichment.enrichmentSource || 'API_FOOTBALL_VENUE_HISTORY'
     });
-    cacheSet(key, result, Number(process.env.STATS_ROUTE_CACHE_TTL_SECONDS || 1800));
+    if (analysisComplete) cacheSet(key, result, Number(process.env.STATS_ROUTE_CACHE_TTL_SECONDS || 1800));
 
     // Persistence is intentionally detached from the public response. The UI
     // receives completed predictions first; Supabase writes finish afterward.
@@ -773,16 +787,18 @@ function waitingStatsResponse(date, engine, fixtures = [], analyser) {
   const ordered = predictionPriority(fixtures || []);
   const items = ordered.map(fixture => routeItem(fixture, null, analyser)).filter(Boolean);
   const eligible = ordered.filter(isUpcomingPredictionFixture).length;
+  const providerQueue = apiFootballRateState();
   return {
     date,
     engine,
     source: 'API_FOOTBALL',
     enrichmentSource: 'API_FOOTBALL_VENUE_HISTORY',
-    warning: null,
+    warning: providerQueue.coolingDown ? 'API-Football minute-limit cooldown is active. Analysis will resume automatically.' : null,
+    providerQueue,
     qualified: items.filter(item => item.engine.selection),
     all: items,
     summary: responseSummary(items, eligible, 0),
-    progress: { stage: 'VENUE_HISTORY', processed: 0, total: eligible, percent: eligible ? 0 : 100 },
+    progress: { stage: providerQueue.coolingDown ? 'RATE_LIMIT_COOLDOWN' : 'VENUE_HISTORY', processed: 0, total: eligible, percent: eligible ? 0 : 100, providerQueue },
     complete: eligible === 0,
     failed: false,
     generatedAt: new Date().toISOString(),
@@ -805,12 +821,19 @@ async function ensureStatsRouteView(date) {
   if (!statsRouteViewJobs.has(date)) {
     const task = getStatsRouteBoards(date).then(bundle => {
       const complete = {
-        ppg: { ...bundle.ppg, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.ppg.summary?.eligible || 0, total: bundle.ppg.summary?.eligible || 0, percent: 100 } },
-        apex: { ...bundle.apex, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.apex.summary?.eligible || 0, total: bundle.apex.summary?.eligible || 0, percent: 100 } },
-        convergence: { ...bundle.convergence, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.convergence.summary?.eligible || 0, total: bundle.convergence.summary?.eligible || 0, percent: 100 } },
-        momentum: { ...bundle.momentum, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.momentum.summary?.eligible || 0, total: bundle.momentum.summary?.eligible || 0, percent: 100 } }
+        ppg: { ...bundle.ppg, failed: false },
+        apex: { ...bundle.apex, failed: false },
+        convergence: { ...bundle.convergence, failed: false },
+        momentum: { ...bundle.momentum, failed: false }
       };
       statsRouteViewSnapshots.set(date, complete);
+      const allComplete = Boolean(complete.ppg.complete && complete.apex.complete && complete.convergence.complete && complete.momentum.complete);
+      if (!allComplete) {
+        const queue = complete.apex?.providerQueue || complete.apex?.progress?.providerQueue || apiFootballRateState();
+        const retryMs = Math.max(5000, Math.min(70000, Number(queue.retryInMs || 10000) + 500));
+        const retry = setTimeout(() => ensureStatsRouteView(date).catch(error => console.error('Deferred engine analysis retry failed:', error.message)), retryMs);
+        retry.unref?.();
+      }
       return complete;
     }).catch(error => {
       const current = statsRouteViewSnapshots.get(date) || {};
@@ -1289,6 +1312,7 @@ async function apiRoute(req, res, url) {
     engines: ENGINE_CODES,
     systems: ['CONSENSUS_BANKERS', 'AUTOMATIC_CALIBRATION'],
     configured: { apiFootball: apiFootballConfigured(), supabase: supabaseConfigured() },
+    providerQueue: apiFootballRateState(),
     sourceRoles: { fixtures: 'API_FOOTBALL', odds: 'API_FOOTBALL', live: 'API_FOOTBALL', results: 'API_FOOTBALL', statistics: 'API_FOOTBALL', visuals: 'API_FOOTBALL' },
     fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null },
     time: new Date().toISOString()
@@ -1376,6 +1400,7 @@ async function apiRoute(req, res, url) {
       version: APP_VERSION,
       engines: ENGINE_CODES,
       cache: cacheStats(),
+      providerQueue: apiFootballRateState(),
       configured: {
         apiFootball: apiFootballConfigured(),
         apiFootballConfig: apiFootballPublicConfig(),

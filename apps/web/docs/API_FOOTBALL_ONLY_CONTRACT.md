@@ -46,6 +46,24 @@ GET /api/wins-carousel?days=14&limit=24
 
 The wins route returns only officially settled `WON` rows. It does not generate or rewrite predictions.
 
-## v5.0.9 five-engine analysis
+## v5.0.10 five-engine analysis
 
 The provider contract remains unchanged. Momentum & Streak consumes the same normalized fixture, exact offered markets and cached last-five home/away venue statistics already used by the statistical engines. It does not create another upstream data source or make browser-side provider calls.
+## v5.0.10 adaptive subscription protection
+
+All engine enrichment requests share one server-side API-Football queue. The queue deduplicates identical history work, uses a rolling per-minute request budget, and pauses globally when the provider returns a rate-limit signal. Rate limits are detected both from HTTP `429` responses and from API-Football error objects returned with HTTP `200`.
+
+During a provider cooldown, unfinished fixtures remain pending rather than being finalized as missing samples. Engine endpoints expose `providerQueue`, `progress.stage = RATE_LIMIT_COOLDOWN`, and retry timing so the browser can continue polling and publish completed picks as soon as enrichment resumes.
+
+Recommended production defaults:
+
+```env
+API_FOOTBALL_ENRICH_CONCURRENCY=2
+API_FOOTBALL_REQUEST_CONCURRENCY=1
+API_FOOTBALL_REQUEST_MIN_INTERVAL_MS=750
+API_FOOTBALL_REQUESTS_PER_MINUTE=8
+API_FOOTBALL_RATE_LIMIT_RETRIES=6
+API_FOOTBALL_RATE_LIMIT_COOLDOWN_MS=65000
+API_FOOTBALL_ENGINE_LEAGUE_HISTORY=true
+API_FOOTBALL_ENGINE_HISTORY_TTL_SECONDS=43200
+```

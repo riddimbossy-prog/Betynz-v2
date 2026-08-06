@@ -1,4 +1,4 @@
-# Betynz web — v5.0.9
+# Betynz web — v5.0.10
 
 API-Football-only five-engine football-analysis application.
 
@@ -15,3 +15,7 @@ PPG Route remains an independent venue-split specialist. Apex Intelligence compl
 The public interface uses the Betynz logo palette: black and charcoal surfaces, silver borders, white text and orange accents. Semantic colours remain reserved for live, won, lost, warning and review states.
 
 API keys and Supabase service credentials stay server-side.
+
+## Adaptive provider queue
+
+All provider requests share one rolling request budget. Body-level “Too many requests” errors and HTTP 429 responses trigger a global cooldown and automatic retry. Fixture, odds and live requests receive priority over background engine history. Completed histories remain cached for reuse across all five engines.

@@ -1,4 +1,4 @@
-# Betynz v5.0.9 — Five-Engine Logo Edition
+# Betynz v5.0.10 — Adaptive API Rate Recovery
 
 Betynz is an API-Football-only football-analysis platform deployed as one Render web service.
 
@@ -10,7 +10,11 @@ Betynz is an API-Football-only football-analysis platform deployed as one Render
 4. Convergence
 5. Momentum & Streak
 
-PPG Route remains active as the venue-split specialist. Apex Intelligence is added beside it as a broader multi-factor engine. Each engine works independently and publishes no more than one official market per fixture.
+## What v5.0.10 fixes
+
+API-Football can report its per-minute limit inside a normal HTTP 200 JSON body. Earlier builds treated that message as a final enrichment failure, which could leave Apex at `151 fixtures checked` but `0 complete samples`.
+
+v5.0.10 adds one adaptive queue for every API-Football request. It detects body-level and HTTP 429 limits, pauses globally, honours reset headers, retries after cooldown, prioritises fixtures/odds/live data, and keeps unfinished engine work queued. Successful league and team histories are cached and shared across all five engines.
 
 ## Consensus
 
@@ -20,9 +24,9 @@ PPG Route remains active as the venue-split specialist. Apex Intelligence is add
 - One independent qualification: Qualified or Safer Pick
 - Opposing qualified directions: Conflict
 
-## Brand system
+## Motion
 
-Every engine page, toolbar chip, navigation item, analysis card and active filter follows the Betynz logo palette: black/charcoal, silver, white and orange. Live, won, lost, review and warning states retain semantic colours for clarity.
+The long games board remains minimal. Apex receives only a light orange loading pulse, progress glow and short pick-card reveal, with full reduced-motion support.
 
 ## Deployment
 

@@ -11,6 +11,11 @@ const apiQueue = [];
 let apiActive = 0;
 let apiNextAt = 0;
 let apiTimer = null;
+let apiQueueSequence = 0;
+let apiBlockedUntil = 0;
+let apiRequestStarts = [];
+let apiLastRateLimit = null;
+let apiRateLimitCount = 0;
 
 function number(value, fallback = null) {
   const parsed = Number(value);
@@ -33,6 +38,7 @@ function truthy(value, fallback = true) {
 
 function config(env = process.env) {
   const key = text(env.API_FOOTBALL_KEY);
+  const isTest = text(env.NODE_ENV).toLowerCase() === 'test' || Boolean(env.NODE_TEST_CONTEXT);
   return {
     configured: configuredValue(key),
     key,
@@ -41,17 +47,20 @@ function config(env = process.env) {
     rapidApiHost: text(env.API_FOOTBALL_RAPIDAPI_HOST),
     timeoutMs: Math.max(3000, number(env.API_FOOTBALL_TIMEOUT_MS, 20000)),
     retries: Math.max(0, Math.min(4, number(env.API_FOOTBALL_RETRIES, 2))),
+    rateLimitRetries: Math.max(0, Math.min(12, number(env.API_FOOTBALL_RATE_LIMIT_RETRIES, isTest ? 0 : 6))),
+    rateLimitCooldownMs: Math.max(1000, Math.min(180000, number(env.API_FOOTBALL_RATE_LIMIT_COOLDOWN_MS, isTest ? 50 : 65000))),
+    requestsPerMinute: Math.max(1, Math.min(600, number(env.API_FOOTBALL_REQUESTS_PER_MINUTE, isTest ? 600 : 8))),
     cacheTtlSeconds: Math.max(60, number(env.API_FOOTBALL_CACHE_TTL_SECONDS, 1800)),
     fixtureTtlSeconds: Math.max(20, number(env.API_FOOTBALL_FIXTURE_CACHE_TTL_SECONDS, 120)),
     oddsTtlSeconds: Math.max(60, number(env.API_FOOTBALL_ODDS_CACHE_TTL_SECONDS, 300)),
     visualTtlSeconds: Math.max(300, number(env.API_FOOTBALL_VISUAL_CACHE_TTL_SECONDS, 604800)),
-    enrichConcurrency: Math.max(1, Math.min(8, number(env.API_FOOTBALL_ENRICH_CONCURRENCY, 2))),
-    requestConcurrency: Math.max(1, Math.min(6, number(env.API_FOOTBALL_REQUEST_CONCURRENCY, 3))),
-    requestMinIntervalMs: Math.max(0, Math.min(5000, number(env.API_FOOTBALL_REQUEST_MIN_INTERVAL_MS, 200))),
+    enrichConcurrency: Math.max(1, Math.min(8, number(env.API_FOOTBALL_ENRICH_CONCURRENCY, isTest ? 4 : 2))),
+    requestConcurrency: Math.max(1, Math.min(6, number(env.API_FOOTBALL_REQUEST_CONCURRENCY, isTest ? 3 : 1))),
+    requestMinIntervalMs: Math.max(0, Math.min(10000, number(env.API_FOOTBALL_REQUEST_MIN_INTERVAL_MS, isTest ? 0 : 750))),
     retryBaseMs: Math.max(250, Math.min(10000, number(env.API_FOOTBALL_RETRY_BASE_MS, 1000))),
     retryMaxMs: Math.max(1000, Math.min(120000, number(env.API_FOOTBALL_RETRY_MAX_MS, 30000))),
     historyLast: Math.max(10, Math.min(100, number(env.API_FOOTBALL_HISTORY_LAST, 40))),
-    engineHistoryTtlSeconds: Math.max(1800, number(env.API_FOOTBALL_ENGINE_HISTORY_TTL_SECONDS, 21600)),
+    engineHistoryTtlSeconds: Math.max(1800, number(env.API_FOOTBALL_ENGINE_HISTORY_TTL_SECONDS, 43200)),
     engineLeagueHistory: truthy(env.API_FOOTBALL_ENGINE_LEAGUE_HISTORY, true),
     mappingThreshold: Math.max(0.45, Math.min(0.95, number(env.API_FOOTBALL_MAPPING_THRESHOLD, 0.55))),
     deepStats: truthy(env.API_FOOTBALL_DEEP_STATS, true),
@@ -62,18 +71,51 @@ function config(env = process.env) {
   };
 }
 
+function pruneRequestWindow(now = Date.now()) {
+  apiRequestStarts = apiRequestStarts.filter(startedAt => now - startedAt < 60000);
+}
+
+function requestPriority(path, params = {}) {
+  const route = `/${String(path || '').replace(/^\/+/, '')}`;
+  if (route === '/fixtures' && (params.date || params.live || params.id)) return 0;
+  if (route === '/odds') return 1;
+  if (['/fixtures/events', '/fixtures/statistics', '/fixtures/lineups', '/fixtures/players'].includes(route)) return 1;
+  if (route === '/fixtures' && (params.league || params.team)) return 3;
+  return 2;
+}
+
+function nextQueueDelay(current, now = Date.now()) {
+  pruneRequestWindow(now);
+  let readyAt = Math.max(apiNextAt, apiBlockedUntil);
+  if (apiRequestStarts.length >= current.requestsPerMinute) {
+    readyAt = Math.max(readyAt, apiRequestStarts[0] + 60000 + 75);
+  }
+  return Math.max(0, readyAt - now);
+}
+
+function armApiTimer(delay) {
+  if (apiTimer) clearTimeout(apiTimer);
+  apiTimer = setTimeout(() => {
+    apiTimer = null;
+    pumpApiQueue();
+  }, Math.max(1, delay));
+  apiTimer.unref?.();
+}
+
 function pumpApiQueue() {
   const current = config();
   if (apiTimer || !apiQueue.length || apiActive >= current.requestConcurrency) return;
-  const delay = Math.max(0, apiNextAt - Date.now());
+  const delay = nextQueueDelay(current);
   if (delay > 0) {
-    apiTimer = setTimeout(() => { apiTimer = null; pumpApiQueue(); }, delay);
-    apiTimer.unref?.();
+    armApiTimer(delay);
     return;
   }
+  apiQueue.sort((a, b) => a.priority - b.priority || a.sequence - b.sequence);
   const job = apiQueue.shift();
+  const now = Date.now();
   apiActive += 1;
-  apiNextAt = Date.now() + current.requestMinIntervalMs;
+  apiRequestStarts.push(now);
+  apiNextAt = now + current.requestMinIntervalMs;
   Promise.resolve().then(job.task).then(job.resolve, job.reject).finally(() => {
     apiActive -= 1;
     pumpApiQueue();
@@ -81,11 +123,98 @@ function pumpApiQueue() {
   pumpApiQueue();
 }
 
-function scheduleApiRequest(task) {
+function scheduleApiRequest(task, meta = {}) {
   return new Promise((resolve, reject) => {
-    apiQueue.push({ task, resolve, reject });
+    apiQueue.push({
+      task,
+      resolve,
+      reject,
+      priority: Number.isFinite(Number(meta.priority)) ? Number(meta.priority) : 2,
+      sequence: apiQueueSequence += 1,
+      path: meta.path || null
+    });
     pumpApiQueue();
   });
+}
+
+async function waitForRetrySlot(current) {
+  while (true) {
+    const delay = nextQueueDelay(current);
+    if (delay > 0) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      continue;
+    }
+    const now = Date.now();
+    apiRequestStarts.push(now);
+    apiNextAt = now + current.requestMinIntervalMs;
+    return;
+  }
+}
+
+function parseRetryAfter(value) {
+  if (!value) return 0;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const when = Date.parse(value);
+  return Number.isFinite(when) ? Math.max(0, when - Date.now()) : 0;
+}
+
+function rateLimitMessage(errors = [], status = 0) {
+  const message = errors.join('; ');
+  return status === 429 || /too many requests|rate[ -]?limit|requests per minute|minute limit/i.test(message);
+}
+
+function isRateLimitError(error) {
+  return Boolean(error?.rateLimited || error?.status === 429 || rateLimitMessage([String(error?.message || '')], Number(error?.status || 0)));
+}
+
+function responseRateResetMs(response) {
+  const candidates = [
+    response?.headers?.get?.('retry-after'),
+    response?.headers?.get?.('x-ratelimit-reset'),
+    response?.headers?.get?.('ratelimit-reset'),
+    response?.headers?.get?.('x-ratelimit-requests-reset')
+  ].filter(Boolean);
+  for (const value of candidates) {
+    const parsed = parseRetryAfter(value);
+    if (parsed > 0) return parsed;
+  }
+  return 0;
+}
+
+function registerRateLimit(current, { path, message, retryAfterMs = 0 } = {}) {
+  const wait = Math.max(Number(retryAfterMs || 0), current.rateLimitCooldownMs);
+  apiBlockedUntil = Math.max(apiBlockedUntil, Date.now() + wait);
+  apiRateLimitCount += 1;
+  apiLastRateLimit = {
+    at: new Date().toISOString(),
+    path: path || null,
+    message: message || 'API-Football minute limit reached',
+    retryAt: new Date(apiBlockedUntil).toISOString()
+  };
+  if (apiTimer) {
+    clearTimeout(apiTimer);
+    apiTimer = null;
+  }
+  armApiTimer(Math.max(1, apiBlockedUntil - Date.now()));
+  return wait;
+}
+
+export function apiFootballRateState(env = process.env) {
+  const current = config(env);
+  const now = Date.now();
+  pruneRequestWindow(now);
+  return {
+    requestsPerMinute: current.requestsPerMinute,
+    requestsInWindow: apiRequestStarts.length,
+    queueDepth: apiQueue.length,
+    active: apiActive,
+    coolingDown: apiBlockedUntil > now,
+    blockedUntil: apiBlockedUntil > now ? new Date(apiBlockedUntil).toISOString() : null,
+    retryInMs: Math.max(0, apiBlockedUntil - now),
+    rateLimitCount: apiRateLimitCount,
+    lastRateLimit: apiLastRateLimit
+  };
 }
 
 export function apiFootballConfigured(env = process.env) {
@@ -104,6 +233,8 @@ export function apiFootballPublicConfig(env = process.env) {
     applicationFixtureCap: null,
     historyLast: value.historyLast,
     engineHistoryStrategy: value.engineLeagueHistory ? 'LEAGUE_POOL_THEN_TEAM_FALLBACK' : 'TEAM_HISTORY',
+    requestsPerMinute: value.requestsPerMinute,
+    adaptiveQueue: true,
     bookmakerId: value.bookmakerId || null,
     bookmakerName: value.bookmakerName || null,
     deepStats: value.deepStats
@@ -125,7 +256,7 @@ function requestHeaders(current) {
   const headers = {
     [current.headerName]: current.key,
     accept: 'application/json',
-    'user-agent': 'Betynz-API-Football-Only/5.0.9'
+    'user-agent': 'Betynz-API-Football-Only/5.0.10'
   };
   if (current.rapidApiHost) headers['x-rapidapi-host'] = current.rapidApiHost;
   return headers;
@@ -147,7 +278,13 @@ export async function apiFootballRequest(path, params = {}, ttlSeconds = null) {
     const secondCached = cacheGet(cacheKey);
     if (secondCached) return secondCached;
     let lastError = null;
-    for (let attempt = 0; attempt <= current.retries; attempt += 1) {
+    let transportAttempt = 0;
+    let rateLimitAttempt = 0;
+    let firstAttempt = true;
+
+    while (true) {
+      if (!firstAttempt) await waitForRetrySlot(current);
+      firstAttempt = false;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), current.timeoutMs);
       try {
@@ -155,16 +292,25 @@ export async function apiFootballRequest(path, params = {}, ttlSeconds = null) {
         const body = await response.json().catch(() => ({}));
         const errors = apiErrors(body);
         if (!response.ok || errors.length) {
-          const error = new Error(errors.join('; ') || `API-Football returned HTTP ${response.status}`);
-          error.status = response.status;
-          const retryAfter = response.headers.get('retry-after');
-          if (retryAfter) {
-            const seconds = Number(retryAfter);
-            const when = Date.parse(retryAfter);
-            error.retryAfterMs = Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : Number.isFinite(when) ? Math.max(0, when - Date.now()) : 0;
-          }
+          const message = errors.join('; ') || `API-Football returned HTTP ${response.status}`;
+          const error = new Error(message);
+          const limited = rateLimitMessage(errors, response.status);
+          error.status = limited ? 429 : response.status;
+          error.rateLimited = limited;
+          error.retryAfterMs = Math.max(
+            parseRetryAfter(response.headers.get('retry-after')),
+            responseRateResetMs(response)
+          );
+          if (limited) registerRateLimit(current, { path: url.pathname, message, retryAfterMs: error.retryAfterMs });
           throw error;
         }
+
+        const remaining = Number(response.headers.get('x-ratelimit-requests-remaining') || response.headers.get('ratelimit-remaining'));
+        if (Number.isFinite(remaining) && remaining <= 0) {
+          const wait = responseRateResetMs(response) || current.rateLimitCooldownMs;
+          apiBlockedUntil = Math.max(apiBlockedUntil, Date.now() + wait);
+        }
+
         const rawResponse = body?.response ?? null;
         const normalized = {
           configured: true,
@@ -177,17 +323,29 @@ export async function apiFootballRequest(path, params = {}, ttlSeconds = null) {
         return normalized;
       } catch (error) {
         lastError = error;
-        const retryable = !error?.status || error.status === 408 || error.status === 429 || error.status >= 500;
-        if (!retryable || attempt >= current.retries) break;
-        const exponential = Math.min(current.retryMaxMs, current.retryBaseMs * (2 ** attempt));
-        const wait = Math.max(Number(error?.retryAfterMs || 0), exponential) + Math.floor(Math.random() * 251);
-        await new Promise(resolve => setTimeout(resolve, wait));
+        if (error?.rateLimited || error?.status === 429) {
+          if (rateLimitAttempt >= current.rateLimitRetries) break;
+          rateLimitAttempt += 1;
+          const wait = Math.max(
+            Number(error?.retryAfterMs || 0),
+            Math.max(0, apiBlockedUntil - Date.now()),
+            current.rateLimitCooldownMs
+          ) + Math.floor(Math.random() * 401);
+          await new Promise(resolve => setTimeout(resolve, wait));
+          continue;
+        }
+
+        const retryable = !error?.status || error.status === 408 || error.status >= 500;
+        if (!retryable || transportAttempt >= current.retries) break;
+        const exponential = Math.min(current.retryMaxMs, current.retryBaseMs * (2 ** transportAttempt));
+        transportAttempt += 1;
+        await new Promise(resolve => setTimeout(resolve, exponential + Math.floor(Math.random() * 251)));
       } finally {
         clearTimeout(timer);
       }
     }
     throw lastError || new Error('API-Football request failed');
-  });
+  }, { path: url.pathname, priority: requestPriority(path, params) });
 
   apiInFlight.set(cacheKey, task);
   try { return await task; }
@@ -851,15 +1009,35 @@ export async function enrichApiFootballStatsBoard(date, fixtures = [], extractVe
         enrichment: { matched: Boolean(intelligence?.mapped), confidence: intelligence?.mappingConfidence || 1, statsAvailable: Boolean(stats?.homeSplit || stats?.awaySplit), source: 'API_FOOTBALL' }
       };
     } catch (error) {
-      result = { ...fixture, stats: null, enrichment: { matched: false, confidence: 0, statsAvailable: false, source: 'API_FOOTBALL', error: error?.message || 'Enrichment failed' } };
+      const deferred = isRateLimitError(error);
+      result = {
+        ...fixture,
+        stats: null,
+        enrichment: {
+          matched: false,
+          confidence: 0,
+          statsAvailable: false,
+          source: 'API_FOOTBALL',
+          deferred,
+          error: error?.message || 'Enrichment failed'
+        }
+      };
     }
     try { options.onFixture?.(result, index, total); } catch {}
     return result;
   });
+  const providerQueue = apiFootballRateState();
+  const deferredCount = enriched.filter(item => item?.enrichment?.deferred).length;
+  const statsAvailable = enriched.some(item => item?.stats?.homeSplit || item?.stats?.awaySplit);
   return {
     configured: true,
     source: 'API_FOOTBALL',
-    warning: enriched.some(item => item?.stats?.homeSplit || item?.stats?.awaySplit) ? null : 'API-Football fixtures loaded, but venue histories were unavailable for this date.',
+    warning: deferredCount
+      ? 'API-Football reached the subscription minute limit. Unfinished fixtures remain queued and will resume automatically.'
+      : statsAvailable ? null : 'API-Football fixtures loaded, but venue histories were unavailable for this date.',
+    rateLimited: deferredCount > 0,
+    deferredCount,
+    providerQueue,
     fixtures: enriched,
     fixtureScope: 'ALL_DAILY_FIXTURES_RETURNED_BY_PROVIDER'
   };

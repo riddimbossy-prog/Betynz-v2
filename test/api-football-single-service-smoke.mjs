@@ -108,7 +108,7 @@ try {
   web.stderr.on('data', chunk => { stderr += chunk; process.stderr.write(`[single-service] ${chunk}`); });
 
   const health = await waitJson(`http://127.0.0.1:${webPort}/api/health`);
-  assert.equal(health.body.version, '5.0.9');
+  assert.equal(health.body.version, '5.0.10');
   assert.equal(health.body.configured.apiFootball, true);
   assert.deepEqual(health.body.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'APEX_INTELLIGENCE', 'CONVERGENCE_ROUTE', 'MOMENTUM_STREAK']);
   assert.deepEqual(new Set(Object.values(health.body.sourceRoles)), new Set(['API_FOOTBALL']));
