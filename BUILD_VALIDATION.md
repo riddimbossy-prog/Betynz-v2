@@ -1,31 +1,38 @@
-# Betynz v5.0.12 Build Validation
+# Betynz v5.0.13 Build Validation
 
-## Passed
+## Result
 
-- Engine and platform tests: **83/83**
-- Non-blocking fixture-board regression: passed
-- Delayed odds pagination regression: passed
-- Fixture list returned before odds completion: passed
-- Background odds merge: passed
-- API-Football rate-limit recovery: passed
-- Five-engine Consensus: passed
-- Single-Render verification: passed
-- One-service integration smoke test: passed
+- Engine and platform tests: **84/84 passed**
+- Seven-day count batching regression: **passed**
+- Shared same-league history regression: **passed**
+- Progressive prediction publishing regression: **passed**
+- API-Football body-level rate-limit recovery: **passed**
+- Render-style production build: **passed**
+- Release verification: **passed**
+- Single-Render verification: **passed**
+- One-service integration smoke test: **passed**
 
-## Fixture-board regression
+## Production-style environment used
 
-The mock API intentionally delayed `/odds` by 1.2 seconds. The dashboard `/api/fixtures` route returned the complete fixture list in under one second with `oddsPending: true`. A later no-cache poll returned the same fixtures with normalized markets and `oddsPending: false`.
-
-## Architecture
-
-```text
-API-Football /fixtures
-        ↓ immediate
-Betynz games board
-        ↓ background
-API-Football /odds pagination
-        ↓ merge
-Priced board + engines
+```env
+NODE_ENV=production
+API_FOOTBALL_REQUESTS_PER_MINUTE=8
+API_FOOTBALL_REQUEST_CONCURRENCY=1
+API_FOOTBALL_REQUEST_MIN_INTERVAL_MS=750
+API_FOOTBALL_RATE_LIMIT_COOLDOWN_MS=65000
 ```
 
-No fixture cap was added.
+## Speed architecture verified
+
+1. Daily fixtures return without waiting for complete odds pagination.
+2. The first odds page is cached and merged immediately.
+3. Priced upcoming fixtures enter the engine lane first.
+4. Later odds pages run below engine-history priority.
+5. One league-season history request is reused by every eligible fixture in that competition.
+6. Team-history fallback starts only for incomplete venue samples.
+7. PPG, Apex, Convergence and Momentum share normalized history work.
+8. Each completed fixture is published to its engine board and Consensus immediately.
+9. Seven future-date counters use one low-priority range request instead of six calls.
+10. No daily fixture cap was introduced.
+
+No engine rule, threshold or settlement rule was changed.

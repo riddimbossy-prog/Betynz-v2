@@ -1,5 +1,23 @@
-# Betynz v5.0.12 — Non-blocking Fixture Board
+# Betynz v5.0.13 — Fast Engine and Consensus Lane
 
-API-Football-only, five-engine Betynz platform. Daily fixtures now render immediately while bookmaker odds paginate in the background.
+Betynz is a five-engine football analysis application powered only by API-Football. It renders the full daily fixture board immediately, streams odds in the background, and gives selected-date engine history priority over future-date and later odds-page work.
 
-Read `START_HERE.md` before deployment and `RELEASE_V5_0_12.md` for the change summary.
+## Active engines
+
+- Market Route
+- PPG Route
+- Apex Intelligence
+- Convergence
+- Momentum & Streak
+
+## Performance design
+
+- Fixtures first
+- First odds page next
+- Priced/upcoming engine candidates next
+- Shared league-history batch
+- Team fallback only when needed
+- Later odds pages and future-date counts last
+- Progressive Consensus publishing
+
+The repository deploys as one Render web service from one root `render.yaml`.

@@ -170,8 +170,8 @@ async function loadDate(date, force = false) {
       if (payload.oddsPending) scheduleBoardOddsRefresh(date, 0);
       loadRouteSummary(date).catch(() => {});
       const loadCounts = () => loadRemainingWeekCounts(date).catch(() => {});
-      if ('requestIdleCallback' in window) requestIdleCallback(loadCounts, { timeout: 2500 });
-      else setTimeout(loadCounts, 1200);
+      if ('requestIdleCallback' in window) requestIdleCallback(loadCounts, { timeout: 6000 });
+      else setTimeout(loadCounts, 4500);
     } else {
       $('#dayLoadState').textContent = payload.warning || 'No real matches are listed for this date yet.';
       setHomeSpotlightMessage('No qualified picks for this date yet.', 'The board updates when complete market and statistics routes become available.');
@@ -500,18 +500,22 @@ async function hydrateVisuals(date) {
 
 async function loadRemainingWeekCounts(selectedDate) {
   const token = ++state.weekCountToken;
-  for (let offset = 1; offset < 7; offset += 1) {
-    const date = dateOffset(offset);
-    if (date === selectedDate) continue;
-    try {
-      const payload = await fetchJson(`/api/fixture-count?date=${encodeURIComponent(date)}`, { cache: 'default', timeoutMs: 12000 });
-      if (token !== state.weekCountToken) return;
-      updateWeekCount(date, Number.isFinite(Number(payload.count)) ? Number(payload.count) : null);
-    } catch {
-      if (token !== state.weekCountToken) return;
-      updateWeekCount(date, null);
+  try {
+    // One low-priority range request replaces six separate daily requests. This
+    // preserves the API minute budget for PPG/Apex/Convergence/Momentum history.
+    const from = dateOffset(0);
+    const payload = await fetchJson(`/api/fixture-counts?from=${encodeURIComponent(from)}&days=7`, { cache: 'default', timeoutMs: 16000 });
+    if (token !== state.weekCountToken) return;
+    for (const row of payload.counts || []) {
+      if (row.date === selectedDate) continue;
+      updateWeekCount(row.date, Number.isFinite(Number(row.count)) ? Number(row.count) : null);
     }
-    await new Promise(resolve => setTimeout(resolve, 100));
+  } catch {
+    if (token !== state.weekCountToken) return;
+    for (let offset = 1; offset < 7; offset += 1) {
+      const date = dateOffset(offset);
+      if (date !== selectedDate) updateWeekCount(date, null);
+    }
   }
 }
 

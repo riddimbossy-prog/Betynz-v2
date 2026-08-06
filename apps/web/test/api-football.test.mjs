@@ -11,6 +11,8 @@ import {
   enrichApiFootballStatsBoard,
   getApiFootballIntelligence,
   getApiFootballFixtureBoard,
+  getApiFootballFastFixtureBoard,
+  getApiFootballFixtureCounts,
   getApiFootballLiveBoard,
   getApiFootballResults,
   getApiFootballFixtureEvents,
@@ -62,6 +64,46 @@ test('API-Football matcher respects team direction and kickoff', () => {
   assert.ok(fixtureMatchScore(sourceFixture, correct) > 0.9);
   assert.equal(fixtureMatchScore(sourceFixture, reversed), 0);
   assert.equal(matchApiFootballFixture(sourceFixture, [reversed, correct])?.fixture?.fixture?.id, 9001);
+});
+
+
+test('seven-day fixture counts use one low-priority range request', async t => {
+  const from = '2034-08-06';
+  let fixtureCalls = 0;
+  const rows = [
+    apiFixture({ id: 4001, date: '2034-08-06T10:00:00Z' }),
+    apiFixture({ id: 4002, date: '2034-08-07T10:00:00Z' }),
+    apiFixture({ id: 4003, date: '2034-08-07T14:00:00Z' }),
+    apiFixture({ id: 4004, date: '2034-08-09T10:00:00Z' })
+  ];
+  const { server, base } = await listen((req, res) => {
+    const url = new URL(req.url, base);
+    res.setHeader('content-type', 'application/json');
+    if (url.pathname === '/fixtures' && url.searchParams.get('from') === from) {
+      fixtureCalls += 1;
+      return res.end(JSON.stringify({ response: rows, errors: [], paging: { current: 1, total: 1 } }));
+    }
+    return res.end(JSON.stringify({ response: [], errors: [], paging: { current: 1, total: 1 } }));
+  });
+  t.after(() => server.close());
+
+  const keys = ['API_FOOTBALL_KEY','API_FOOTBALL_BASE_URL','API_FOOTBALL_KEY_HEADER','API_FOOTBALL_RETRIES','API_FOOTBALL_REQUEST_MIN_INTERVAL_MS'];
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  Object.assign(process.env, {
+    API_FOOTBALL_KEY: 'range-key',
+    API_FOOTBALL_BASE_URL: base,
+    API_FOOTBALL_KEY_HEADER: 'x-apisports-key',
+    API_FOOTBALL_RETRIES: '0',
+    API_FOOTBALL_REQUEST_MIN_INTERVAL_MS: '0'
+  });
+  t.after(() => restoreEnv(previous));
+
+  const result = await getApiFootballFixtureCounts(from, 7);
+  assert.equal(fixtureCalls, 1);
+  assert.equal(result.counts.find(row => row.date === '2034-08-06').count, 1);
+  assert.equal(result.counts.find(row => row.date === '2034-08-07').count, 2);
+  assert.equal(result.counts.find(row => row.date === '2034-08-08').count, 0);
+  assert.equal(result.total, 4);
 });
 
 test('API_FOOTBALL_KEY supplies crests, venue history and deep intelligence server-side', async t => {

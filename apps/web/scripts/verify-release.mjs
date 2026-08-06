@@ -17,13 +17,13 @@ const required = [
   'sql/014_five_engine_ppg_apex.sql','package.json','package-lock.json','.env.example'
 ];
 for (const path of required) await access(resolve(appRoot, path));
-for (const path of ['render.yaml','package.json','scripts/verify-single-render.mjs','RELEASE_V5_0_10.md']) await access(resolve(repoRoot, path));
+for (const path of ['render.yaml','package.json','scripts/verify-single-render.mjs','RELEASE_V5_0_13.md']) await access(resolve(repoRoot, path));
 
 const [server, apiFootball, sw, styles, motion, env, render, rootPkgText, pkgText, lockText, indexHtml, appJs, picksHtml] = await Promise.all([
   read('src/server.mjs'), read('src/lib/apiFootball.mjs'), read('public/sw.js'), read('public/styles.css'), read('public/motion.js'), read('.env.example'), readRoot('render.yaml'), readRoot('package.json'), read('package.json'), read('package-lock.json'), read('public/index.html'), read('public/app.js'), read('public/picks.html')
 ]);
 
-if (!/const APP_VERSION = '5\.0\.12'/.test(server)) throw new Error('Server version is not 5.0.12.');
+if (!/const APP_VERSION = '5\.0\.13'/.test(server)) throw new Error('Server version is not 5.0.13.');
 for (const code of ['MARKET_ROUTE','PPG_ROUTE','APEX_INTELLIGENCE','CONVERGENCE_ROUTE','MOMENTUM_STREAK']) if (!server.includes(code)) throw new Error(`Missing engine ${code}.`);
 for (const token of ['analyzeMarketRoute','analyzePpgRoute','analyzeApexIntelligence','analyzeConvergence','analyzeMomentumStreak']) if (!server.includes(token)) throw new Error(`Missing analysis function ${token}.`);
 for (const route of ['market-route-board','ppg-route-board','apex-intelligence-board','convergence-route-board','momentum-streak-board']) if (!server.includes(route)) throw new Error(`Missing route ${route}.`);
@@ -31,7 +31,10 @@ for (const label of ['Market Route','PPG Route','Apex Intelligence','Convergence
 if (!/FIVE ENGINES · SHARED DIRECTION/.test(indexHtml) || !/5\/5 agreement/.test(indexHtml) || !/4\/5 agreement/.test(indexHtml)) throw new Error('Five-engine consensus labels are missing.');
 if (!/renderPpgEngine/.test(appJs) || !/renderApexEngine/.test(appJs)) throw new Error('PPG or Apex match-intelligence rendering is missing.');
 if (!/scheduleBoardOddsRefresh/.test(appJs) || !/oddsPending/.test(appJs)) throw new Error('Non-blocking fixture-board odds upgrade is missing.');
-if (!/betynz-v5-0-12/.test(sw) || !/ppg-route\.html/.test(sw)) throw new Error('Service-worker cache was not bumped or PPG is absent.');
+if (!/fixture-counts/.test(server) || !/getApiFootballFixtureCounts/.test(apiFootball) || !/fixture-counts/.test(appJs)) throw new Error('One-call seven-day fixture counts are missing.');
+if (!/LEAGUE_BATCH_THEN_TEAM_FALLBACK/.test(apiFootball) || !/__deferOnRateLimit/.test(apiFootball)) throw new Error('Fast engine history lane is missing.');
+if (!/__priority/.test(apiFootball) || !/onPage/.test(apiFootball)) throw new Error('Progressive provider priority or odds-page streaming is missing.');
+if (!/betynz-v5-0-13/.test(sw) || !/ppg-route\.html/.test(sw)) throw new Error('Service-worker cache was not bumped or PPG is absent.');
 if (!/five independent engines/i.test(picksHtml)) throw new Error('Picks page does not describe the five-engine system.');
 if (!/grid-template-columns:repeat\(5/.test(styles) || !/brand-orange/.test(styles) || !/ppg-result-card/.test(styles)) throw new Error('Unified five-engine logo palette is missing.');
 if (/IntersectionObserver|pointermove|data-lightning/.test(motion) || !/prefers-reduced-motion/.test(motion)) throw new Error('Minimal-motion safeguards are missing.');
@@ -43,7 +46,7 @@ if ((render.match(/^\s*-\s+type:\s+web\s*$/gm) || []).length !== 1) throw new Er
 const pkg = JSON.parse(pkgText);
 const lock = JSON.parse(lockText);
 const rootPkg = JSON.parse(rootPkgText);
-if (pkg.version !== '5.0.12' || lock.version !== '5.0.12' || rootPkg.version !== '5.0.12') throw new Error('Package versions are not 5.0.12.');
+if (pkg.version !== '5.0.13' || lock.version !== '5.0.13' || rootPkg.version !== '5.0.13') throw new Error('Package versions are not 5.0.13.');
 
 const tests = (await readdir(resolve(appRoot, 'test'))).sort();
 const allowed = [
@@ -51,4 +54,4 @@ const allowed = [
 ].sort();
 if (JSON.stringify(tests) !== JSON.stringify(allowed)) throw new Error(`Unexpected test files remain: ${tests.join(', ')}`);
 
-console.log('Release verification passed: Betynz 5.0.12 non-blocking fixture board edition.');
+console.log('Release verification passed: Betynz 5.0.13 fast engine and Consensus lane.');

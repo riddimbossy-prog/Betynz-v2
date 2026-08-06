@@ -1,4 +1,4 @@
-# Betynz web — v5.0.12
+# Betynz web — v5.0.13
 
 API-Football-only five-engine football-analysis application.
 

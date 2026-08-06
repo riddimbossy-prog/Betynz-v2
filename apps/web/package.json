@@ -1,6 +1,6 @@
 {
   "name": "betynz-api-football-only-web",
-  "version": "5.0.12",
+  "version": "5.0.13",
   "private": true,
   "type": "module",
   "description": "Betynz five-engine platform with Market Route, PPG Route, Apex Intelligence, Convergence and Momentum & Streak.",

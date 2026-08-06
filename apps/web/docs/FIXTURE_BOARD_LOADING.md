@@ -1,4 +1,4 @@
-# Betynz v5.0.12 — Non-blocking fixture board
+# Betynz v5.0.13 — Non-blocking fixture board
 
 ## Problem fixed
 

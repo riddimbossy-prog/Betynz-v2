@@ -39,6 +39,7 @@ import {
   getApiFootballFixtureBoard,
   getApiFootballFastFixtureBoard,
   getApiFootballFixtureCount,
+  getApiFootballFixtureCounts,
   getApiFootballLiveBoard,
   getApiFootballResults,
   getApiFootballFixtureEvents,
@@ -49,7 +50,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.12';
+const APP_VERSION = '5.0.13';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const APEX_INTELLIGENCE_CODE = 'APEX_INTELLIGENCE';
@@ -122,7 +123,7 @@ async function loadApiFootballMedia(kind, id) {
       const keyValue = String(process.env.API_FOOTBALL_KEY || '');
       const headers = {
         accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'user-agent': 'Betynz-Media-Proxy/5.0.12'
+        'user-agent': 'Betynz-Media-Proxy/5.0.13'
       };
       if (keyValue) headers[keyHeader] = keyValue;
       const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
@@ -374,7 +375,7 @@ async function getFastFixtureBoard(date) {
   if (fixtureBoardInflight.has(key)) return fixtureBoardInflight.get(key);
   const task = (async () => {
     const started = Date.now();
-    const feed = await getApiFootballFixtureBoard(date);
+    const feed = await getApiFootballFastFixtureBoard(date);
     const fixtures = (feed.fixtures || [])
       .filter(item => !isSrlFixture(item))
       .map(item => ({ ...publicFixture(item), boardStatus: fixtureStatusForDate(item) }))
@@ -385,11 +386,13 @@ async function getFastFixtureBoard(date) {
       fixtures,
       source: 'API_FOOTBALL',
       warning: feed.warning || null,
+      oddsPending: Boolean(feed.oddsPending),
+      oddsPages: Number(feed.oddsPages || 0),
       generatedAt: new Date().toISOString(),
       loadMs: Date.now() - started,
       cache: 'MISS'
     };
-    cacheSet(key, response, Number(process.env.FIXTURE_BOARD_CACHE_TTL_SECONDS || 120));
+    cacheSet(key, response, response.oddsPending ? 1 : Number(process.env.FIXTURE_BOARD_CACHE_TTL_SECONDS || 120));
     if (fixtures.some(item => fixtureStatusForDate(item) === 'SETTLED')) requestSettlement(date).catch(() => null);
     return response;
   })();
@@ -611,13 +614,14 @@ async function getMarketRouteBoard(date) {
         conflict: items.filter(item => item.engine.decision === 'CONFLICT').length,
         noSignal: items.filter(item => !item.engine.selection).length
       },
-      progress: { stage: 'ODDS_READY_STATS_RUNNING', processed: 0, total: items.length, percent: 0 },
+      progress: { stage: board.oddsPending ? 'ODDS_STREAMING' : 'ODDS_READY_STATS_RUNNING', processed: 0, total: items.length, percent: 0 },
+      oddsPending: Boolean(board.oddsPending),
       complete: false,
       failed: false,
       generatedAt: new Date().toISOString(),
       cache: 'MISS'
     };
-    cacheSet(key, response, 120);
+    cacheSet(key, response, board.oddsPending ? 1 : 120);
     // Start the shared venue-history job without holding this HTTP response open.
     queueMicrotask(() => ensureStatsRouteView(date).catch(error => console.error('Shared engine analysis failed:', error.message)));
     return response;
@@ -738,6 +742,7 @@ async function getStatsRouteBoards(date) {
         convergence: progressiveEngineResponse({ date, engine: 'Convergence Engine', items: convergenceMap, processed, total, complete, failed, warning, enrichmentSource }),
         momentum: progressiveEngineResponse({ date, engine: 'Momentum & Streak Engine', items: momentumMap, processed, total, complete, failed, warning, enrichmentSource })
       };
+      for (const response of Object.values(snapshot)) response.oddsPending = Boolean(board.oddsPending);
       statsRouteViewSnapshots.set(date, snapshot);
       cacheSet(`market-route-board:${date}`, market, complete ? 300 : 120);
       return { market, ...snapshot };
@@ -773,7 +778,7 @@ async function getStatsRouteBoards(date) {
       });
     }
 
-    const analysisComplete = !enrichment.rateLimited;
+    const analysisComplete = !enrichment.rateLimited && !board.oddsPending;
     if (analysisComplete) processed = total;
     const result = publish({
       complete: analysisComplete,
@@ -821,11 +826,12 @@ async function getMomentumRouteBoard(date) {
 const statsRouteViewSnapshots = new Map();
 const statsRouteViewJobs = new Map();
 
-function waitingStatsResponse(date, engine, fixtures = [], analyser) {
+function waitingStatsResponse(date, engine, fixtures = [], analyser, oddsPending = false) {
   const ordered = predictionPriority(fixtures || []);
   const items = ordered.map(fixture => routeItem(fixture, null, analyser)).filter(Boolean);
   const eligible = ordered.filter(isUpcomingPredictionFixture).length;
   const providerQueue = apiFootballRateState();
+  const stage = oddsPending ? 'ODDS_STREAMING' : providerQueue.coolingDown ? 'RATE_LIMIT_COOLDOWN' : 'VENUE_HISTORY';
   return {
     date,
     engine,
@@ -836,8 +842,9 @@ function waitingStatsResponse(date, engine, fixtures = [], analyser) {
     qualified: items.filter(item => item.engine.selection),
     all: items,
     summary: responseSummary(items, eligible, 0),
-    progress: { stage: providerQueue.coolingDown ? 'RATE_LIMIT_COOLDOWN' : 'VENUE_HISTORY', processed: 0, total: eligible, percent: eligible ? 0 : 100, providerQueue },
-    complete: eligible === 0,
+    progress: { stage, processed: 0, total: eligible, percent: eligible ? 0 : oddsPending ? 0 : 100, providerQueue },
+    oddsPending: Boolean(oddsPending),
+    complete: eligible === 0 && !oddsPending,
     failed: false,
     generatedAt: new Date().toISOString(),
     cache: 'MISS'
@@ -846,14 +853,15 @@ function waitingStatsResponse(date, engine, fixtures = [], analyser) {
 
 async function ensureStatsRouteView(date) {
   const existing = statsRouteViewSnapshots.get(date);
-  if (existing?.ppg?.complete && existing?.apex?.complete && existing?.convergence?.complete && existing?.momentum?.complete) return existing;
+  if (existing?.ppg?.complete && existing?.apex?.complete && existing?.convergence?.complete && existing?.momentum?.complete
+      && !existing?.ppg?.oddsPending && !existing?.apex?.oddsPending && !existing?.convergence?.oddsPending && !existing?.momentum?.oddsPending) return existing;
   if (!existing) {
     const board = await getFastFixtureBoard(date);
     statsRouteViewSnapshots.set(date, {
-      ppg: waitingStatsResponse(date, 'PPG Route Engine', board.fixtures || [], analyzePpgRoute),
-      apex: waitingStatsResponse(date, 'Apex Intelligence Engine', board.fixtures || [], analyzeApexIntelligence),
-      convergence: waitingStatsResponse(date, 'Convergence Engine', board.fixtures || [], analyzeConvergence),
-      momentum: waitingStatsResponse(date, 'Momentum & Streak Engine', board.fixtures || [], analyzeMomentumStreak)
+      ppg: waitingStatsResponse(date, 'PPG Route Engine', board.fixtures || [], analyzePpgRoute, board.oddsPending),
+      apex: waitingStatsResponse(date, 'Apex Intelligence Engine', board.fixtures || [], analyzeApexIntelligence, board.oddsPending),
+      convergence: waitingStatsResponse(date, 'Convergence Engine', board.fixtures || [], analyzeConvergence, board.oddsPending),
+      momentum: waitingStatsResponse(date, 'Momentum & Streak Engine', board.fixtures || [], analyzeMomentumStreak, board.oddsPending)
     });
   }
   if (!statsRouteViewJobs.has(date)) {
@@ -1462,6 +1470,18 @@ async function apiRoute(req, res, url) {
       return jsonCached(res, 200, result, 120);
     } catch {
       return json(res, apiFootballConfigured() ? 502 : 503, { error: 'FIXTURE_COUNT_UNAVAILABLE', date, count: null });
+    }
+  }
+
+  if (url.pathname === '/api/fixture-counts') {
+    const from = url.searchParams.get('from') || utcDateOffset(0);
+    const days = Math.max(1, Math.min(14, Number(url.searchParams.get('days') || 7)));
+    if (!safeDate(from)) return json(res, 400, { error: 'from must be YYYY-MM-DD' });
+    try {
+      const result = await getApiFootballFixtureCounts(from, days);
+      return jsonCached(res, 200, result, 120);
+    } catch {
+      return json(res, apiFootballConfigured() ? 502 : 503, { error: 'FIXTURE_COUNTS_UNAVAILABLE', from, counts: [] });
     }
   }
 

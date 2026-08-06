@@ -1,6 +1,6 @@
 {
   "name": "betynz-api-football-only",
-  "version": "5.0.12",
+  "version": "5.0.13",
   "private": true,
   "type": "module",
   "description": "Single-Render Betynz platform using API-Football with five independent prediction engines and unified Betynz branding.",

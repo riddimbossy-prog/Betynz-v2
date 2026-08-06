@@ -14,6 +14,7 @@ let apiNextAt = 0;
 let apiTimer = null;
 let apiQueueSequence = 0;
 let apiBlockedUntil = 0;
+let apiBlockedIdentity = null;
 let apiRequestStarts = [];
 let apiLastRateLimit = null;
 let apiRateLimitCount = 0;
@@ -88,22 +89,33 @@ function config(env = process.env) {
   };
 }
 
+function apiIdentity(current = config()) {
+  return `${current.baseUrl}|${current.headerName}|${String(current.key || '').slice(-8)}`;
+}
+
+function activeBlockedUntil(current = config()) {
+  return apiBlockedIdentity === apiIdentity(current) ? apiBlockedUntil : 0;
+}
+
 function pruneRequestWindow(now = Date.now()) {
   apiRequestStarts = apiRequestStarts.filter(startedAt => now - startedAt < 60000);
 }
 
 function requestPriority(path, params = {}) {
+  const explicit = Number(params.__priority);
+  if (Number.isFinite(explicit)) return Math.max(0, Math.min(9, explicit));
   const route = `/${String(path || '').replace(/^\/+/, '')}`;
   if (route === '/fixtures' && (params.date || params.live || params.id)) return 0;
   if (route === '/odds') return 1;
   if (['/fixtures/events', '/fixtures/statistics', '/fixtures/lineups', '/fixtures/players'].includes(route)) return 1;
   if (route === '/fixtures' && (params.league || params.team)) return 3;
+  if (route === '/fixtures' && (params.from || params.to)) return 5;
   return 2;
 }
 
 function nextQueueDelay(current, now = Date.now()) {
   pruneRequestWindow(now);
-  let readyAt = Math.max(apiNextAt, apiBlockedUntil);
+  let readyAt = Math.max(apiNextAt, activeBlockedUntil(current));
   if (apiRequestStarts.length >= current.requestsPerMinute) {
     readyAt = Math.max(readyAt, apiRequestStarts[0] + 60000 + 75);
   }
@@ -201,7 +213,8 @@ function responseRateResetMs(response) {
 
 function registerRateLimit(current, { path, message, retryAfterMs = 0 } = {}) {
   const wait = Math.max(Number(retryAfterMs || 0), current.rateLimitCooldownMs);
-  apiBlockedUntil = Math.max(apiBlockedUntil, Date.now() + wait);
+  apiBlockedIdentity = apiIdentity(current);
+  apiBlockedUntil = Math.max(activeBlockedUntil(current), Date.now() + wait);
   apiRateLimitCount += 1;
   apiLastRateLimit = {
     at: new Date().toISOString(),
@@ -221,14 +234,15 @@ export function apiFootballRateState(env = process.env) {
   const current = config(env);
   const now = Date.now();
   pruneRequestWindow(now);
+  const blockedUntil = activeBlockedUntil(current);
   return {
     requestsPerMinute: current.requestsPerMinute,
     requestsInWindow: apiRequestStarts.length,
     queueDepth: apiQueue.length,
     active: apiActive,
-    coolingDown: apiBlockedUntil > now,
-    blockedUntil: apiBlockedUntil > now ? new Date(apiBlockedUntil).toISOString() : null,
-    retryInMs: Math.max(0, apiBlockedUntil - now),
+    coolingDown: blockedUntil > now,
+    blockedUntil: blockedUntil > now ? new Date(blockedUntil).toISOString() : null,
+    retryInMs: Math.max(0, blockedUntil - now),
     rateLimitCount: apiRateLimitCount,
     lastRateLimit: apiLastRateLimit
   };
@@ -273,7 +287,7 @@ function requestHeaders(current) {
   const headers = {
     [current.headerName]: current.key,
     accept: 'application/json',
-    'user-agent': 'Betynz-API-Football-Only/5.0.12'
+    'user-agent': 'Betynz-API-Football-Only/5.0.13'
   };
   if (current.rapidApiHost) headers['x-rapidapi-host'] = current.rapidApiHost;
   return headers;
@@ -282,8 +296,10 @@ function requestHeaders(current) {
 export async function apiFootballRequest(path, params = {}, ttlSeconds = null) {
   const current = config();
   if (!current.configured) return { configured: false, response: [], errors: ['API_FOOTBALL_KEY is not configured'] };
+  const deferOnRateLimit = Boolean(params.__deferOnRateLimit);
   const url = new URL(path.replace(/^\//, ''), current.baseUrl.endsWith('/') ? current.baseUrl : `${current.baseUrl}/`);
   for (const [name, value] of Object.entries(params)) {
+    if (name.startsWith('__')) continue;
     if (value !== undefined && value !== null && text(value) !== '') url.searchParams.set(name, String(value));
   }
   const cacheKey = `api-football:${url.toString()}`;
@@ -325,7 +341,8 @@ export async function apiFootballRequest(path, params = {}, ttlSeconds = null) {
         const remaining = Number(response.headers.get('x-ratelimit-requests-remaining') || response.headers.get('ratelimit-remaining'));
         if (Number.isFinite(remaining) && remaining <= 0) {
           const wait = responseRateResetMs(response) || current.rateLimitCooldownMs;
-          apiBlockedUntil = Math.max(apiBlockedUntil, Date.now() + wait);
+          apiBlockedIdentity = apiIdentity(current);
+          apiBlockedUntil = Math.max(activeBlockedUntil(current), Date.now() + wait);
         }
 
         const rawResponse = body?.response ?? null;
@@ -341,11 +358,12 @@ export async function apiFootballRequest(path, params = {}, ttlSeconds = null) {
       } catch (error) {
         lastError = error;
         if (error?.rateLimited || error?.status === 429) {
+          if (deferOnRateLimit) break;
           if (rateLimitAttempt >= current.rateLimitRetries) break;
           rateLimitAttempt += 1;
           const wait = Math.max(
             Number(error?.retryAfterMs || 0),
-            Math.max(0, apiBlockedUntil - Date.now()),
+            Math.max(0, activeBlockedUntil(current) - Date.now()),
             current.rateLimitCooldownMs
           ) + Math.floor(Math.random() * 401);
           await new Promise(resolve => setTimeout(resolve, wait));
@@ -369,14 +387,21 @@ export async function apiFootballRequest(path, params = {}, ttlSeconds = null) {
   finally { apiInFlight.delete(cacheKey); }
 }
 
-async function apiFootballPagedRequest(path, params = {}, ttlSeconds = null, maxPages = 0) {
+async function apiFootballPagedRequest(path, params = {}, ttlSeconds = null, maxPages = 0, options = {}) {
   const rows = [];
   let page = 1;
   let totalPages = 1;
   do {
-    const body = await apiFootballRequest(path, { ...params, page }, ttlSeconds);
+    // The first odds page is user-visible. Later pages run behind venue-history
+    // work so the engines can publish before the complete bookmaker catalogue.
+    const body = await apiFootballRequest(path, {
+      ...params,
+      page,
+      __priority: path === '/odds' ? (page === 1 ? 1 : 4) : params.__priority
+    }, ttlSeconds);
     rows.push(...responseArray(body));
     totalPages = Math.max(1, number(body?.paging?.total, 1));
+    try { options.onPage?.({ rows: [...rows], page, totalPages, body }); } catch {}
     page += 1;
   } while (page <= totalPages && (maxPages <= 0 || page <= maxPages));
   return { configured: true, response: rows, paging: { current: Math.max(1, page - 1), total: totalPages }, fetchedAt: new Date().toISOString() };
@@ -645,6 +670,42 @@ export async function getApiFootballFixtureCount(date) {
   };
 }
 
+export async function getApiFootballFixtureCounts(from, days = 7) {
+  if (!safeDate(from)) throw new Error('from must be YYYY-MM-DD');
+  const safeDays = Math.max(1, Math.min(14, Number(days) || 7));
+  const start = new Date(`${from}T00:00:00.000Z`);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + safeDays - 1);
+  const to = end.toISOString().slice(0, 10);
+  const current = config();
+  const body = await apiFootballRequest('/fixtures', {
+    from,
+    to,
+    timezone: current.timezone,
+    __priority: 5
+  }, current.fixtureTtlSeconds);
+  const counts = new Map();
+  for (let offset = 0; offset < safeDays; offset += 1) {
+    const date = new Date(start);
+    date.setUTCDate(date.getUTCDate() + offset);
+    counts.set(date.toISOString().slice(0, 10), 0);
+  }
+  for (const row of responseArray(body)) {
+    const date = text(row?.fixture?.date).slice(0, 10);
+    if (counts.has(date)) counts.set(date, counts.get(date) + 1);
+  }
+  return {
+    configured: body.configured,
+    source: 'API_FOOTBALL',
+    from,
+    to,
+    days: safeDays,
+    counts: [...counts.entries()].map(([date, count]) => ({ date, count })),
+    total: [...counts.values()].reduce((sum, count) => sum + count, 0),
+    fetchedAt: body.fetchedAt || null
+  };
+}
+
 function oddsDateCacheKey(date, current = config()) {
   return `api-football-odds-date:${date}:${current.timezone}:${current.bookmakerId || 'ALL'}`;
 }
@@ -659,14 +720,26 @@ export async function getApiFootballOddsForDate(date) {
   const current = config();
   const aggregateKey = oddsDateCacheKey(date, current);
   const cached = cacheGet(aggregateKey);
-  if (cached) return { ...cached, cache: 'HIT' };
+  if (cached && !cached.pending) return { ...cached, cache: 'HIT' };
   if (oddsDateInflight.has(aggregateKey)) return oddsDateInflight.get(aggregateKey);
 
   const task = (async () => {
     const params = { date, timezone: current.timezone };
     if (current.bookmakerId) params.bookmaker = current.bookmakerId;
-    const body = await apiFootballPagedRequest('/odds', params, current.oddsTtlSeconds, current.maxOddsPages);
-    const result = { configured: body.configured, odds: responseArray(body), fetchedAt: body.fetchedAt || null, pages: body.paging?.total || 1, cache: 'MISS' };
+    const body = await apiFootballPagedRequest('/odds', params, current.oddsTtlSeconds, current.maxOddsPages, {
+      onPage: ({ rows, page, totalPages }) => {
+        cacheSet(aggregateKey, {
+          configured: true,
+          odds: rows,
+          fetchedAt: new Date().toISOString(),
+          pages: page,
+          totalPages,
+          pending: page < totalPages,
+          cache: 'PARTIAL'
+        }, current.oddsTtlSeconds);
+      }
+    });
+    const result = { configured: body.configured, odds: responseArray(body), fetchedAt: body.fetchedAt || null, pages: body.paging?.total || 1, totalPages: body.paging?.total || 1, pending: false, cache: 'MISS' };
     cacheSet(aggregateKey, result, current.oddsTtlSeconds);
     return result;
   })();
@@ -684,7 +757,7 @@ function normalizeFixtureBoard(daily, oddsResult = null) {
 export async function getApiFootballFastFixtureBoard(date) {
   const daily = await getApiFootballDailyFixtures(date);
   const cachedOdds = getCachedApiFootballOddsForDate(date);
-  if (!cachedOdds) {
+  if (!cachedOdds || cachedOdds.pending) {
     // The dashboard must never wait for every bookmaker-odds page. Start the
     // expensive pagination in the background and return the complete fixture
     // list immediately. A short browser poll upgrades the rows with odds.
@@ -695,7 +768,7 @@ export async function getApiFootballFastFixtureBoard(date) {
     source: 'API_FOOTBALL',
     fixtures: normalizeFixtureBoard(daily, cachedOdds),
     warning: cachedOdds?.warning || null,
-    oddsPending: !cachedOdds,
+    oddsPending: !cachedOdds || Boolean(cachedOdds.pending),
     oddsPages: cachedOdds?.pages || 0,
     fetchedAt: daily.fetchedAt || null
   };
@@ -832,6 +905,35 @@ function selectVenueHistory(rows, teamId, venue, beforeMs, limit = 5) {
   }).sort((a, b) => (kickoffMs(b) || 0) - (kickoffMs(a) || 0)).slice(0, limit).map(historyRow);
 }
 
+function engineIntelligenceFromHistories(fixture, homeHistory = [], awayHistory = [], strategy = 'TEAM_HISTORY') {
+  const homeId = Number(fixture?.home?.id);
+  const awayId = Number(fixture?.away?.id);
+  return {
+    source: 'API_FOOTBALL',
+    mapped: true,
+    mappingConfidence: 1,
+    historyStrategy: strategy,
+    fixture: {
+      id: Number(fixture?.id) || null,
+      date: fixture?.kickoff || null,
+      venue: fixture?.venue || null,
+      status: fixture?.status || null,
+      league: fixture?.league || null,
+      home: fixture?.home || null,
+      away: fixture?.away || null,
+      mappingConfidence: 1
+    },
+    home: { id: homeId, name: fixture?.home?.name || '', logo: fixture?.home?.logo || null, history: homeHistory },
+    away: { id: awayId, name: fixture?.away?.name || '', logo: fixture?.away?.logo || null, history: awayHistory },
+    league: fixture?.league || null,
+    standings: null,
+    teamStatistics: { home: null, away: null },
+    h2h: [],
+    predictions: null,
+    injuries: []
+  };
+}
+
 async function getApiFootballEngineIntelligence(date, fixture) {
   const current = config();
   if (!current.configured || !fixture) return null;
@@ -841,10 +943,6 @@ async function getApiFootballEngineIntelligence(date, fixture) {
   const season = Number(fixture?.league?.season);
   const beforeMs = kickoffMs(fixture) || Date.now();
 
-  // API-Football already owns the fixture object, so engine scans do not need
-  // a second daily-fixture mapping pass. A single league-season history pool
-  // is shared by every match in that competition; team requests are only used
-  // when the league pool does not contain five venue matches.
   if (!Number.isFinite(homeId) || !Number.isFinite(awayId)) {
     return getApiFootballIntelligence({ date, beforeDate: date }, fixture, { mode: 'engine' });
   }
@@ -853,7 +951,12 @@ async function getApiFootballEngineIntelligence(date, fixture) {
   let strategy = 'TEAM_HISTORY';
   if (current.engineLeagueHistory && Number.isFinite(leagueId) && Number.isFinite(season)) {
     try {
-      const pool = await apiFootballRequest('/fixtures', { league: leagueId, season, status: 'FT' }, current.engineHistoryTtlSeconds);
+      const pool = await apiFootballRequest('/fixtures', {
+        league: leagueId,
+        season,
+        status: 'FT',
+        __priority: 2
+      }, current.engineHistoryTtlSeconds);
       poolRows = responseArray(pool);
       if (poolRows.length) strategy = 'LEAGUE_POOL';
     } catch {}
@@ -863,44 +966,31 @@ async function getApiFootballEngineIntelligence(date, fixture) {
   let awayHistory = selectVenueHistory(poolRows, awayId, 'away', beforeMs, 5);
   const fallbacks = [];
   if (homeHistory.length < 5) {
-    fallbacks.push(apiFootballRequest('/fixtures', { team: homeId, last: current.historyLast, status: 'FT' }, current.engineHistoryTtlSeconds)
-      .then(body => { homeHistory = selectVenueHistory(responseArray(body), homeId, 'home', beforeMs, 5); })
-      .catch(() => null));
+    fallbacks.push(apiFootballRequest('/fixtures', {
+      team: homeId,
+      last: current.historyLast,
+      status: 'FT',
+      __priority: 3
+    }, current.engineHistoryTtlSeconds).then(body => {
+      homeHistory = selectVenueHistory(responseArray(body), homeId, 'home', beforeMs, 5);
+    }).catch(() => null));
   }
   if (awayHistory.length < 5) {
-    fallbacks.push(apiFootballRequest('/fixtures', { team: awayId, last: current.historyLast, status: 'FT' }, current.engineHistoryTtlSeconds)
-      .then(body => { awayHistory = selectVenueHistory(responseArray(body), awayId, 'away', beforeMs, 5); })
-      .catch(() => null));
+    fallbacks.push(apiFootballRequest('/fixtures', {
+      team: awayId,
+      last: current.historyLast,
+      status: 'FT',
+      __priority: 3
+    }, current.engineHistoryTtlSeconds).then(body => {
+      awayHistory = selectVenueHistory(responseArray(body), awayId, 'away', beforeMs, 5);
+    }).catch(() => null));
   }
   if (fallbacks.length) {
     await Promise.all(fallbacks);
     strategy = poolRows.length ? 'LEAGUE_POOL_WITH_TEAM_FALLBACK' : 'TEAM_HISTORY';
   }
 
-  return {
-    source: 'API_FOOTBALL',
-    mapped: true,
-    mappingConfidence: 1,
-    historyStrategy: strategy,
-    fixture: {
-      id: Number(fixture.id) || null,
-      date: fixture.kickoff || null,
-      venue: fixture.venue || null,
-      status: fixture.status || null,
-      league: fixture.league || null,
-      home: fixture.home || null,
-      away: fixture.away || null,
-      mappingConfidence: 1
-    },
-    home: { id: homeId, name: fixture.home?.name || '', logo: fixture.home?.logo || null, history: homeHistory },
-    away: { id: awayId, name: fixture.away?.name || '', logo: fixture.away?.logo || null, history: awayHistory },
-    league: fixture.league || null,
-    standings: null,
-    teamStatistics: { home: null, away: null },
-    h2h: [],
-    predictions: null,
-    injuries: []
-  };
+  return engineIntelligenceFromHistories(fixture, homeHistory, awayHistory, strategy);
 }
 
 function teamStatsSummary(body) {
@@ -1039,55 +1129,186 @@ export async function getApiFootballIntelligence(context = {}, sourceFixture = n
 export async function enrichApiFootballStatsBoard(date, fixtures = [], extractVenueStats, options = {}) {
   const current = config();
   if (!current.configured) return { configured: false, source: null, warning: 'API_FOOTBALL_KEY is not configured.', fixtures };
+
   const total = fixtures.length;
-  const enriched = await mapWithConcurrency(fixtures, current.enrichConcurrency, async (fixture, index) => {
+  const byId = new Map();
+  const pending = [];
+  let rateLimited = false;
+
+  const emit = (fixture, intelligence, { deferred = false, error = null } = {}) => {
     const context = {
       date,
       beforeDate: date,
-      sourceEventId: fixture.sourceId || fixture.id,
-      kickoff: fixture.kickoff,
-      homeName: fixture.home?.name,
-      awayName: fixture.away?.name,
-      league: fixture.league?.name,
-      country: fixture.league?.country
+      sourceEventId: fixture?.sourceId || fixture?.id,
+      kickoff: fixture?.kickoff,
+      homeName: fixture?.home?.name,
+      awayName: fixture?.away?.name,
+      league: fixture?.league?.name,
+      country: fixture?.league?.country
     };
-    let result;
-    try {
-      const intelligence = await getApiFootballEngineIntelligence(date, fixture);
-      const stats = typeof extractVenueStats === 'function' ? extractVenueStats(intelligence, context) : null;
-      result = {
-        ...fixture,
-        stats: stats ? {
-          ...stats,
-          source: 'API_FOOTBALL',
-          mappingConfidence: intelligence?.mappingConfidence || 1,
-          standings: intelligence?.standings || null,
-          teamStatistics: intelligence?.teamStatistics || null,
-          h2h: intelligence?.h2h || [],
-          predictions: intelligence?.predictions || null,
-          injuries: intelligence?.injuries || []
-        } : null,
-        apiFootballFixtureId: Number(fixture.id) || intelligence?.fixture?.id || null,
-        enrichment: { matched: Boolean(intelligence?.mapped), confidence: intelligence?.mappingConfidence || 1, statsAvailable: Boolean(stats?.homeSplit || stats?.awaySplit), source: 'API_FOOTBALL' }
-      };
-    } catch (error) {
-      const deferred = isRateLimitError(error);
-      result = {
-        ...fixture,
-        stats: null,
-        enrichment: {
-          matched: false,
-          confidence: 0,
-          statsAvailable: false,
-          source: 'API_FOOTBALL',
-          deferred,
-          error: error?.message || 'Enrichment failed'
-        }
-      };
-    }
-    try { options.onFixture?.(result, index, total); } catch {}
+    const stats = !deferred && intelligence && typeof extractVenueStats === 'function'
+      ? extractVenueStats(intelligence, context)
+      : null;
+    const result = {
+      ...fixture,
+      stats: stats ? {
+        ...stats,
+        source: 'API_FOOTBALL',
+        mappingConfidence: intelligence?.mappingConfidence || 1,
+        standings: intelligence?.standings || null,
+        teamStatistics: intelligence?.teamStatistics || null,
+        h2h: intelligence?.h2h || [],
+        predictions: intelligence?.predictions || null,
+        injuries: intelligence?.injuries || []
+      } : null,
+      apiFootballFixtureId: Number(fixture?.id) || intelligence?.fixture?.id || null,
+      enrichment: {
+        matched: Boolean(intelligence?.mapped),
+        confidence: intelligence?.mappingConfidence || (deferred ? 0 : 1),
+        statsAvailable: Boolean(stats?.homeSplit || stats?.awaySplit),
+        source: 'API_FOOTBALL',
+        deferred,
+        error: error ? String(error?.message || error) : null,
+        historyStrategy: intelligence?.historyStrategy || null
+      }
+    };
+    byId.set(String(fixture?.id), result);
+    try { options.onFixture?.(result, byId.size, total); } catch {}
     return result;
+  };
+
+  // Stage one groups fixtures by league-season. One league history request can
+  // complete several matches at once, so the first predictions are published
+  // after one provider call instead of waiting for two team calls per fixture.
+  const groups = new Map();
+  for (const fixture of fixtures) {
+    const leagueId = Number(fixture?.league?.id);
+    const season = Number(fixture?.league?.season);
+    const key = current.engineLeagueHistory && Number.isFinite(leagueId) && Number.isFinite(season)
+      ? `${leagueId}:${season}`
+      : `NO_POOL:${fixture?.id}`;
+    if (!groups.has(key)) groups.set(key, { leagueId, season, fixtures: [] });
+    groups.get(key).fixtures.push(fixture);
+  }
+
+  const groupList = [...groups.values()];
+  const stageConcurrency = Math.max(1, Math.min(current.enrichConcurrency, current.requestConcurrency));
+  await mapWithConcurrency(groupList, stageConcurrency, async group => {
+    if (rateLimited) {
+      for (const fixture of group.fixtures) emit(fixture, null, { deferred: true, error: 'Provider cooldown active' });
+      return;
+    }
+
+    let poolRows = [];
+    let poolError = null;
+    if (current.engineLeagueHistory && Number.isFinite(group.leagueId) && Number.isFinite(group.season)) {
+      try {
+        const pool = await apiFootballRequest('/fixtures', {
+          league: group.leagueId,
+          season: group.season,
+          status: 'FT',
+          __priority: 2,
+          __deferOnRateLimit: true
+        }, current.engineHistoryTtlSeconds);
+        poolRows = responseArray(pool);
+      } catch (error) {
+        poolError = error;
+        if (isRateLimitError(error)) rateLimited = true;
+      }
+    }
+
+    if (rateLimited && poolError) {
+      for (const fixture of group.fixtures) emit(fixture, null, { deferred: true, error: poolError });
+      return;
+    }
+
+    for (const fixture of group.fixtures) {
+      const homeId = Number(fixture?.home?.id);
+      const awayId = Number(fixture?.away?.id);
+      if (!Number.isFinite(homeId) || !Number.isFinite(awayId)) {
+        try {
+          const intelligence = await getApiFootballIntelligence({
+            date,
+            beforeDate: date,
+            sourceEventId: fixture?.sourceId || fixture?.id,
+            kickoff: fixture?.kickoff,
+            homeName: fixture?.home?.name,
+            awayName: fixture?.away?.name,
+            league: fixture?.league?.name,
+            country: fixture?.league?.country
+          }, fixture, { mode: 'engine' });
+          emit(fixture, intelligence);
+        } catch (error) {
+          const deferred = isRateLimitError(error);
+          if (deferred) rateLimited = true;
+          emit(fixture, null, { deferred, error });
+        }
+        continue;
+      }
+      const beforeMs = kickoffMs(fixture) || Date.now();
+      const homeHistory = Number.isFinite(homeId) ? selectVenueHistory(poolRows, homeId, 'home', beforeMs, 5) : [];
+      const awayHistory = Number.isFinite(awayId) ? selectVenueHistory(poolRows, awayId, 'away', beforeMs, 5) : [];
+      if (homeHistory.length >= 5 && awayHistory.length >= 5) {
+        emit(fixture, engineIntelligenceFromHistories(fixture, homeHistory, awayHistory, 'LEAGUE_POOL'));
+      } else {
+        pending.push({ fixture, homeHistory, awayHistory, poolRows });
+      }
+    }
   });
+
+  // Stage two is only for fixtures whose league pool lacks five venue matches.
+  // Team histories are cached/deduplicated and run after all pool-complete picks
+  // have already reached the UI and Consensus.
+  if (!rateLimited && pending.length) {
+    await mapWithConcurrency(pending, stageConcurrency, async item => {
+      const fixture = item.fixture;
+      if (rateLimited) {
+        emit(fixture, null, { deferred: true, error: 'Provider cooldown active' });
+        return;
+      }
+      const homeId = Number(fixture?.home?.id);
+      const awayId = Number(fixture?.away?.id);
+      const beforeMs = kickoffMs(fixture) || Date.now();
+      let homeHistory = item.homeHistory;
+      let awayHistory = item.awayHistory;
+      try {
+        if (homeHistory.length < 5 && Number.isFinite(homeId)) {
+          const body = await apiFootballRequest('/fixtures', {
+            team: homeId,
+            last: current.historyLast,
+            status: 'FT',
+            __priority: 3,
+            __deferOnRateLimit: true
+          }, current.engineHistoryTtlSeconds);
+          homeHistory = selectVenueHistory(responseArray(body), homeId, 'home', beforeMs, 5);
+        }
+        if (awayHistory.length < 5 && Number.isFinite(awayId)) {
+          const body = await apiFootballRequest('/fixtures', {
+            team: awayId,
+            last: current.historyLast,
+            status: 'FT',
+            __priority: 3,
+            __deferOnRateLimit: true
+          }, current.engineHistoryTtlSeconds);
+          awayHistory = selectVenueHistory(responseArray(body), awayId, 'away', beforeMs, 5);
+        }
+        const strategy = item.poolRows.length ? 'LEAGUE_POOL_WITH_TEAM_FALLBACK' : 'TEAM_HISTORY';
+        emit(fixture, engineIntelligenceFromHistories(fixture, homeHistory, awayHistory, strategy));
+      } catch (error) {
+        const deferred = isRateLimitError(error);
+        if (deferred) rateLimited = true;
+        emit(fixture, null, { deferred, error });
+      }
+    });
+  }
+
+  // Any fixture not reached because a cooldown began is returned explicitly as
+  // deferred. This keeps progress honest and lets the shared retry job resume it.
+  for (const fixture of fixtures) {
+    if (!byId.has(String(fixture?.id))) emit(fixture, null, { deferred: rateLimited, error: rateLimited ? 'Provider cooldown active' : 'History unavailable' });
+  }
+
+  const enriched = fixtures.map(fixture => byId.get(String(fixture?.id)) || fixture);
   const providerQueue = apiFootballRateState();
   const deferredCount = enriched.filter(item => item?.enrichment?.deferred).length;
   const statsAvailable = enriched.some(item => item?.stats?.homeSplit || item?.stats?.awaySplit);
@@ -1101,7 +1322,9 @@ export async function enrichApiFootballStatsBoard(date, fixtures = [], extractVe
     deferredCount,
     providerQueue,
     fixtures: enriched,
-    fixtureScope: 'ALL_DAILY_FIXTURES_RETURNED_BY_PROVIDER'
+    fixtureScope: 'ALL_DAILY_FIXTURES_RETURNED_BY_PROVIDER',
+    analysisPriority: 'PRICED_UPCOMING_FIXTURES_FIRST',
+    historyStrategy: 'LEAGUE_BATCH_THEN_TEAM_FALLBACK'
   };
 }
 
