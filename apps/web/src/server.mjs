@@ -44,7 +44,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.0';
+const APP_VERSION = '5.0.1';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const CONVERGENCE_ROUTE_CODE = 'CONVERGENCE_ROUTE';

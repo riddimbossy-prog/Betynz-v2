@@ -1,4 +1,4 @@
-# Start here — Betynz v5.0.0
+# Start here — Betynz v5.0.1
 
 ## 1. Create one GitHub repository
 
@@ -57,7 +57,7 @@ Open:
 /api/live
 ```
 
-Expected version: `5.0.0`. Health should show `apiFootball: true`, and every football source role should be `API_FOOTBALL`.
+Expected version: `5.0.1`. Health should show `apiFootball: true`, and every football source role should be `API_FOOTBALL`.
 
 ## 5. Connect the domain
 
@@ -66,3 +66,7 @@ Only after the temporary Render URL works, add `betynz.com` and `www.betynz.com`
 ## Coverage note
 
 Betynz applies no daily fixture cap. It displays every fixture returned by API-Football for the selected date. Actual competition, odds and statistics availability still depends on the user's API-Football plan and provider coverage.
+
+## v5.0.1 stale-folder protection
+
+The Render build now runs `npm run clean:provider-reset` before tests. This automatically deletes any retired provider app directory left behind by an older repository. A clean repository replacement is still recommended, but stale provider folders can no longer fail the build.

@@ -1,10 +1,12 @@
 {
   "name": "betynz-api-football-only-web",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "private": true,
   "type": "module",
   "description": "Betynz three-engine platform using API-Football as the sole provider for fixtures, odds, live scores, results, statistics and visuals.",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/server.mjs",
     "dev": "NODE_ENV=development node --watch src/server.mjs",

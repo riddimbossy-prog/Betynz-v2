@@ -1,4 +1,4 @@
-# Betynz v5.0.0 — API-Football Only
+# Betynz v5.0.1 — API-Football Only
 
 Betynz is a single-service Node.js prediction platform. `API_FOOTBALL_KEY` is the sole football-data credential and API-Football supplies every football input used by the website and engines.
 

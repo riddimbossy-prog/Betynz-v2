@@ -1,6 +1,6 @@
 # Modern prediction interface
 
-Betynz v5.0.0 preserves the premium dark dashboard, official silver-and-orange brand mark, responsive fixture cards, engine status chips, match-intelligence dialog and mobile/Z Fold navigation.
+Betynz v5.0.1 preserves the premium dark dashboard, official silver-and-orange brand mark, responsive fixture cards, engine status chips, match-intelligence dialog and mobile/Z Fold navigation.
 
 The presentation layer reads only same-origin Betynz endpoints. All fixture, odds, live, results, statistics and visual data behind those endpoints now comes from API-Football.
 

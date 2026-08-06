@@ -1,4 +1,4 @@
-# Betynz v5.0.0 build validation
+# Betynz v5.0.1 build validation
 
 Validation date: 2026-08-06 UTC
 
@@ -14,22 +14,28 @@ Validation date: 2026-08-06 UTC
 ## Automated results
 
 ```text
-Syntax checks:                         passed
-Engine/platform tests:                66 passed, 0 failed
-API-Football sole-source checks:       passed
-Fixture and odds normalization:        passed
-Odds pagination test:                  passed
-No 30-fixture enrichment cap:          45/45 processed
-Live score and minute normalization:   passed
-Result normalization and API route:    passed
-Incident/event normalization:          passed
-Crests, league logos and flags:        passed
-Venue history and PPG extraction:      passed
-Deep intelligence contract:            passed
-Release verification:                  passed
-Single-render verification:            passed
-One-service integration test:          passed
+Root stale-provider cleanup:            passed
+Contaminated-repository build test:      passed
+Syntax checks:                           passed
+Engine/platform tests:                  66 passed, 0 failed
+API-Football sole-source checks:         passed
+Fixture and odds normalization:          passed
+Odds pagination test:                    passed
+No 30-fixture enrichment cap:            45/45 processed
+Live score and minute normalization:     passed
+Result normalization and API route:      passed
+Incident/event normalization:            passed
+Crests, league logos and flags:          passed
+Venue history and PPG extraction:        passed
+Deep intelligence contract:              passed
+Release verification:                    passed
+Single-render verification:              passed
+One-service integration test:            passed
 ```
+
+## Build-failure regression
+
+The repository was deliberately contaminated with an extra retired app directory plus old root launcher/test files. `npm run build` removed the stale files before the test suite, after which all 66 tests and both release verifiers passed. This reproduces and fixes the Render failure reported for test 64.
 
 ## Integration smoke result
 
@@ -37,7 +43,7 @@ One-service integration test:          passed
 {
   "deployment": "ONE_RENDER_SERVICE",
   "provider": "API_FOOTBALL",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "engines": ["MARKET_ROUTE", "PPG_ROUTE", "CONVERGENCE_ROUTE"],
   "fixtures": 2,
   "live": 1,

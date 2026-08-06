@@ -1,6 +1,6 @@
 {
   "name": "betynz-api-football-only",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "private": true,
   "type": "module",
   "description": "Single-Render Betynz platform using API-Football as the sole football data provider for fixtures, odds, live scores, results, statistics and visuals.",
@@ -9,9 +9,10 @@
   },
   "scripts": {
     "start": "node apps/web/src/server.mjs",
-    "build": "npm --prefix apps/web run build && npm run verify:single-render",
+    "build": "npm run clean:provider-reset && npm --prefix apps/web run build && npm run verify:single-render",
     "test": "npm run build",
     "test:integration": "node test/api-football-single-service-smoke.mjs",
-    "verify:single-render": "node scripts/verify-single-render.mjs"
+    "verify:single-render": "node scripts/verify-single-render.mjs",
+    "clean:provider-reset": "node scripts/clean-provider-reset.mjs"
   }
 }

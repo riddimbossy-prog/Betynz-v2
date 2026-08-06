@@ -1,4 +1,4 @@
-# Betynz v5.0.0 architecture
+# Betynz v5.0.1 architecture
 
 ```text
 API-Football

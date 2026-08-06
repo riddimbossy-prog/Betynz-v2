@@ -1,4 +1,4 @@
-# Betynz v5.0.0 release
+# Betynz v5.0.1 release
 
 ## Provider reset
 

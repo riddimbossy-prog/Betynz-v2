@@ -136,7 +136,7 @@ test('production server boots with API-Football as the only football source', as
   t.after(() => child.kill('SIGTERM'));
 
   const health = await (await waitFor(`http://127.0.0.1:${port}/api/health`)).json();
-  assert.equal(health.version, '5.0.0');
+  assert.equal(health.version, '5.0.1');
   assert.equal(health.configured.apiFootball, true);
   assert.deepEqual(health.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'CONVERGENCE_ROUTE']);
   assert.deepEqual(new Set(Object.values(health.sourceRoles)), new Set(['API_FOOTBALL']));
