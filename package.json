@@ -1,0 +1,19 @@
+{
+  "name": "betynz-unified-sportybet",
+  "version": "3.8.0",
+  "private": true,
+  "type": "module",
+  "description": "Single-service Betynz deployment containing the SportyBet core API and all Betynz prediction engines.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node scripts/start-combined.mjs",
+    "build": "npm run build:api && npm run build:web && npm run verify:single-render",
+    "build:api": "npm --prefix apps/sportybet-api run build",
+    "build:web": "npm --prefix apps/web run build",
+    "test": "npm run build",
+    "test:integration": "node test/combined-smoke.mjs",
+    "verify:single-render": "node scripts/verify-single-render.mjs"
+  }
+}

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile, access } from 'node:fs/promises';
 
 const read = path => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+const readCombined = path => readFile(new URL(`../../../${path}`, import.meta.url), 'utf8');
 
 test('production server exposes the three engines and custom-data-API data layer', async () => {
   const server = await read('src/server.mjs');
@@ -24,13 +25,17 @@ test('public dashboard contains the three current engines and no retired engines
   assert.doesNotMatch(html, /Atlas 80\/20|Odds Threshold|Counter Odds|Supervisor|Best Picks/);
 });
 
-test('only SportyBet custom API connector variables remain', async () => {
+test('combined Render service uses only the internal SportyBet custom API', async () => {
   const env = await read('.env.example');
-  const render = await read('render.yaml');
+  const render = await readCombined('render.yaml');
+  const launcher = await readCombined('scripts/start-combined.mjs');
   assert.match(env, /BETYNZ_DATA_API_BASE_URL/);
-  assert.match(render, /BETYNZ_DATA_API_BASE_URL/);
-  assert.doesNotMatch(env, /ODDS_FEED_|API_FOOTBALL_/);
-  assert.doesNotMatch(render, /ODDS_FEED_|API_FOOTBALL_/);
+  assert.match(render, /SPORTYBET_PUBLIC_UPCOMING_URL/);
+  assert.match(render, /SPORTYBET_PUBLIC_LIVE_URL/);
+  assert.match(render, /SPORTYBET_PUBLIC_RESULTS_URL/);
+  assert.match(launcher, /BETYNZ_DATA_API_BASE_URL/);
+  assert.match(launcher, /127\.0\.0\.1/);
+  assert.doesNotMatch(`${env}\n${render}\n${launcher}`, /ODDS_FEED_|API_FOOTBALL_/);
 });
 
 test('retired engine and old data-adapter modules are absent', async () => {

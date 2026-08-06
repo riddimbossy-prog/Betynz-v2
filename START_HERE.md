@@ -1,25 +1,61 @@
-# Betynz v3.8.0 — SportyBet-only rebuild
+# Start here — Betynz single-Render build
 
-This release contains two fresh services:
+This package replaces the earlier two-service setup.
 
-1. `betynz-sportybet-api` — the private SportyBet core API.
-2. `betynz-web` — the Betynz website and prediction engines.
+## What to upload
 
-The SportyBet custom API is the only football-data source. Betynz contains no Parse.bot, BetExplorer, API-Football, The Odds API, demo-feed runtime, or packaged demo fixture fallback.
+Upload **everything inside this folder** to one blank GitHub repository. Do not upload the containing folder as another nested level.
 
-## Deployment order
+The repository root must show:
 
-1. Create a blank GitHub repository named `betynz-sportybet-api`.
-2. Upload the contents of the API package and deploy its `render.yaml` as a Render Blueprint.
-3. Set `SPORTYBET_API_KEY` to one long private secret.
-4. Confirm the API health route: `/api/health`.
-5. Test private routes with the same key: `/api/fixtures`, `/api/live`, `/api/results`, and one event detail.
-6. Create a blank GitHub repository named `betynz-web`.
-7. Upload the contents of the web package and deploy its `render.yaml`.
-8. Set `BETYNZ_DATA_API_BASE_URL` to the private API Render URL ending in `/api/`.
-9. Set `BETYNZ_DATA_API_KEY` to exactly the same secret used by `SPORTYBET_API_KEY`.
-10. Supabase is optional for first boot. Add a fresh project later for accounts, frozen predictions, proof, settlement, performance, and learning.
+```text
+apps/
+package.json
+package-lock.json
+render.yaml
+scripts/
+test/
+README.md
+DEPLOY_SINGLE_RENDER.md
+```
 
-## Important production check
+## Render
 
-The upcoming SportyBet route comes from the previously working collector. SportyBet may change its logged-out live, result, or event-detail route. Those four upstream templates are environment variables in the API service so they can be corrected without rebuilding the site.
+1. Choose **New → Blueprint**.
+2. Connect the new GitHub repository.
+3. Render reads the only `render.yaml` and creates one service named `betynz`.
+4. Enter the three new Supabase values when prompted.
+5. Deploy.
+
+You do not need a second Render service for the SportyBet API. The same container starts the private SportyBet core on an internal port, then starts the public Betynz website.
+
+## Supabase values
+
+```env
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+## First checks
+
+```text
+https://YOUR-SERVICE.onrender.com/api/health
+https://YOUR-SERVICE.onrender.com/api/config
+https://YOUR-SERVICE.onrender.com/api/fixtures?date=YYYY-MM-DD
+https://YOUR-SERVICE.onrender.com/api/live?date=YYYY-MM-DD
+```
+
+Expected engines:
+
+```text
+MARKET_ROUTE
+PPG_ROUTE
+CONVERGENCE_ROUTE
+```
+
+Expected football-data source:
+
+```text
+SPORTYBET_CUSTOM_API
+```

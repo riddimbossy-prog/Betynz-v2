@@ -3,37 +3,43 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
+const combinedRoot = resolve(root, '..', '..');
 const required = [
-  'package.json','package-lock.json','render.yaml','.env.example','src/server.mjs','src/lib/dataApi.mjs','src/lib/results.mjs',
+  'package.json','package-lock.json','.env.example','src/server.mjs','src/lib/dataApi.mjs','src/lib/results.mjs',
   'src/engines/marketRoute.mjs','src/engines/ppgRoute.mjs','src/engines/convergence.mjs','src/engines/consensus.mjs','src/engines/settlement.mjs',
   'public/index.html','public/app.js','public/styles.css','public/motion.js','public/sw.js','public/picks.html','public/picks.js',
   'public/market-route.html','public/ppg-route.html','public/convergence.html','public/live.html','public/proof.html','public/performance.html',
   'public/admin-engine-audit.html','public/admin-calibration.html','DEPLOY_V3_8.md','V3_8_CHANGES.md','docs/SPORTYBET_CORE_API_CONTRACT.md'
 ];
 for (const path of required) await access(resolve(root, path));
+for (const path of ['render.yaml','scripts/start-combined.mjs','apps/sportybet-api/src/server.mjs']) await access(resolve(combinedRoot, path));
 
 const forbiddenFiles = [
   'src/lib/oddsFeed.mjs','src/lib/apiFootball.mjs','src/engines/atlas8020.mjs','src/engines/oddsThreshold.mjs',
   'src/engines/counterOdds.mjs','src/engines/supervisor.mjs','public/atlas.html','public/odds-threshold.html',
-  'public/counter-odds.html','public/best-picks.html'
+  'public/counter-odds.html','public/best-picks.html','render.yaml'
 ];
 for (const path of forbiddenFiles) {
-  try { await access(resolve(root, path)); throw new Error(`Retired file remains: ${path}`); }
+  try { await access(resolve(root, path)); throw new Error(`Retired or duplicate file remains: ${path}`); }
   catch (error) { if (error?.code !== 'ENOENT') throw error; }
 }
 
 const read = path => readFile(resolve(root, path), 'utf8');
-const [env, render, server, adapter, results, sw, pkgText, lockText, styles, motion] = await Promise.all([
-  read('.env.example'),read('render.yaml'),read('src/server.mjs'),read('src/lib/dataApi.mjs'),read('src/lib/results.mjs'),
+const readCombined = path => readFile(resolve(combinedRoot, path), 'utf8');
+const [env, render, launcher, server, adapter, results, sw, pkgText, lockText, styles, motion] = await Promise.all([
+  read('.env.example'),readCombined('render.yaml'),readCombined('scripts/start-combined.mjs'),read('src/server.mjs'),read('src/lib/dataApi.mjs'),read('src/lib/results.mjs'),
   read('public/sw.js'),read('package.json'),read('package-lock.json'),read('public/styles.css'),read('public/motion.js')
 ]);
 const pkg = JSON.parse(pkgText);
 const lock = JSON.parse(lockText);
 
-if (!/BETYNZ_DATA_API_BASE_URL/.test(env) || !/BETYNZ_DATA_API_FIXTURES_PATH/.test(render)) throw new Error('Betynz Data API configuration is incomplete.');
-if (/ODDS_FEED_|API_FOOTBALL_/i.test(`${env}\n${render}\n${server}\n${results}`)) throw new Error('A retired data-source configuration remains.');
-const projectFiles = ['.env.example','render.yaml','src/server.mjs','src/lib/dataApi.mjs','src/lib/results.mjs','package.json'];
-const projectText = (await Promise.all(projectFiles.map(read))).join('\n').toLowerCase();
+if (!/BETYNZ_DATA_API_BASE_URL/.test(env) || !/BETYNZ_DATA_API_BASE_URL/.test(launcher)) throw new Error('Internal Betynz Data API wiring is incomplete.');
+for (const key of ['SPORTYBET_PUBLIC_UPCOMING_URL','SPORTYBET_PUBLIC_LIVE_URL','SPORTYBET_PUBLIC_RESULTS_URL','SPORTYBET_PUBLIC_EVENT_DETAIL_URL']) {
+  if (!render.includes(key)) throw new Error(`Root Render configuration is missing ${key}.`);
+}
+if ((render.match(/^\s*-\s+type:\s+web\s*$/gm) || []).length !== 1) throw new Error('Root render.yaml must create exactly one web service.');
+if (/ODDS_FEED_|API_FOOTBALL_/i.test(`${env}\n${render}\n${launcher}\n${server}\n${results}`)) throw new Error('A retired data-source configuration remains.');
+const projectText = `${env}\n${render}\n${launcher}\n${server}\n${adapter}\n${results}\n${pkgText}`.toLowerCase();
 for (const forbidden of ['parse.bot','betexplorer','api-football','api_football','odds_api','the-odds-api']) {
   if (projectText.includes(forbidden)) throw new Error(`A retired provider reference remains: ${forbidden}`);
 }
@@ -53,4 +59,4 @@ const allowed = [
 ].sort();
 if (JSON.stringify(tests) !== JSON.stringify(allowed)) throw new Error(`Unexpected test files remain: ${tests.join(', ')}`);
 
-console.log('Release verification passed: Betynz 3.8.0 SportyBet-only core release.');
+console.log('Release verification passed: Betynz 3.8.0 unified SportyBet-only release.');
