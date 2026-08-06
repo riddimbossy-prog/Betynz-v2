@@ -30,7 +30,8 @@ const state = {
   consensusPollTimer: null,
   routePollTimer: null,
   weekCountToken: 0,
-  winsPollTimer: null
+  winsPollTimer: null,
+  listSignature: ''
 };
 
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
@@ -132,6 +133,7 @@ async function loadDate(date, force = false) {
   state.consensusByFixture = new Map();
   state.visualByFixture = new Map();
   state.selected = null;
+  state.listSignature = '';
   $('#dateInput').value = date;
   $$('#weekStrip button').forEach(button => button.classList.toggle('active', button.dataset.date === date));
   const label = dateLabel(date);
@@ -154,9 +156,12 @@ async function loadDate(date, force = false) {
     renderKpis();
     if (state.fixtures.length) {
       $('#dayLoadState').textContent = `${state.fixtures.length} fixtures loaded. Deep statistics load only when you open a match.`;
-      hydrateVisuals(date).catch(() => {});
+      const missingVisualIds = state.fixtures.some(fixture => !Number(fixture?.home?.id) || !Number(fixture?.away?.id));
+      if (missingVisualIds) hydrateVisuals(date).catch(() => {});
       loadRouteSummary(date).catch(() => {});
-      loadRemainingWeekCounts(date).catch(() => {});
+      const loadCounts = () => loadRemainingWeekCounts(date).catch(() => {});
+      if ('requestIdleCallback' in window) requestIdleCallback(loadCounts, { timeout: 2500 });
+      else setTimeout(loadCounts, 1200);
     } else {
       $('#dayLoadState').textContent = payload.warning || 'No real matches are listed for this date yet.';
       setHomeSpotlightMessage('No qualified picks for this date yet.', 'The board updates when complete market and statistics routes become available.');
@@ -243,6 +248,15 @@ function teamCrest(team, country, fixtureId, side) {
 function renderList() {
   const list = $('#matchList');
   const visible = state.filtered;
+  const signature = visible.map(fixture => {
+    const id = String(fixture.id);
+    const route = state.routeByFixture.get(id);
+    const ppg = state.ppgByFixture.get(id);
+    const consensus = state.consensusByFixture.get(id);
+    return [id, fixture.home?.id, fixture.away?.id, route?.decision, route?.selection?.market, ppg?.decision, ppg?.selection?.market, consensus?.classification, consensus?.final?.market].join(':');
+  }).join('|');
+  if (state.listSignature === signature && list.children.length) return;
+  state.listSignature = signature;
   if (!visible.length) {
     list.innerHTML = '<div class="empty-state"><h3>No matches found</h3><p>Change the date or filters.</p></div>';
     $('#visibleMatches').textContent = '0 matches shown';
@@ -389,14 +403,21 @@ function renderHomeBankers(payload) {
   window.dispatchEvent(new CustomEvent('betynz:content-rendered'));
 }
 
-async function loadHomeConsensus(date, attempt = 0) {
+async function loadHomeConsensus(date, attempt = 0, days = 1) {
   clearTimeout(state.consensusPollTimer);
   try {
-    const qualified = await fetchJson(`/api/consensus-picks?from=${encodeURIComponent(date)}&days=2`, { cache: 'no-store', timeoutMs: 20000 });
+    const qualified = await fetchJson(`/api/consensus-picks?from=${encodeURIComponent(date)}&days=${days}`, { cache: 'no-store', timeoutMs: 20000 });
     if (state.selectedDate !== date) return;
     renderHomeBankers(qualified);
-    if (!qualified.complete && !qualified.failed && attempt < 90) {
-      state.consensusPollTimer = setTimeout(() => loadHomeConsensus(date, attempt + 1), 4500);
+    if (!qualified.complete && !qualified.failed && attempt < 120) {
+      const delay = attempt < 16 ? 1500 : 4000;
+      state.consensusPollTimer = setTimeout(() => loadHomeConsensus(date, attempt + 1, days), delay);
+    } else if (qualified.complete && !qualified.failed && days === 1) {
+      const expand = () => {
+        if (state.selectedDate === date && !document.hidden) loadHomeConsensus(date, 0, 2).catch(() => {});
+      };
+      if ('requestIdleCallback' in window) requestIdleCallback(expand, { timeout: 8000 });
+      else setTimeout(expand, 5000);
     }
   } catch (error) {
     if (state.selectedDate === date) setHomeSpotlightMessage('Engine analysis could not be completed.', error?.name === 'AbortError' ? 'The request timed out. Tap Refresh to retry.' : 'Tap Refresh to retry.');
@@ -412,7 +433,8 @@ async function loadRouteSummary(date, attempt = 0) {
   renderList();
   if (attempt === 0) loadHomeConsensus(date).catch(() => {});
   if (!payload.complete && !payload.failed && attempt < 90) {
-    state.routePollTimer = setTimeout(() => loadRouteSummary(date, attempt + 1).catch(() => {}), 4500);
+    const delay = attempt < 16 ? 1500 : 4000;
+    state.routePollTimer = setTimeout(() => loadRouteSummary(date, attempt + 1).catch(() => {}), delay);
   }
 }
 
@@ -436,14 +458,14 @@ async function loadRemainingWeekCounts(selectedDate) {
     const date = dateOffset(offset);
     if (date === selectedDate) continue;
     try {
-      const payload = await fetchJson(`/api/fixtures?date=${encodeURIComponent(date)}`, { cache: 'default', timeoutMs: 20000 });
+      const payload = await fetchJson(`/api/fixture-count?date=${encodeURIComponent(date)}`, { cache: 'default', timeoutMs: 12000 });
       if (token !== state.weekCountToken) return;
-      updateWeekCount(date, Array.isArray(payload.fixtures) ? payload.fixtures.length : null);
+      updateWeekCount(date, Number.isFinite(Number(payload.count)) ? Number(payload.count) : null);
     } catch {
       if (token !== state.weekCountToken) return;
       updateWeekCount(date, null);
     }
-    await new Promise(resolve => setTimeout(resolve, 250));
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 }
 

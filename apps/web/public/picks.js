@@ -5,6 +5,7 @@ const today = new Date().toISOString().slice(0, 10);
 let payload = null;
 let pollTimer = null;
 let requestVersion = 0;
+let pollCount = 0;
 let requestedDays = 1;
 
 function engineName(code) {
@@ -168,7 +169,7 @@ function schedulePoll(from, days, version) {
   clearTimeout(pollTimer);
   pollTimer = setTimeout(() => {
     if (version === requestVersion && ($('#picksDate').value || today) === from) load({ silent: true, days });
-  }, 4500);
+  }, pollCount++ < 16 ? 1500 : 4000);
 }
 
 async function load({ silent = false, days = 1 } = {}) {
@@ -177,6 +178,7 @@ async function load({ silent = false, days = 1 } = {}) {
   requestedDays = days;
   clearTimeout(pollTimer);
   if (!silent) {
+    pollCount = 0;
     for (const id of ['eliteGrid','consensusGrid','qualifiedList','saferList','conflictList']) $(`#${id}`).innerHTML = '<div class="picks-empty">Starting engine analysis…</div>';
   }
   try {

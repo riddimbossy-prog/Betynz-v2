@@ -1,19 +1,14 @@
-# Betynz Web v5.0.5
+# Betynz web v5.0.6
 
-The single Node web service uses API-Football for all football data and runs four independent prediction engines:
+API-Football-only four-engine web application.
 
-- Market Route
-- PPG Route
-- Convergence
-- Momentum & Streak
+Speed changes in v5.0.6:
 
-Momentum & Streak reads recent venue matches in order and evaluates six route families: home dominance, away dominance, goal wave, goal drought, BTTS wave and BTTS suppression. It requires a complete 5+5 venue sample, two independent streak families and an offered output market.
+- Progressive per-fixture engine publication
+- Priced upcoming fixtures first
+- Shared league-season history pools with team fallback
+- Lightweight future date counts
+- Shared in-flight requests and stronger caching
+- Minimal games-board motion
 
-Consensus classifications are now:
-
-- Elite Banker — 4/4 compatible agreement
-- Consensus Banker — 3/4 compatible agreement
-- Qualified Pick — one or two complete engine routes
-- Safer Pick — an approved single-engine downgrade
-
-Automatic settlement, proof, learning, rolling wins, PWA assets and responsive layouts remain part of the same service.
+Run `npm run build` from the repository root for the full release verification.

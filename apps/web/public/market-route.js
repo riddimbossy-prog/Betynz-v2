@@ -5,6 +5,7 @@ const today = new Date().toISOString().slice(0, 10);
 let payload = null;
 let pollTimer = null;
 let requestVersion = 0;
+let pollCount = 0;
 
 $('#routeDate').value = today;
 $('#routeRefresh').addEventListener('click', () => load());
@@ -26,14 +27,14 @@ function schedulePoll(date, version) {
   clearTimeout(pollTimer);
   pollTimer = setTimeout(() => {
     if (version === requestVersion && ($('#routeDate').value || today) === date) load({ silent: true });
-  }, 4000);
+  }, pollCount++ < 16 ? 1500 : 4000);
 }
 
 async function load({ silent = false } = {}) {
   const date = $('#routeDate').value || today;
   const version = ++requestVersion;
   clearTimeout(pollTimer);
-  if (!silent) $('#routeGrid').innerHTML = '<div class="route-empty">Loading market routes…</div>';
+  if (!silent) { pollCount = 0; $('#routeGrid').innerHTML = '<div class="route-empty">Loading market routes…</div>'; }
   try {
     const data = await fetchJson(`/api/market-route-board?date=${encodeURIComponent(date)}`);
     if (version !== requestVersion) return;

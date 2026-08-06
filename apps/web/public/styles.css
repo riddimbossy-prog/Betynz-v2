@@ -249,7 +249,7 @@ a{color:inherit;text-decoration:none}
 /* v5.0.3 same-origin API-Football crest delivery */
 .mini-crest img[hidden],.mini-crest b[hidden],.live-crest img[hidden],.live-crest span[hidden]{display:none!important}.live-crest{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:#0c151d;border:1px solid var(--line);overflow:hidden;flex:0 0 34px}.live-crest img{width:100%;height:100%;object-fit:contain}.live-crest span{font-size:10px;font-weight:900;color:var(--orange)}
 
-/* v5.0.5 settlement, board-aware visibility, rolling proof and PWA motion */
+/* v5.0.6 settlement, board-aware visibility, rolling proof and PWA motion */
 [hidden]{display:none!important}
 .board-score{font-size:18px!important;color:var(--green)!important;letter-spacing:.04em}.kickoff-cell>span{font-size:9px;color:var(--muted)}
 
@@ -291,7 +291,43 @@ a{color:inherit;text-decoration:none}
 @media(max-width:560px){.win-carousel{margin:8px 9px 0;padding:8px;gap:8px;border-radius:13px}.win-carousel-label{padding-right:8px}.win-carousel-label div{display:none}.win-carousel-label>span{width:28px;height:28px}.win-carousel-item{min-width:280px}.win-copy b{font-size:10px}.board-aware-empty{margin:10px 0;padding:15px!important}.pwa-splash-core img{width:min(190px,54vw)}}
 @media(prefers-reduced-motion:reduce){.win-carousel-track{animation:none!important;transform:none!important}.win-carousel-window{overflow-x:auto;mask-image:none;-webkit-mask-image:none}.pwa-launch-splash{display:none!important}.kpis article,.spotlight-pick,.consensus-pick-card{transform:none!important}.refresh-btn::after,.picks-actions button::after{display:none!important}}
 
-/* v5.0.5 Momentum & Streak Engine */
+/* v5.0.6 Momentum & Streak Engine */
 .momentum-chip{border-color:rgba(45,212,191,.34)!important}.momentum-pulse{background:#2dd4bf!important;box-shadow:0 0 0 0 rgba(45,212,191,.45)!important}.momentum-hero{background:radial-gradient(circle at 88% 0,rgba(45,212,191,.2),transparent 40%),linear-gradient(145deg,#071d25,#06131d)!important}.momentum-rules-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 18px}.momentum-rules-strip article{padding:15px;border:1px solid var(--line);border-radius:14px;background:#081d29}.momentum-rules-strip b,.momentum-rules-strip span{display:block}.momentum-rules-strip b{color:#5eead4}.momentum-rules-strip span{margin-top:5px;color:var(--muted);font-size:11px}.momentum-pick-card{border-color:rgba(45,212,191,.28)}.momentum-team-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.momentum-team-grid>article{padding:12px;border:1px solid var(--line);border-radius:12px;background:#071a22}.momentum-team-grid>article>small{display:block;color:#99f6e4;font-weight:900;margin-bottom:8px}.momentum-form-row{display:grid;gap:7px}.momentum-form-row>div{display:flex;gap:5px;flex-wrap:wrap}.momentum-form-row small{color:var(--muted);font-size:10px}.form-dot{display:grid;place-items:center;width:25px;height:25px;border-radius:7px;font-size:10px;font-weight:950;background:#13212a;color:#d9e4eb}.form-dot.w{background:rgba(41,226,125,.16);color:#5df59a}.form-dot.d{background:rgba(255,184,0,.14);color:#ffd166}.form-dot.l{background:rgba(255,88,107,.14);color:#ff7a8d}.momentum-family-row{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.momentum-family-row span{padding:5px 8px;border:1px solid rgba(45,212,191,.25);border-radius:99px;background:rgba(45,212,191,.08);color:#99f6e4;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.5px}
 @media(max-width:1100px){.momentum-rules-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.momentum-rules-strip,.momentum-team-grid{grid-template-columns:1fr}}
+
+/* v5.0.6 performance mode: the fixture board stays visually stable. */
+.minimal-board-motion .match-row,
+.minimal-board-motion .matches-panel,
+.minimal-board-motion .kpis article,
+.minimal-board-motion .spotlight-pick,
+.minimal-board-motion .consensus-pick-card,
+.minimal-board-motion .route-pick-card,
+.minimal-board-motion .ppg-pick-card,
+.minimal-board-motion .convergence-card,
+.minimal-board-motion .momentum-card,
+.minimal-board-motion .home-consensus-section,
+.minimal-board-motion .consensus-stage,
+.minimal-board-motion .qualified-stage{
+  animation:none!important;
+  transform:none!important;
+  transition:background-color .12s ease,border-color .12s ease!important;
+}
+.minimal-board-motion .cinematic-spotlight::after,
+.minimal-board-motion .consensus-stage::after,
+.minimal-board-motion .consensus-pick-card::before,
+.minimal-board-motion .refresh-btn::after,
+.minimal-board-motion .picks-actions button::after{
+  display:none!important;
+  animation:none!important;
+}
+.minimal-board-motion .motion-reveal,
+.minimal-board-motion .motion-visible{
+  opacity:1!important;
+  transform:none!important;
+  transition:none!important;
+}
+.minimal-board-motion .match-row{content-visibility:auto;contain-intrinsic-size:104px}
+.minimal-board-motion .match-list{scroll-behavior:auto}
+.minimal-board-motion body{background-attachment:scroll}
+.minimal-board-motion .pulse{animation-duration:2.8s}

@@ -51,6 +51,8 @@ function config(env = process.env) {
     retryBaseMs: Math.max(250, Math.min(10000, number(env.API_FOOTBALL_RETRY_BASE_MS, 1000))),
     retryMaxMs: Math.max(1000, Math.min(120000, number(env.API_FOOTBALL_RETRY_MAX_MS, 30000))),
     historyLast: Math.max(10, Math.min(100, number(env.API_FOOTBALL_HISTORY_LAST, 40))),
+    engineHistoryTtlSeconds: Math.max(1800, number(env.API_FOOTBALL_ENGINE_HISTORY_TTL_SECONDS, 21600)),
+    engineLeagueHistory: truthy(env.API_FOOTBALL_ENGINE_LEAGUE_HISTORY, true),
     mappingThreshold: Math.max(0.45, Math.min(0.95, number(env.API_FOOTBALL_MAPPING_THRESHOLD, 0.55))),
     deepStats: truthy(env.API_FOOTBALL_DEEP_STATS, true),
     bookmakerId: text(env.API_FOOTBALL_BOOKMAKER_ID),
@@ -101,6 +103,7 @@ export function apiFootballPublicConfig(env = process.env) {
     fixtureScope: 'ALL_DAILY_FIXTURES_RETURNED_BY_PROVIDER',
     applicationFixtureCap: null,
     historyLast: value.historyLast,
+    engineHistoryStrategy: value.engineLeagueHistory ? 'LEAGUE_POOL_THEN_TEAM_FALLBACK' : 'TEAM_HISTORY',
     bookmakerId: value.bookmakerId || null,
     bookmakerName: value.bookmakerName || null,
     deepStats: value.deepStats
@@ -122,7 +125,7 @@ function requestHeaders(current) {
   const headers = {
     [current.headerName]: current.key,
     accept: 'application/json',
-    'user-agent': 'Betynz-API-Football-Only/5.0.5'
+    'user-agent': 'Betynz-API-Football-Only/5.0.6'
   };
   if (current.rapidApiHost) headers['x-rapidapi-host'] = current.rapidApiHost;
   return headers;
@@ -456,6 +459,17 @@ export async function getApiFootballDailyFixtures(date) {
   return { configured: body.configured, fixtures: responseArray(body), fetchedAt: body.fetchedAt || null };
 }
 
+export async function getApiFootballFixtureCount(date) {
+  const daily = await getApiFootballDailyFixtures(date);
+  return {
+    configured: daily.configured,
+    source: 'API_FOOTBALL',
+    date,
+    count: (daily.fixtures || []).length,
+    fetchedAt: daily.fetchedAt || null
+  };
+}
+
 export async function getApiFootballOddsForDate(date) {
   if (!safeDate(date)) throw new Error('date must be YYYY-MM-DD');
   const current = config();
@@ -596,6 +610,77 @@ function selectVenueHistory(rows, teamId, venue, beforeMs, limit = 5) {
     if (beforeMs && kickoff && kickoff >= beforeMs) return false;
     return venue === 'home' ? Number(row?.teams?.home?.id) === Number(teamId) : Number(row?.teams?.away?.id) === Number(teamId);
   }).sort((a, b) => (kickoffMs(b) || 0) - (kickoffMs(a) || 0)).slice(0, limit).map(historyRow);
+}
+
+async function getApiFootballEngineIntelligence(date, fixture) {
+  const current = config();
+  if (!current.configured || !fixture) return null;
+  const homeId = Number(fixture?.home?.id);
+  const awayId = Number(fixture?.away?.id);
+  const leagueId = Number(fixture?.league?.id);
+  const season = Number(fixture?.league?.season);
+  const beforeMs = kickoffMs(fixture) || Date.now();
+
+  // API-Football already owns the fixture object, so engine scans do not need
+  // a second daily-fixture mapping pass. A single league-season history pool
+  // is shared by every match in that competition; team requests are only used
+  // when the league pool does not contain five venue matches.
+  if (!Number.isFinite(homeId) || !Number.isFinite(awayId)) {
+    return getApiFootballIntelligence({ date, beforeDate: date }, fixture, { mode: 'engine' });
+  }
+
+  let poolRows = [];
+  let strategy = 'TEAM_HISTORY';
+  if (current.engineLeagueHistory && Number.isFinite(leagueId) && Number.isFinite(season)) {
+    try {
+      const pool = await apiFootballRequest('/fixtures', { league: leagueId, season, status: 'FT' }, current.engineHistoryTtlSeconds);
+      poolRows = responseArray(pool);
+      if (poolRows.length) strategy = 'LEAGUE_POOL';
+    } catch {}
+  }
+
+  let homeHistory = selectVenueHistory(poolRows, homeId, 'home', beforeMs, 5);
+  let awayHistory = selectVenueHistory(poolRows, awayId, 'away', beforeMs, 5);
+  const fallbacks = [];
+  if (homeHistory.length < 5) {
+    fallbacks.push(apiFootballRequest('/fixtures', { team: homeId, last: current.historyLast, status: 'FT' }, current.engineHistoryTtlSeconds)
+      .then(body => { homeHistory = selectVenueHistory(responseArray(body), homeId, 'home', beforeMs, 5); })
+      .catch(() => null));
+  }
+  if (awayHistory.length < 5) {
+    fallbacks.push(apiFootballRequest('/fixtures', { team: awayId, last: current.historyLast, status: 'FT' }, current.engineHistoryTtlSeconds)
+      .then(body => { awayHistory = selectVenueHistory(responseArray(body), awayId, 'away', beforeMs, 5); })
+      .catch(() => null));
+  }
+  if (fallbacks.length) {
+    await Promise.all(fallbacks);
+    strategy = poolRows.length ? 'LEAGUE_POOL_WITH_TEAM_FALLBACK' : 'TEAM_HISTORY';
+  }
+
+  return {
+    source: 'API_FOOTBALL',
+    mapped: true,
+    mappingConfidence: 1,
+    historyStrategy: strategy,
+    fixture: {
+      id: Number(fixture.id) || null,
+      date: fixture.kickoff || null,
+      venue: fixture.venue || null,
+      status: fixture.status || null,
+      league: fixture.league || null,
+      home: fixture.home || null,
+      away: fixture.away || null,
+      mappingConfidence: 1
+    },
+    home: { id: homeId, name: fixture.home?.name || '', logo: fixture.home?.logo || null, history: homeHistory },
+    away: { id: awayId, name: fixture.away?.name || '', logo: fixture.away?.logo || null, history: awayHistory },
+    league: fixture.league || null,
+    standings: null,
+    teamStatistics: { home: null, away: null },
+    h2h: [],
+    predictions: null,
+    injuries: []
+  };
 }
 
 function teamStatsSummary(body) {
@@ -748,7 +833,7 @@ export async function enrichApiFootballStatsBoard(date, fixtures = [], extractVe
     };
     let result;
     try {
-      const intelligence = await getApiFootballIntelligence(context, fixture, { mode: 'engine' });
+      const intelligence = await getApiFootballEngineIntelligence(date, fixture);
       const stats = typeof extractVenueStats === 'function' ? extractVenueStats(intelligence, context) : null;
       result = {
         ...fixture,

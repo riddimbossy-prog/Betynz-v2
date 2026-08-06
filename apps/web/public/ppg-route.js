@@ -5,6 +5,7 @@ const today = new Date().toISOString().slice(0, 10);
 let payload = null;
 let pollTimer = null;
 let requestVersion = 0;
+let pollCount = 0;
 
 $('#ppgDate').value = today;
 $('#ppgRefresh').addEventListener('click', () => load());
@@ -37,7 +38,7 @@ function schedulePoll(date, version) {
   clearTimeout(pollTimer);
   pollTimer = setTimeout(() => {
     if (version === requestVersion && ($('#ppgDate').value || today) === date) load({ silent: true });
-  }, 4000);
+  }, pollCount++ < 16 ? 1500 : 4000);
 }
 
 async function load({ silent = false } = {}) {
@@ -45,6 +46,7 @@ async function load({ silent = false } = {}) {
   const version = ++requestVersion;
   clearTimeout(pollTimer);
   if (!silent) {
+    pollCount = 0;
     $('#ppgGrid').innerHTML = '<div class="route-empty"><h3>Starting venue PPG analysis…</h3><p>The page will update automatically while team histories are processed.</p></div>';
   }
   try {

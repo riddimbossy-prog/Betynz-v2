@@ -40,7 +40,7 @@ services:
       - key: API_FOOTBALL_MEDIA_TIMEOUT_MS
         value: "10000"
       - key: API_FOOTBALL_ENRICH_CONCURRENCY
-        value: "2"
+        value: "4"
       - key: API_FOOTBALL_REQUEST_CONCURRENCY
         value: "3"
       - key: API_FOOTBALL_REQUEST_MIN_INTERVAL_MS
@@ -51,6 +51,10 @@ services:
         value: "30000"
       - key: API_FOOTBALL_HISTORY_LAST
         value: "40"
+      - key: API_FOOTBALL_ENGINE_LEAGUE_HISTORY
+        value: "true"
+      - key: API_FOOTBALL_ENGINE_HISTORY_TTL_SECONDS
+        value: "21600"
       - key: API_FOOTBALL_MAPPING_THRESHOLD
         value: "0.55"
       - key: API_FOOTBALL_DEEP_STATS
@@ -62,7 +66,7 @@ services:
       - key: CACHE_TTL_SECONDS
         value: "120"
       - key: FIXTURE_BOARD_CACHE_TTL_SECONDS
-        value: "60"
+        value: "120"
       - key: MATCH_INTELLIGENCE_CACHE_TTL_SECONDS
         value: "600"
       - key: ODDS_SNAPSHOT_INTERVAL_SECONDS

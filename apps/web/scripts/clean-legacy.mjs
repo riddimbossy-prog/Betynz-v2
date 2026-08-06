@@ -24,7 +24,8 @@ const allowedTests = new Set([
   'api-football.test.mjs',
   'api-football-source.test.mjs',
   'platform-smoke.test.mjs',
-  'progressive-engine-analysis.test.mjs'
+  'progressive-engine-analysis.test.mjs',
+  'fast-prediction-pipeline.test.mjs'
 ]);
 
 try {

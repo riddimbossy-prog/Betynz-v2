@@ -1,4 +1,4 @@
-# Betynz v5.0.5 — Momentum & Streak fourth engine
+# Betynz v5.0.6 — Momentum & Streak fourth engine
 
 ## New engine
 

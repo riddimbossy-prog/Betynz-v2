@@ -1,6 +1,6 @@
 {
   "name": "betynz-api-football-only-web",
-  "version": "5.0.5",
+  "version": "5.0.6",
   "private": true,
   "type": "module",
   "description": "Betynz four-engine platform using API-Football as the sole provider for fixtures, odds, live scores, results, statistics and visuals.",
@@ -16,6 +16,6 @@
     "test": "npm run clean:legacy && npm run test:engines",
     "build": "npm run clean:legacy && npm run check:syntax && npm run test:engines && npm run verify:release",
     "verify:release": "node scripts/verify-release.mjs",
-    "test:engines": "node --test test/market-route.test.mjs test/ppg-route.test.mjs test/convergence.test.mjs test/momentum-streak.test.mjs test/consensus.test.mjs test/calibration.test.mjs test/settlement.test.mjs test/four-engine-reset.test.mjs test/qualified-picks.test.mjs test/responsive-cinematic.test.mjs test/api-football.test.mjs test/api-football-source.test.mjs test/platform-smoke.test.mjs test/progressive-engine-analysis.test.mjs"
+    "test:engines": "node --test test/market-route.test.mjs test/ppg-route.test.mjs test/convergence.test.mjs test/momentum-streak.test.mjs test/consensus.test.mjs test/calibration.test.mjs test/settlement.test.mjs test/four-engine-reset.test.mjs test/qualified-picks.test.mjs test/responsive-cinematic.test.mjs test/api-football.test.mjs test/api-football-source.test.mjs test/platform-smoke.test.mjs test/progressive-engine-analysis.test.mjs test/fast-prediction-pipeline.test.mjs"
   }
 }

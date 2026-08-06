@@ -1,4 +1,4 @@
-# Betynz v5.0.5 responsive validation
+# Betynz v5.0.6 responsive validation
 
 Source assertions cover phone, Z Fold cover, Z Fold inner, tablet, laptop and wide desktop layouts.
 

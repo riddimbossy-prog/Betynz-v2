@@ -5,12 +5,12 @@ import { readFile, readdir } from 'node:fs/promises';
 const root = new URL('../', import.meta.url);
 const read = path => readFile(new URL(path, root), 'utf8');
 
-test('all public pages declare a device viewport and load cinematic motion', async () => {
+test('all public pages declare a device viewport and load the lightweight motion layer', async () => {
   const files = (await readdir(new URL('../public/', import.meta.url))).filter(name => name.endsWith('.html'));
   for (const name of files) {
     const html = await read(`public/${name}`);
     assert.match(html, /name="viewport"/i, `${name} is missing viewport metadata`);
-    assert.match(html, /motion\.js\?v=5\.0\.5/, `${name} is missing the motion layer`);
+    assert.match(html, /motion\.js\?v=5\.0\.6/, `${name} is missing the lightweight motion layer`);
     assert.match(html, /favicon\.ico/, `${name} is missing favicon metadata`);
     assert.match(html, /apple-touch-icon/, `${name} is missing Apple PWA metadata`);
   }
@@ -28,18 +28,19 @@ test('responsive CSS includes phone, Z Fold cover, Z Fold inner, tablet, desktop
   assert.match(css, /overflow-x:clip/);
 });
 
-test('cinematic motion remains decorative and accessible', async () => {
+test('fixture board motion is minimal while PWA splash and win ticker remain accessible', async () => {
   const motion = await read('public/motion.js');
   const css = await read('public/styles.css');
   assert.match(motion, /prefers-reduced-motion/);
-  assert.match(motion, /IntersectionObserver/);
-  assert.match(motion, /pointer: fine/);
-  assert.match(css, /lightningFlash/);
-  assert.match(css, /panelSweep/);
-  assert.match(css, /borderOrbit/);
+  assert.match(motion, /display-mode: standalone/);
+  assert.match(motion, /minimal-board-motion/);
+  assert.doesNotMatch(motion, /IntersectionObserver/);
+  assert.doesNotMatch(motion, /pointermove/);
+  assert.doesNotMatch(motion, /scheduleLightning/);
   assert.match(css, /winTicker/);
   assert.match(css, /pwa-launch-splash/);
-  assert.match(motion, /showLaunchSplash/);
+  assert.match(css, /content-visibility:auto/);
+  assert.match(css, /\.minimal-board-motion \.match-row/);
 });
 
 test('new audit and calibration pages are mobile navigable', async () => {

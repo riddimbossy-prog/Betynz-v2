@@ -5,6 +5,7 @@ const today = new Date().toISOString().slice(0, 10);
 let payload = null;
 let pollTimer = null;
 let requestVersion = 0;
+let pollCount = 0;
 
 $('#momentumDate').value = today;
 $('#momentumRefresh').addEventListener('click', () => load());
@@ -31,7 +32,7 @@ function schedulePoll(date, version) {
   clearTimeout(pollTimer);
   pollTimer = setTimeout(() => {
     if (version === requestVersion && ($('#momentumDate').value || today) === date) load({ silent: true });
-  }, 4000);
+  }, pollCount++ < 16 ? 1500 : 4000);
 }
 
 async function load({ silent = false } = {}) {

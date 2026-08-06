@@ -1,4 +1,4 @@
--- Betynz v5.0.5 upgrade for the Momentum & Streak Engine.
+-- Betynz v5.0.6 upgrade for the Momentum & Streak Engine.
 -- Existing records remain valid. New writes may use all four active engines.
 
 alter table if exists public.engine_predictions

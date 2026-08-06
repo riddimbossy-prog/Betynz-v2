@@ -1,8 +1,8 @@
-# Betynz v5.0.5 modern UI
+# Betynz v5.0.6 modern UI
 
 The premium black, silver and orange interface now exposes four independent engines throughout the application.
 
-Added in v5.0.5:
+Added in v5.0.6:
 
 - Dedicated Momentum & Streak dashboard page
 - Momentum engine chip in the sticky dashboard controls

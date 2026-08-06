@@ -46,6 +46,6 @@ GET /api/wins-carousel?days=14&limit=24
 
 The wins route returns only officially settled `WON` rows. It does not generate or rewrite predictions.
 
-## v5.0.5 four-engine analysis
+## v5.0.6 four-engine analysis
 
 The provider contract remains unchanged. Momentum & Streak consumes the same normalized fixture, exact offered markets and cached last-five home/away venue statistics already used by the statistical engines. It does not create another upstream data source or make browser-side provider calls.

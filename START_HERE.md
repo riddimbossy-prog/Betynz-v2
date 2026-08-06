@@ -1,34 +1,32 @@
-# Start here — Betynz v5.0.5
+# Start here — Betynz v5.0.6
 
-## Existing GitHub repository
+## Upgrade the existing GitHub repository
 
 1. Keep only the hidden `.git` folder in the local repository.
-2. Copy every file from the extracted v5.0.5 folder into the repository root.
-3. Commit with: `Betynz v5.0.5 Momentum and Streak Engine`.
+2. Copy every file from the extracted v5.0.6 folder into the repository root.
+3. Commit with: `Betynz v5.0.6 fast predictions and minimal board motion`.
 4. Push to the branch connected to Render.
 5. In Render select **Manual Deploy → Clear build cache & deploy**.
-6. Confirm `/api/health` reports version `5.0.5` and four engines.
-7. Open `/momentum-streak.html` and analyse a date.
+6. Confirm `/api/health` reports version `5.0.6` and four engines.
+7. Open the dashboard and confirm priced upcoming fixtures begin producing progress/results before the full day finishes.
 8. Hard-refresh the browser with `Ctrl + Shift + R`.
-9. Close and reopen the installed PWA so service-worker cache `betynz-v5-0-5` activates.
+9. Close and reopen the installed PWA so service-worker cache `betynz-v5-0-6` activates.
 
-## Supabase upgrade
+## Database
 
-For an existing Betynz database, run this once in the Supabase SQL editor before the new engine writes predictions:
+No new Supabase migration is required when upgrading from v5.0.5.
+
+An existing project must already include:
 
 ```text
 apps/web/sql/012_momentum_streak_engine.sql
 ```
-
-The migration adds `MOMENTUM_STREAK` to prediction constraints and expands consensus agreement counts from three to four.
 
 For a completely new Supabase project, run:
 
 ```text
 apps/web/sql/001_market_route_fresh.sql
 ```
-
-The fresh schema already includes all four engines.
 
 ## Required football secret
 

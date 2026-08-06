@@ -35,6 +35,7 @@ import {
   enrichApiFootballStatsBoard,
   enrichApiFootballVisuals,
   getApiFootballFixtureBoard,
+  getApiFootballFixtureCount,
   getApiFootballLiveBoard,
   getApiFootballResults,
   getApiFootballFixtureEvents,
@@ -45,7 +46,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.5';
+const APP_VERSION = '5.0.6';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const CONVERGENCE_ROUTE_CODE = 'CONVERGENCE_ROUTE';
@@ -117,7 +118,7 @@ async function loadApiFootballMedia(kind, id) {
       const keyValue = String(process.env.API_FOOTBALL_KEY || '');
       const headers = {
         accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'user-agent': 'Betynz-Media-Proxy/5.0.5'
+        'user-agent': 'Betynz-Media-Proxy/5.0.6'
       };
       if (keyValue) headers[keyHeader] = keyValue;
       const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
@@ -585,6 +586,74 @@ async function getMarketRouteBoard(date) {
 
 const statsBoardInflight = new Map();
 
+function hasPredictionMarkets(fixture = {}) {
+  return Number(fixture?.availableMarketCount || 0) > 0
+    || Object.values(fixture?.odds || {}).some(value => Number(value) > 1);
+}
+
+function isUpcomingPredictionFixture(fixture = {}) {
+  const kickoff = new Date(fixture?.kickoff || 0).getTime();
+  const status = String(fixture?.status || '').toUpperCase();
+  return hasPredictionMarkets(fixture)
+    && Number.isFinite(kickoff)
+    && kickoff > Date.now()
+    && !/FT|AET|PEN|CANC|PST|ABD|LIVE|1H|2H|HT/.test(status);
+}
+
+function predictionPriority(fixtures = []) {
+  return [...fixtures].sort((a, b) => {
+    const pa = isUpcomingPredictionFixture(a) ? 0 : hasPredictionMarkets(a) ? 1 : 2;
+    const pb = isUpcomingPredictionFixture(b) ? 0 : hasPredictionMarkets(b) ? 1 : 2;
+    return pa - pb || new Date(a?.kickoff || 0) - new Date(b?.kickoff || 0);
+  });
+}
+
+function routeItem(fixture, stats, analyser) {
+  const safeFixture = publicFixture(fixture);
+  if (!safeFixture) return null;
+  return { fixture: safeFixture, engine: analyser(fixture, stats), venueForm: publicVenueForm(stats) };
+}
+
+function responseSummary(items = [], eligible = 0, processed = 0) {
+  return {
+    fixtures: items.length,
+    eligible,
+    processed,
+    awaitingOdds: Math.max(0, items.length - eligible),
+    analysed: items.filter(item => item?.engine?.decision !== 'WAITING').length,
+    fire: items.filter(item => item?.engine?.decision === 'FIRE').length,
+    safer: items.filter(item => item?.engine?.decision === 'SAFER').length,
+    waiting: items.filter(item => item?.engine?.decision === 'WAITING').length,
+    conflict: items.filter(item => ['CONFLICT', 'STAT_CONFLICT'].includes(item?.engine?.decision)).length,
+    noSignal: items.filter(item => !item?.engine?.selection).length
+  };
+}
+
+function progressiveEngineResponse({ date, engine, items, processed, total, complete = false, failed = false, warning = null, enrichmentSource = 'API_FOOTBALL_VENUE_HISTORY' }) {
+  const all = [...items.values()].filter(Boolean).sort((a, b) => new Date(a.fixture?.kickoff || 0) - new Date(b.fixture?.kickoff || 0));
+  const progress = {
+    stage: failed ? 'FAILED' : complete ? 'COMPLETE' : 'VENUE_HISTORY',
+    processed,
+    total,
+    percent: total ? Math.round(processed / total * 100) : 100
+  };
+  return {
+    date,
+    engine,
+    source: 'API_FOOTBALL',
+    enrichmentSource,
+    warning,
+    qualified: all.filter(item => item?.engine?.selection),
+    all,
+    summary: responseSummary(all, total, processed),
+    progress,
+    complete,
+    failed,
+    generatedAt: new Date().toISOString(),
+    cache: 'MISS'
+  };
+}
+
 async function getStatsRouteBoards(date) {
   const key = `stats-route-boards:${date}`;
   const cached = cacheGet(key);
@@ -592,99 +661,75 @@ async function getStatsRouteBoards(date) {
   if (statsBoardInflight.has(key)) return statsBoardInflight.get(key);
   const task = (async () => {
     const board = await getFastFixtureBoard(date);
+    const fixtures = predictionPriority((board.fixtures || []).filter(Boolean));
+    const eligibleFixtures = fixtures.filter(isUpcomingPredictionFixture);
+    const total = eligibleFixtures.length;
     let processed = 0;
-    const total = (board.fixtures || []).length;
-    const enrichment = await enrichPrimaryStatsAndVisuals(date, board.fixtures, {
-      onFixture: () => {
-        processed += 1;
-        const snapshot = statsRouteViewSnapshots.get(date);
-        if (!snapshot) return;
-        const progress = { stage: 'VENUE_HISTORY', processed, total, percent: total ? Math.round(processed / total * 100) : 100 };
-        statsRouteViewSnapshots.set(date, {
-          ppg: { ...snapshot.ppg, progress, complete: false },
-          convergence: { ...snapshot.convergence, progress, complete: false },
-          momentum: { ...snapshot.momentum, progress, complete: false }
-        });
-        const marketSnapshot = cacheGet(`market-route-board:${date}`);
-        if (marketSnapshot && !marketSnapshot.complete) cacheSet(`market-route-board:${date}`, { ...marketSnapshot, progress, complete: false }, 120);
-      }
-    });
-    const enrichedFixtures = enrichment.fixtures || [];
-    const marketItems = [];
-    const ppgItems = [];
-    const convergenceItems = [];
-    const momentumItems = [];
-    for (const fixture of enrichedFixtures) {
-      
-      const stats = fixture?.stats?.homeSplit || fixture?.stats?.awaySplit
-        ? { homeSplit: fixture.stats?.homeSplit || null, awaySplit: fixture.stats?.awaySplit || null, source: fixture.stats?.source || 'API_FOOTBALL' }
-        : null;
-      const safeFixture = publicFixture(fixture);
-      if (!safeFixture) continue;
-      marketItems.push({ fixture: safeFixture, engine: analyzeMarketRoute(fixture, stats), venueForm: publicVenueForm(stats) });
-      ppgItems.push({ fixture: safeFixture, engine: analyzePpgRoute(fixture, stats), venueForm: publicVenueForm(stats) });
-      convergenceItems.push({ fixture: safeFixture, engine: analyzeConvergence(fixture, stats), venueForm: publicVenueForm(stats) });
-      momentumItems.push({ fixture: safeFixture, engine: analyzeMomentumStreak(fixture, stats), venueForm: publicVenueForm(stats) });
+
+    const marketMap = new Map();
+    const ppgMap = new Map();
+    const convergenceMap = new Map();
+    const momentumMap = new Map();
+    for (const fixture of fixtures) {
+      const id = String(fixture.id);
+      marketMap.set(id, routeItem(fixture, null, analyzeMarketRoute));
+      ppgMap.set(id, routeItem(fixture, null, analyzePpgRoute));
+      convergenceMap.set(id, routeItem(fixture, null, analyzeConvergence));
+      momentumMap.set(id, routeItem(fixture, null, analyzeMomentumStreak));
     }
-    await Promise.all([
-      storePredictions(date, marketItems, MARKET_ROUTE_CODE),
-      storePredictions(date, ppgItems, PPG_ROUTE_CODE),
-      storePredictions(date, convergenceItems, CONVERGENCE_ROUTE_CODE),
-      storePredictions(date, momentumItems, MOMENTUM_STREAK_CODE)
-    ]);
-    const makeResponse = (engine, items) => ({
-      date,
-      engine,
-      source: 'API_FOOTBALL',
-      enrichmentSource: enrichment.enrichmentSource || null,
-      warning: enrichment.warning || board.warning || null,
-      qualified: items.filter(item => item.engine.selection),
-      all: items,
-      summary: {
-        fixtures: items.length,
-        analysed: items.filter(item => item.engine.decision !== 'WAITING').length,
-        fire: items.filter(item => item.engine.decision === 'FIRE').length,
-        safer: items.filter(item => item.engine.decision === 'SAFER').length,
-        waiting: items.filter(item => item.engine.decision === 'WAITING').length,
-        conflict: items.filter(item => item.engine.decision === 'CONFLICT').length,
-        noSignal: items.filter(item => item.engine.decision === 'NO_SIGNAL').length
-      },
-      generatedAt: new Date().toISOString(),
-      cache: 'MISS'
-    });
-    const marketResponse = {
-      date,
-      engine: 'Market Route Engine',
-      source: 'API_FOOTBALL',
-      statisticsSource: 'API_FOOTBALL',
-      enrichmentSource: enrichment.enrichmentSource || 'API_FOOTBALL_VENUE_HISTORY',
-      warning: enrichment.warning || board.warning || null,
-      qualified: marketItems.filter(item => item.engine.selection),
-      all: marketItems,
-      summary: {
-        fixtures: marketItems.length,
-        fire: marketItems.filter(item => item.engine.decision === 'FIRE').length,
-        safer: marketItems.filter(item => item.engine.decision === 'SAFER').length,
-        conflict: marketItems.filter(item => ['CONFLICT','STAT_CONFLICT'].includes(item.engine.decision)).length,
-        noSignal: marketItems.filter(item => !item.engine.selection).length
-      },
-      progress: { stage: 'COMPLETE', processed: marketItems.length, total: marketItems.length, percent: 100 },
+
+    const publish = ({ complete = false, failed = false, warning = null, enrichmentSource = 'API_FOOTBALL_VENUE_HISTORY' } = {}) => {
+      const market = progressiveEngineResponse({ date, engine: 'Market Route Engine', items: marketMap, processed, total, complete, failed, warning, enrichmentSource });
+      market.statisticsSource = complete ? 'API_FOOTBALL' : 'PENDING_SHARED_ENRICHMENT';
+      const snapshot = {
+        ppg: progressiveEngineResponse({ date, engine: 'PPG Route Engine', items: ppgMap, processed, total, complete, failed, warning, enrichmentSource }),
+        convergence: progressiveEngineResponse({ date, engine: 'Convergence Engine', items: convergenceMap, processed, total, complete, failed, warning, enrichmentSource }),
+        momentum: progressiveEngineResponse({ date, engine: 'Momentum & Streak Engine', items: momentumMap, processed, total, complete, failed, warning, enrichmentSource })
+      };
+      statsRouteViewSnapshots.set(date, snapshot);
+      cacheSet(`market-route-board:${date}`, market, complete ? 300 : 120);
+      return { market, ...snapshot };
+    };
+
+    // Publish an immediate snapshot before the first history request finishes.
+    publish();
+
+    let enrichment = { fixtures: [], warning: null, enrichmentSource: 'API_FOOTBALL_VENUE_HISTORY' };
+    if (eligibleFixtures.length) {
+      enrichment = await enrichPrimaryStatsAndVisuals(date, eligibleFixtures, {
+        onFixture: result => {
+          const stats = result?.stats?.homeSplit || result?.stats?.awaySplit
+            ? { homeSplit: result.stats?.homeSplit || null, awaySplit: result.stats?.awaySplit || null, source: result.stats?.source || 'API_FOOTBALL' }
+            : null;
+          const id = String(result?.id || '');
+          if (id) {
+            marketMap.set(id, routeItem(result, stats, analyzeMarketRoute));
+            ppgMap.set(id, routeItem(result, stats, analyzePpgRoute));
+            convergenceMap.set(id, routeItem(result, stats, analyzeConvergence));
+            momentumMap.set(id, routeItem(result, stats, analyzeMomentumStreak));
+          }
+          processed += 1;
+          publish({ warning: enrichment.warning || board.warning || null, enrichmentSource: enrichment.enrichmentSource || 'API_FOOTBALL_VENUE_HISTORY' });
+        }
+      });
+    }
+
+    processed = total;
+    const result = publish({
       complete: true,
-      failed: false,
-      generatedAt: new Date().toISOString(),
-      cache: 'MISS'
-    };
-    const result = {
-      market: marketResponse,
-      ppg: makeResponse('PPG Route Engine', ppgItems),
-      convergence: makeResponse('Convergence Engine', convergenceItems),
-      momentum: makeResponse('Momentum & Streak Engine', momentumItems)
-    };
-    result.ppg = { ...result.ppg, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: ppgItems.length, total: ppgItems.length, percent: 100 } };
-    result.convergence = { ...result.convergence, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: convergenceItems.length, total: convergenceItems.length, percent: 100 } };
-    result.momentum = { ...result.momentum, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: momentumItems.length, total: momentumItems.length, percent: 100 } };
-    cacheSet(`market-route-board:${date}`, marketResponse, 120);
+      warning: enrichment.warning || board.warning || null,
+      enrichmentSource: enrichment.enrichmentSource || 'API_FOOTBALL_VENUE_HISTORY'
+    });
     cacheSet(key, result, Number(process.env.STATS_ROUTE_CACHE_TTL_SECONDS || process.env.PPG_ROUTE_CACHE_TTL_SECONDS || 1800));
+
+    // Persistence is intentionally detached from the public response. The UI
+    // receives completed predictions first; Supabase writes finish afterward.
+    Promise.allSettled([
+      storePredictions(date, [...marketMap.values()].filter(Boolean), MARKET_ROUTE_CODE),
+      storePredictions(date, [...ppgMap.values()].filter(Boolean), PPG_ROUTE_CODE),
+      storePredictions(date, [...convergenceMap.values()].filter(Boolean), CONVERGENCE_ROUTE_CODE),
+      storePredictions(date, [...momentumMap.values()].filter(Boolean), MOMENTUM_STREAK_CODE)
+    ]).catch(() => null);
     return result;
   })();
   statsBoardInflight.set(key, task);
@@ -711,11 +756,9 @@ const statsRouteViewSnapshots = new Map();
 const statsRouteViewJobs = new Map();
 
 function waitingStatsResponse(date, engine, fixtures = [], analyser) {
-  const items = (fixtures || []).map(fixture => ({
-    fixture: publicFixture(fixture),
-    engine: analyser(fixture, null),
-    venueForm: null
-  })).filter(item => item.fixture);
+  const ordered = predictionPriority(fixtures || []);
+  const items = ordered.map(fixture => routeItem(fixture, null, analyser)).filter(Boolean);
+  const eligible = ordered.filter(isUpcomingPredictionFixture).length;
   return {
     date,
     engine,
@@ -724,17 +767,9 @@ function waitingStatsResponse(date, engine, fixtures = [], analyser) {
     warning: null,
     qualified: items.filter(item => item.engine.selection),
     all: items,
-    summary: {
-      fixtures: items.length,
-      analysed: items.filter(item => item.engine.decision !== 'WAITING').length,
-      fire: items.filter(item => item.engine.decision === 'FIRE').length,
-      safer: items.filter(item => item.engine.decision === 'SAFER').length,
-      waiting: items.filter(item => item.engine.decision === 'WAITING').length,
-      conflict: items.filter(item => item.engine.decision === 'CONFLICT').length,
-      noSignal: items.filter(item => item.engine.decision === 'NO_SIGNAL').length
-    },
-    progress: { stage: 'VENUE_HISTORY', processed: 0, total: items.length, percent: 0 },
-    complete: false,
+    summary: responseSummary(items, eligible, 0),
+    progress: { stage: 'VENUE_HISTORY', processed: 0, total: eligible, percent: eligible ? 0 : 100 },
+    complete: eligible === 0,
     failed: false,
     generatedAt: new Date().toISOString(),
     cache: 'MISS'
@@ -755,9 +790,9 @@ async function ensureStatsRouteView(date) {
   if (!statsRouteViewJobs.has(date)) {
     const task = getStatsRouteBoards(date).then(bundle => {
       const complete = {
-        ppg: { ...bundle.ppg, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.ppg.summary?.fixtures || 0, total: bundle.ppg.summary?.fixtures || 0, percent: 100 } },
-        convergence: { ...bundle.convergence, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.convergence.summary?.fixtures || 0, total: bundle.convergence.summary?.fixtures || 0, percent: 100 } },
-        momentum: { ...bundle.momentum, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.momentum.summary?.fixtures || 0, total: bundle.momentum.summary?.fixtures || 0, percent: 100 } }
+        ppg: { ...bundle.ppg, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.ppg.summary?.eligible || 0, total: bundle.ppg.summary?.eligible || 0, percent: 100 } },
+        convergence: { ...bundle.convergence, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.convergence.summary?.eligible || 0, total: bundle.convergence.summary?.eligible || 0, percent: 100 } },
+        momentum: { ...bundle.momentum, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.momentum.summary?.eligible || 0, total: bundle.momentum.summary?.eligible || 0, percent: 100 } }
       };
       statsRouteViewSnapshots.set(date, complete);
       return complete;
@@ -1329,6 +1364,17 @@ async function apiRoute(req, res, url) {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
     return json(res, 200, await diagnoseApiFootball(date));
+  }
+
+  if (url.pathname === '/api/fixture-count') {
+    const date = url.searchParams.get('date') || utcDateOffset(0);
+    if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    try {
+      const result = await getApiFootballFixtureCount(date);
+      return jsonCached(res, 200, result, 120);
+    } catch {
+      return json(res, apiFootballConfigured() ? 502 : 503, { error: 'FIXTURE_COUNT_UNAVAILABLE', date, count: null });
+    }
   }
 
   if (url.pathname === '/api/fixtures') {
