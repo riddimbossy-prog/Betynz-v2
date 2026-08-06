@@ -205,9 +205,30 @@ function renderKpis() {
   if (!state.routeByFixture.size) $('#routeTipCount').textContent = '—';
 }
 
+function crestSource(team, country = '') {
+  const id = Number(team?.id);
+  if (Number.isFinite(id) && id > 0) return `/api/media/team/${encodeURIComponent(String(id))}.png`;
+  const name = String(team?.name || '').trim();
+  if (name.length >= 2) return `/api/team-crest?name=${encodeURIComponent(name)}&country=${encodeURIComponent(String(country || ''))}`;
+  return '';
+}
+
+function bindCrestFallbacks(root = document) {
+  root.querySelectorAll('.mini-crest img').forEach(image => {
+    if (image.dataset.bound === '1') return;
+    image.dataset.bound = '1';
+    const fallback = image.parentElement?.querySelector('b');
+    image.addEventListener('load', () => { image.hidden = false; if (fallback) fallback.hidden = true; }, { once: true });
+    image.addEventListener('error', () => { image.hidden = true; if (fallback) fallback.hidden = false; }, { once: true });
+  });
+}
+
 function teamCrest(team, country, fixtureId, side) {
-  const logo = team?.logo || state.visualByFixture.get(String(fixtureId))?.[side]?.logo;
-  return `<span class="mini-crest" data-fixture-id="${esc(fixtureId)}" data-side="${side}">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : `<b>${esc(initials(team?.name))}</b>`}</span>`;
+  const visual = state.visualByFixture.get(String(fixtureId))?.[side] || null;
+  const merged = { ...(team || {}), ...(visual || {}) };
+  const logo = crestSource(merged, country);
+  const fallback = esc(initials(merged?.name));
+  return `<span class="mini-crest" data-fixture-id="${esc(fixtureId)}" data-side="${side}">${logo ? `<img src="${esc(logo)}" alt="${esc(merged?.name || '')} crest" loading="lazy"><b hidden>${fallback}</b>` : `<b>${fallback}</b>`}</span>`;
 }
 
 function renderList() {
@@ -250,6 +271,7 @@ function renderList() {
       <span class="markets-count"><b>${Number(fixture.availableMarketCount) || Object.values(fixture.odds || {}).filter(validOdd).length}</b><small>markets</small></span>
     </button>`;
   }).join('');
+  bindCrestFallbacks(list);
   $$('.match-row').forEach(button => button.addEventListener('click', () => openMatch(button.dataset.fixtureId)));
   $('#visibleMatches').textContent = `All ${state.filtered.length} matches for this day`;
   $('#loadMoreBtn').hidden = true;
@@ -358,11 +380,12 @@ async function loadRemainingWeekCounts(selectedDate) {
   }
 }
 
-function setCrest(imageSelector, fallbackSelector, team) {
+function setCrest(imageSelector, fallbackSelector, team, country = '') {
   const image = $(imageSelector);
   const fallback = $(fallbackSelector);
   fallback.textContent = initials(team?.name);
-  const logo = String(team?.logo || '');
+  const logo = crestSource(team, country);
+  image.removeAttribute('src');
   if (!logo) {
     image.hidden = true;
     fallback.hidden = false;
@@ -371,6 +394,7 @@ function setCrest(imageSelector, fallbackSelector, team) {
   image.hidden = false;
   fallback.hidden = true;
   image.onerror = () => { image.hidden = true; fallback.hidden = false; };
+  image.onload = () => { image.hidden = false; fallback.hidden = true; };
   image.src = logo;
 }
 
@@ -388,8 +412,8 @@ function openMatch(id) {
   $('#detailDrawOdd').textContent = odd(fixture.odds?.draw);
   $('#detailAwayOdd').textContent = odd(fixture.odds?.awayWin);
   $('#matchStatus').textContent = fixtureStatus(fixture);
-  setCrest('#homeLogo', '#homeCrest', fixture.home);
-  setCrest('#awayLogo', '#awayCrest', fixture.away);
+  setCrest('#homeLogo', '#homeCrest', fixture.home, fixture.league?.country);
+  setCrest('#awayLogo', '#awayCrest', fixture.away, fixture.league?.country);
   renderAllOdds(fixture.odds || {});
   renderEngine(state.routeByFixture.get(String(fixture.id)) || null);
   renderPpgEngine(state.ppgByFixture.get(String(fixture.id)) || null);

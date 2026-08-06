@@ -1,13 +1,14 @@
-# Deploy Betynz v5.0.2 on one Render service
+# Deploy Betynz v5.0.3 on one Render service
 
-1. Extract the ZIP.
-2. In the GitHub repository, keep only the hidden `.git` folder and remove the previous project files.
-3. Copy the contents of `betynz-api-football-only-v5.0.2` into the repository root.
-4. Commit and push to GitHub.
-5. Confirm Render has the private `API_FOOTBALL_KEY` value.
-6. In Render choose **Manual Deploy → Clear build cache & deploy**.
-7. Open `/api/health` and confirm version `5.0.2` and provider `API_FOOTBALL`.
-8. Open Market Route, PPG Route, Convergence and Consensus. They may show progress briefly but must not remain permanently on `Loading…`.
-9. Hard-refresh the browser with `Ctrl + Shift + R`.
+The included `render.yaml` defines one Node web service.
 
-No new Supabase migration is required. The repository contains one root `render.yaml` and one web service.
+## Deployment
+
+1. Replace the repository contents cleanly.
+2. Push the v5.0.3 files to the branch connected to Render.
+3. Confirm the Render secret `API_FOOTBALL_KEY` is present.
+4. Use **Manual Deploy → Clear build cache & deploy**.
+5. Verify `/api/health` and `/api/media/team/<TEAM_ID>.png`.
+6. Hard-refresh the website once.
+
+No second service, SportyBet variable or additional image provider is required.

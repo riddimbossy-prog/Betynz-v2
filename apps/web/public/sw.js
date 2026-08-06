@@ -1,17 +1,17 @@
-const CACHE = 'betynz-v5-0-2';
+const CACHE = 'betynz-v5-0-3';
 const SHELL = [
-  '/', '/styles.css?v=5.0.2', '/motion.js?v=5.0.2', '/app.js?v=5.0.2',
-  '/picks.html', '/picks.js?v=5.0.2',
-  '/market-route.html', '/market-route.js?v=5.0.2',
-  '/ppg-route.html', '/ppg-route.js?v=5.0.2',
-  '/convergence.html', '/convergence.js?v=5.0.2',
-  '/proof.html', '/proof.js?v=5.0.2',
-  '/performance.html', '/performance.js?v=5.0.2',
-  '/live.html', '/live.js?v=5.0.2',
-  '/odds-movement.html', '/odds-movement.js?v=5.0.2',
-  '/leagues.html', '/leagues.js?v=5.0.2',
-  '/admin-engine-audit.html', '/admin-engine-audit.js?v=5.0.2',
-  '/admin-calibration.html', '/admin-calibration.js?v=5.0.2',
+  '/', '/styles.css?v=5.0.3', '/motion.js?v=5.0.3', '/app.js?v=5.0.3',
+  '/picks.html', '/picks.js?v=5.0.3',
+  '/market-route.html', '/market-route.js?v=5.0.3',
+  '/ppg-route.html', '/ppg-route.js?v=5.0.3',
+  '/convergence.html', '/convergence.js?v=5.0.3',
+  '/proof.html', '/proof.js?v=5.0.3',
+  '/performance.html', '/performance.js?v=5.0.3',
+  '/live.html', '/live.js?v=5.0.3',
+  '/odds-movement.html', '/odds-movement.js?v=5.0.3',
+  '/leagues.html', '/leagues.js?v=5.0.3',
+  '/admin-engine-audit.html', '/admin-engine-audit.js?v=5.0.3',
+  '/admin-calibration.html', '/admin-calibration.js?v=5.0.3',
   '/manifest.webmanifest', '/assets/icon-192.png', '/assets/icon-512.png'
 ];
 self.addEventListener('install', event => event.waitUntil(

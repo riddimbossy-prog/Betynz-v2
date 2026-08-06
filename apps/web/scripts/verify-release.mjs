@@ -22,7 +22,8 @@ const [server, apiFootball, results, marketRoute, sw, styles, motion, env, rende
   read('public/sw.js'), read('public/styles.css'), read('public/motion.js'), read('.env.example'), readRoot('render.yaml'), readRoot('package.json'), read('package.json'), read('package-lock.json')
 ]);
 
-if (!/const APP_VERSION = '5\.0\.2'/.test(server)) throw new Error('Server version is not 5.0.2.');
+if (!/const APP_VERSION = '5\.0\.3'/.test(server)) throw new Error('Server version is not 5.0.3.');
+if (!/serveApiFootballMedia/.test(server) || !/API_FOOTBALL_MEDIA_BASE_URL/.test(server)) throw new Error('Same-origin crest proxy is missing.');
 for (const token of [
   'getApiFootballFixtureBoard','getApiFootballOddsForDate','getApiFootballLiveBoard','getApiFootballResults',
   'getApiFootballFixtureEvents','getApiFootballIntelligence','enrichApiFootballStatsBoard','enrichApiFootballVisuals','resolveApiFootballTeam'
@@ -31,7 +32,7 @@ if (!/SOLE_FOOTBALL_DATA_PROVIDER/.test(apiFootball)) throw new Error('The sole-
 if (!/ALL_DAILY_FIXTURES_RETURNED_BY_PROVIDER/.test(apiFootball)) throw new Error('Unlimited daily fixture scope is missing.');
 if (!/API_FOOTBALL/.test(results)) throw new Error('Results are not wired to API-Football.');
 if (!/STAT_CONFLICT/.test(marketRoute) || !/statisticalValidation/.test(marketRoute)) throw new Error('Market Route statistical gate is missing.');
-if (!/betynz-v5-0-2/.test(sw)) throw new Error('Service-worker cache was not bumped to v5.0.2.');
+if (!/betynz-v5-0-3/.test(sw)) throw new Error('Service-worker cache was not bumped to v5.0.3.');
 
 for (const requiredKey of ['API_FOOTBALL_KEY','API_FOOTBALL_BASE_URL','API_FOOTBALL_KEY_HEADER','API_FOOTBALL_MAX_ODDS_PAGES']) {
   if (!env.includes(requiredKey) || !render.includes(requiredKey)) throw new Error(`Configuration is missing ${requiredKey}.`);
@@ -42,7 +43,7 @@ if (/API_FOOTBALL_MAX_FIXTURES/.test(render)) throw new Error('A daily fixture c
 const pkg = JSON.parse(pkgText);
 const lock = JSON.parse(lockText);
 const rootPkg = JSON.parse(rootPkgText);
-if (pkg.version !== '5.0.2' || lock.version !== '5.0.2' || rootPkg.version !== '5.0.2') throw new Error('Package versions are not 5.0.2.');
+if (pkg.version !== '5.0.3' || lock.version !== '5.0.3' || rootPkg.version !== '5.0.3') throw new Error('Package versions are not 5.0.3.');
 if (pkg.name !== 'betynz-api-football-only-web' || lock.name !== pkg.name) throw new Error('Web package names do not match.');
 if (rootPkg.name !== 'betynz-api-football-only') throw new Error('Root package name is incorrect.');
 if (!/@media\s*\(max-width:\s*380px\)/.test(styles) || !/@media\s*\(min-width:\s*600px\)\s*and\s*\(max-width:\s*760px\)/.test(styles) || !/@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(styles)) throw new Error('Responsive safeguards are missing.');
@@ -55,4 +56,4 @@ const allowed = [
 ].sort();
 if (JSON.stringify(tests) !== JSON.stringify(allowed)) throw new Error(`Unexpected test files remain: ${tests.join(', ')}`);
 
-console.log('Release verification passed: Betynz 5.0.2 API-Football-only single-service release.');
+console.log('Release verification passed: Betynz 5.0.3 API-Football-only single-service release.');

@@ -44,7 +44,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.2';
+const APP_VERSION = '5.0.3';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const CONVERGENCE_ROUTE_CODE = 'CONVERGENCE_ROUTE';
@@ -62,6 +62,104 @@ const contentTypes = {
   '.png': 'image/png',
   '.ico': 'image/x-icon'
 };
+
+
+const mediaCache = new Map();
+const mediaInflight = new Map();
+const mediaQueue = [];
+let mediaActive = 0;
+
+function mediaBaseUrl() {
+  return String(process.env.API_FOOTBALL_MEDIA_BASE_URL || 'https://media.api-sports.io/football').replace(/\/+$/, '');
+}
+
+function mediaConcurrency() {
+  return Math.max(1, Math.min(12, Number(process.env.API_FOOTBALL_MEDIA_CONCURRENCY || 6)));
+}
+
+function scheduleMedia(task) {
+  return new Promise((resolve, reject) => {
+    mediaQueue.push({ task, resolve, reject });
+    drainMediaQueue();
+  });
+}
+
+function drainMediaQueue() {
+  while (mediaActive < mediaConcurrency() && mediaQueue.length) {
+    const entry = mediaQueue.shift();
+    mediaActive += 1;
+    Promise.resolve().then(entry.task).then(entry.resolve, entry.reject).finally(() => {
+      mediaActive -= 1;
+      drainMediaQueue();
+    });
+  }
+}
+
+function apiFootballMediaUrl(kind, id) {
+  const folder = kind === 'league' ? 'leagues' : 'teams';
+  return `${mediaBaseUrl()}/${folder}/${encodeURIComponent(String(id))}.png`;
+}
+
+async function loadApiFootballMedia(kind, id) {
+  const key = `${kind}:${id}`;
+  const now = Date.now();
+  const cached = mediaCache.get(key);
+  if (cached && cached.expiresAt > now) return cached;
+  if (mediaInflight.has(key)) return mediaInflight.get(key);
+
+  const task = scheduleMedia(async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), Math.max(3000, Number(process.env.API_FOOTBALL_MEDIA_TIMEOUT_MS || 10000)));
+    try {
+      const keyHeader = String(process.env.API_FOOTBALL_KEY_HEADER || 'x-apisports-key');
+      const keyValue = String(process.env.API_FOOTBALL_KEY || '');
+      const headers = {
+        accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'user-agent': 'Betynz-Media-Proxy/5.0.3'
+      };
+      if (keyValue) headers[keyHeader] = keyValue;
+      const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
+      if (!response.ok) throw Object.assign(new Error(`Crest upstream returned ${response.status}`), { status: response.status });
+      const contentType = String(response.headers.get('content-type') || 'image/png').split(';')[0].trim().toLowerCase();
+      if (!contentType.startsWith('image/')) throw Object.assign(new Error('Crest upstream did not return an image'), { status: 502 });
+      const body = Buffer.from(await response.arrayBuffer());
+      const maxBytes = Math.max(100_000, Number(process.env.API_FOOTBALL_MEDIA_MAX_BYTES || 2_000_000));
+      if (!body.length || body.length > maxBytes) throw Object.assign(new Error('Crest image size is invalid'), { status: 502 });
+      const value = { body, contentType, expiresAt: now + Math.max(3600, Number(process.env.API_FOOTBALL_VISUAL_CACHE_TTL_SECONDS || 604800)) * 1000 };
+      mediaCache.set(key, value);
+      return value;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }).finally(() => mediaInflight.delete(key));
+
+  mediaInflight.set(key, task);
+  return task;
+}
+
+async function serveApiFootballMedia(res, url) {
+  const match = url.pathname.match(/^\/api\/media\/(team|league)\/(\d+)\.png$/);
+  if (!match) return json(res, 404, { error: 'Media not found' });
+  const [, kind, id] = match;
+  try {
+    const media = await loadApiFootballMedia(kind, id);
+    res.writeHead(200, {
+      ...securityHeaders(),
+      'content-type': media.contentType,
+      'content-length': media.body.length,
+      'cache-control': 'public, max-age=604800, stale-while-revalidate=2592000',
+      'cross-origin-resource-policy': 'same-origin'
+    });
+    res.end(media.body);
+  } catch (error) {
+    res.writeHead(error?.status === 404 ? 404 : 502, {
+      ...securityHeaders(),
+      'cache-control': 'public, max-age=300',
+      'content-type': 'text/plain; charset=utf-8'
+    });
+    res.end('Crest unavailable');
+  }
+}
 
 function securityHeaders() {
   return {
@@ -977,12 +1075,12 @@ async function serveTeamCrest(res, url) {
     return res.end();
   }
   const visual = await findApiFootballTeamVisual(name, country);
-  if (!visual?.logo) {
+  if (!visual?.id) {
     res.writeHead(404, securityHeaders());
     return res.end();
   }
-  res.writeHead(302, { ...securityHeaders(), location: visual.logo, 'cache-control': 'public, max-age=604800' });
-  res.end();
+  const proxyUrl = new URL(`/api/media/team/${encodeURIComponent(String(visual.id))}.png`, 'http://betynz.local');
+  return serveApiFootballMedia(res, proxyUrl);
 }
 
 async function readJsonBody(req, limit = 100_000) {
@@ -1037,6 +1135,7 @@ async function apiRoute(req, res, url) {
     responsiblePlay: 'Predictions are informational, not guarantees. Adults only.'
   });
 
+  if (url.pathname.startsWith('/api/media/')) return serveApiFootballMedia(res, url);
   if (url.pathname === '/api/team-crest') return serveTeamCrest(res, url);
 
   if (url.pathname === '/api/team-visual') {

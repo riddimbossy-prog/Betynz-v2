@@ -33,6 +33,12 @@ services:
         value: "300"
       - key: API_FOOTBALL_VISUAL_CACHE_TTL_SECONDS
         value: "604800"
+      - key: API_FOOTBALL_MEDIA_BASE_URL
+        value: "https://media.api-sports.io/football"
+      - key: API_FOOTBALL_MEDIA_CONCURRENCY
+        value: "6"
+      - key: API_FOOTBALL_MEDIA_TIMEOUT_MS
+        value: "10000"
       - key: API_FOOTBALL_ENRICH_CONCURRENCY
         value: "2"
       - key: API_FOOTBALL_REQUEST_CONCURRENCY

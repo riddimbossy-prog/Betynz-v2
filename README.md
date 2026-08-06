@@ -1,39 +1,16 @@
-# Betynz v5.0.2 — API-Football Only
+# Betynz v5.0.3 — API-Football only
 
-Betynz is a single-service Node.js prediction platform. `API_FOOTBALL_KEY` is the sole football-data credential and API-Football supplies every football input used by the website and engines.
+Betynz uses API-Football for fixtures, odds, live scores, results, statistics and visuals. Team crests are delivered through a cached same-origin endpoint to avoid browser hotlink failures.
 
-## Data responsibilities
+## Core routes
 
-| Capability | Source |
-|---|---|
-| Daily fixtures and kickoff | API-Football `/fixtures` |
-| Prematch odds and markets | API-Football `/odds` |
-| Live scores and minutes | API-Football `/fixtures?live=all` |
-| Results and settlement | API-Football `/fixtures?date=...` |
-| Team crests, league logos and flags | API-Football fixture/team data |
-| Venue histories and PPG | API-Football team fixture history |
-| Standings and season team statistics | API-Football |
-| H2H, predictions and injuries | API-Football |
-| Lineups, events, fixture and player statistics | API-Football |
-| Prediction history and learning storage | Supabase, when configured |
+```text
+GET /api/health
+GET /api/fixtures?date=YYYY-MM-DD
+GET /api/live
+GET /api/results?date=YYYY-MM-DD
+GET /api/media/team/<TEAM_ID>.png
+GET /api/media/league/<LEAGUE_ID>.png
+```
 
-There is no second football provider or private collector service.
-
-## Engines
-
-- **Market Route** analyses API-Football bookmaker prices and rejects statistically contradicted routes.
-- **PPG Route** compares the home side's last five home matches with the away side's last five away matches.
-- **Convergence** combines attack, defence, goals, clean sheets, failed-to-score, BTTS and venue evidence.
-- **Consensus** publishes only compatible selections from the three engines.
-
-## Deployment
-
-The repository contains one root `render.yaml` and one Render web service. Add `API_FOOTBALL_KEY` as a private Render environment variable, optionally add Supabase credentials, and deploy the Blueprint.
-
-No application-level fixture cap is applied. The board displays every fixture returned by the subscription for the selected date. Odds pagination continues until API-Football reports the final page.
-
-See `START_HERE.md` for exact installation steps.
-
-## Shared non-blocking analysis
-
-Market Route returns when fixtures and odds are ready. PPG Route and Convergence then share one background venue-history scan. Consensus reads those same snapshots instead of launching a separate full-day analysis. Public routes expose progress and terminal error states so pages cannot remain indefinitely on a loading message.
+The deployment remains one repository, one Render service and one root `render.yaml`.

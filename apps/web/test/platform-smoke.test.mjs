@@ -83,6 +83,17 @@ test('responsive interface includes phone, Z Fold, tablet, desktop and reduced-m
   assert.match(css, /100dvw|100dvh/);
 });
 
+
+
+test('dashboard crests use the same-origin API-Football media proxy with a fallback', async () => {
+  const [server, app, live] = await Promise.all([read('src/server.mjs'), read('public/app.js'), read('public/live.js')]);
+  assert.match(server, /serveApiFootballMedia/);
+  assert.match(server, /API_FOOTBALL_MEDIA_BASE_URL/);
+  assert.match(app, /\/api\/media\/team\//);
+  assert.match(app, /bindCrestFallbacks/);
+  assert.match(live, /live-crest/);
+});
+
 test('production server boots with API-Football as the only football source', async t => {
   const port = await freePort();
   const apiPort = await freePort();
@@ -95,6 +106,10 @@ test('production server boots with API-Football as the only football source', as
   const api = createServer((req, res) => {
     assert.equal(req.headers['x-apisports-key'], 'smoke-api-key');
     const url = new URL(req.url, `http://${req.headers.host}`);
+    if (url.pathname === '/media/teams/101.png') {
+      res.setHeader('content-type', 'image/png');
+      return res.end(Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0]));
+    }
     res.setHeader('content-type', 'application/json');
     const send = (response, paging = { current: 1, total: 1 }) => res.end(JSON.stringify({ response, errors: [], paging }));
     if (url.pathname === '/fixtures' && url.searchParams.get('date') === today) return send([scheduled]);
@@ -121,6 +136,7 @@ test('production server boots with API-Football as the only football source', as
       NODE_ENV: 'test',
       API_FOOTBALL_KEY: 'smoke-api-key',
       API_FOOTBALL_BASE_URL: `http://127.0.0.1:${apiPort}/`,
+      API_FOOTBALL_MEDIA_BASE_URL: `http://127.0.0.1:${apiPort}/media`,
       API_FOOTBALL_KEY_HEADER: 'x-apisports-key',
       API_FOOTBALL_RETRIES: '0',
       API_FOOTBALL_REQUEST_MIN_INTERVAL_MS: '0',
@@ -136,7 +152,7 @@ test('production server boots with API-Football as the only football source', as
   t.after(() => child.kill('SIGTERM'));
 
   const health = await (await waitFor(`http://127.0.0.1:${port}/api/health`)).json();
-  assert.equal(health.version, '5.0.2');
+  assert.equal(health.version, '5.0.3');
   assert.equal(health.configured.apiFootball, true);
   assert.deepEqual(health.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'CONVERGENCE_ROUTE']);
   assert.deepEqual(new Set(Object.values(health.sourceRoles)), new Set(['API_FOOTBALL']));
@@ -149,6 +165,11 @@ test('production server boots with API-Football as the only football source', as
   assert.equal(fixturePayload.fixtures.length, 1);
   assert.equal(fixturePayload.fixtures[0].odds.homeWin, 1.70);
   assert.equal(fixturePayload.fixtures[0].home.logo, 'https://img.test/101.png');
+
+  const crestResponse = await fetch(`http://127.0.0.1:${port}/api/media/team/101.png`);
+  assert.equal(crestResponse.status, 200, logs);
+  assert.equal(crestResponse.headers.get('content-type'), 'image/png');
+  assert.ok((await crestResponse.arrayBuffer()).byteLength > 8);
 
   const livePayload = await (await fetch(`http://127.0.0.1:${port}/api/live?date=${today}`)).json();
   assert.equal(livePayload.source, 'API_FOOTBALL');
