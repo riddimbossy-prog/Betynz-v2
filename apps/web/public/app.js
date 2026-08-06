@@ -32,6 +32,8 @@ const state = {
   routePollTimer: null,
   weekCountToken: 0,
   winsPollTimer: null,
+  boardOddsPollTimer: null,
+  boardOddsPollAttempt: 0,
   listSignature: ''
 };
 
@@ -124,6 +126,9 @@ function setHomeSpotlightMessage(message, detail = '') {
 }
 
 async function loadDate(date, force = false) {
+  clearTimeout(state.boardOddsPollTimer);
+  state.boardOddsPollTimer = null;
+  state.boardOddsPollAttempt = 0;
   state.selectedDate = date;
   state.fixtures = [];
   state.filtered = [];
@@ -157,9 +162,12 @@ async function loadDate(date, force = false) {
     applyFilters();
     renderKpis();
     if (state.fixtures.length) {
-      $('#dayLoadState').textContent = `${state.fixtures.length} fixtures loaded. Deep statistics load only when you open a match.`;
+      $('#dayLoadState').textContent = payload.oddsPending
+        ? `${state.fixtures.length} fixtures loaded. Bookmaker odds are loading in the background.`
+        : `${state.fixtures.length} fixtures loaded. Deep statistics load only when you open a match.`;
       const missingVisualIds = state.fixtures.some(fixture => !Number(fixture?.home?.id) || !Number(fixture?.away?.id));
       if (missingVisualIds) hydrateVisuals(date).catch(() => {});
+      if (payload.oddsPending) scheduleBoardOddsRefresh(date, 0);
       loadRouteSummary(date).catch(() => {});
       const loadCounts = () => loadRemainingWeekCounts(date).catch(() => {});
       if ('requestIdleCallback' in window) requestIdleCallback(loadCounts, { timeout: 2500 });
@@ -186,6 +194,37 @@ async function loadDate(date, force = false) {
     $('#matchList').innerHTML = `<div class="empty-state"><h3>${configIssue ? 'Football feed connection needs attention' : 'Matches are temporarily unavailable'}</h3><p>${configIssue ? 'Update the private feed settings in Render, then redeploy.' : 'Tap Refresh to retry this date.'}</p></div>`;
     $('#dayLoadState').textContent = configIssue ? 'The private football feed is not configured.' : 'This date could not be loaded. No older match list is being shown.';
     setHomeSpotlightMessage('Qualified picks could not be checked.', 'Refresh after the fixture connection returns.');
+  }
+}
+
+function scheduleBoardOddsRefresh(date, attempt = 0) {
+  clearTimeout(state.boardOddsPollTimer);
+  if (state.selectedDate !== date || document.hidden || attempt > 30) return;
+  const delay = attempt < 8 ? 3000 : attempt < 20 ? 7000 : 15000;
+  state.boardOddsPollAttempt = attempt;
+  state.boardOddsPollTimer = setTimeout(() => refreshBoardOdds(date, attempt).catch(() => {
+    if (state.selectedDate === date) scheduleBoardOddsRefresh(date, attempt + 1);
+  }), delay);
+}
+
+async function refreshBoardOdds(date, attempt = 0) {
+  if (state.selectedDate !== date) return;
+  const payload = await fetchJson(`/api/fixtures?date=${encodeURIComponent(date)}&odds_refresh=${Date.now()}`, { cache: 'no-store', timeoutMs: 12000 });
+  if (state.selectedDate !== date) return;
+  const fixtures = (payload.fixtures || []).filter(fixture => !/srl|simulated reality/i.test([fixture?.league?.name, fixture?.home?.name, fixture?.away?.name].join(' ')));
+  if (fixtures.length) {
+    state.fixtures = fixtures;
+    populateLeagues();
+    applyFilters();
+    renderKpis();
+    $('#dayLoadState').textContent = payload.oddsPending
+      ? `${fixtures.length} fixtures loaded. Bookmaker odds are still loading in the background.`
+      : `${fixtures.length} fixtures loaded. Deep statistics load only when you open a match.`;
+  }
+  if (payload.oddsPending) scheduleBoardOddsRefresh(date, attempt + 1);
+  else {
+    state.boardOddsPollTimer = null;
+    loadRouteSummary(date).catch(() => {});
   }
 }
 

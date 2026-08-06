@@ -37,6 +37,7 @@ import {
   enrichApiFootballStatsBoard,
   enrichApiFootballVisuals,
   getApiFootballFixtureBoard,
+  getApiFootballFastFixtureBoard,
   getApiFootballFixtureCount,
   getApiFootballLiveBoard,
   getApiFootballResults,
@@ -48,7 +49,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.11';
+const APP_VERSION = '5.0.12';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const APEX_INTELLIGENCE_CODE = 'APEX_INTELLIGENCE';
@@ -121,7 +122,7 @@ async function loadApiFootballMedia(kind, id) {
       const keyValue = String(process.env.API_FOOTBALL_KEY || '');
       const headers = {
         accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'user-agent': 'Betynz-Media-Proxy/5.0.11'
+        'user-agent': 'Betynz-Media-Proxy/5.0.12'
       };
       if (keyValue) headers[keyHeader] = keyValue;
       const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
@@ -325,6 +326,43 @@ async function getWinCarousel(days = 14, limit = 24) {
   };
   cacheSet(key, response, Math.max(20, Number(process.env.WIN_CAROUSEL_CACHE_TTL_SECONDS || 60)));
   return response;
+}
+
+const dashboardFixtureInflight = new Map();
+
+async function getDashboardFixtureBoard(date) {
+  const key = `dashboard-fixtures:${date}`;
+  const cached = cacheGet(key);
+  if (cached) return { ...cached, cache: 'HIT' };
+  if (dashboardFixtureInflight.has(key)) return dashboardFixtureInflight.get(key);
+  const task = (async () => {
+    const started = Date.now();
+    const feed = await getApiFootballFastFixtureBoard(date);
+    const fixtures = (feed.fixtures || [])
+      .filter(item => !isSrlFixture(item))
+      .map(item => ({ ...publicFixture(item), boardStatus: fixtureStatusForDate(item) }))
+      .filter(Boolean);
+    captureBoardOdds(fixtures);
+    const response = {
+      date,
+      fixtures,
+      source: 'API_FOOTBALL',
+      warning: feed.warning || null,
+      oddsPending: Boolean(feed.oddsPending),
+      oddsPages: Number(feed.oddsPages || 0),
+      generatedAt: new Date().toISOString(),
+      loadMs: Date.now() - started,
+      cache: 'MISS'
+    };
+    // Fixture-only responses are intentionally very short lived. The browser
+    // polls again while odds paginate in the background and upgrades the same
+    // rows without ever hiding the games board.
+    cacheSet(key, response, response.oddsPending ? 1 : Number(process.env.FIXTURE_BOARD_CACHE_TTL_SECONDS || 120));
+    return response;
+  })();
+  dashboardFixtureInflight.set(key, task);
+  try { return await task; }
+  finally { dashboardFixtureInflight.delete(key); }
 }
 
 const fixtureBoardInflight = new Map();
@@ -1431,7 +1469,8 @@ async function apiRoute(req, res, url) {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
     try {
-      return jsonCached(res, 200, await getFastFixtureBoard(date), 60);
+      const board = await getDashboardFixtureBoard(date);
+      return jsonCached(res, 200, board, board.oddsPending ? 1 : 60);
     } catch (error) {
       const code = apiFootballConfigured() ? 'API_FOOTBALL_REQUEST_FAILED' : 'API_FOOTBALL_NOT_CONFIGURED';
       return json(res, apiFootballConfigured() ? 502 : 503, { error: code, message: 'The football fixture feed is temporarily unavailable.' });

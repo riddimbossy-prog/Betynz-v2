@@ -7,6 +7,7 @@ const FINISHED = new Set(['FT', 'AET', 'PEN']);
 const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT']);
 
 const apiInFlight = new Map();
+const oddsDateInflight = new Map();
 const apiQueue = [];
 let apiActive = 0;
 let apiNextAt = 0;
@@ -272,7 +273,7 @@ function requestHeaders(current) {
   const headers = {
     [current.headerName]: current.key,
     accept: 'application/json',
-    'user-agent': 'Betynz-API-Football-Only/5.0.11'
+    'user-agent': 'Betynz-API-Football-Only/5.0.12'
   };
   if (current.rapidApiHost) headers['x-rapidapi-host'] = current.rapidApiHost;
   return headers;
@@ -644,13 +645,60 @@ export async function getApiFootballFixtureCount(date) {
   };
 }
 
+function oddsDateCacheKey(date, current = config()) {
+  return `api-football-odds-date:${date}:${current.timezone}:${current.bookmakerId || 'ALL'}`;
+}
+
+export function getCachedApiFootballOddsForDate(date) {
+  if (!safeDate(date)) return null;
+  return cacheGet(oddsDateCacheKey(date));
+}
+
 export async function getApiFootballOddsForDate(date) {
   if (!safeDate(date)) throw new Error('date must be YYYY-MM-DD');
   const current = config();
-  const params = { date, timezone: current.timezone };
-  if (current.bookmakerId) params.bookmaker = current.bookmakerId;
-  const body = await apiFootballPagedRequest('/odds', params, current.oddsTtlSeconds, current.maxOddsPages);
-  return { configured: body.configured, odds: responseArray(body), fetchedAt: body.fetchedAt || null, pages: body.paging?.total || 1 };
+  const aggregateKey = oddsDateCacheKey(date, current);
+  const cached = cacheGet(aggregateKey);
+  if (cached) return { ...cached, cache: 'HIT' };
+  if (oddsDateInflight.has(aggregateKey)) return oddsDateInflight.get(aggregateKey);
+
+  const task = (async () => {
+    const params = { date, timezone: current.timezone };
+    if (current.bookmakerId) params.bookmaker = current.bookmakerId;
+    const body = await apiFootballPagedRequest('/odds', params, current.oddsTtlSeconds, current.maxOddsPages);
+    const result = { configured: body.configured, odds: responseArray(body), fetchedAt: body.fetchedAt || null, pages: body.paging?.total || 1, cache: 'MISS' };
+    cacheSet(aggregateKey, result, current.oddsTtlSeconds);
+    return result;
+  })();
+  oddsDateInflight.set(aggregateKey, task);
+  try { return await task; }
+  finally { oddsDateInflight.delete(aggregateKey); }
+}
+
+function normalizeFixtureBoard(daily, oddsResult = null) {
+  const oddsMap = oddsByFixture(oddsResult?.odds || []);
+  return (daily.fixtures || []).map(row => normalizeApiFootballFixture(row, oddsMap.get(String(row?.fixture?.id)) || null)).filter(Boolean)
+    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+}
+
+export async function getApiFootballFastFixtureBoard(date) {
+  const daily = await getApiFootballDailyFixtures(date);
+  const cachedOdds = getCachedApiFootballOddsForDate(date);
+  if (!cachedOdds) {
+    // The dashboard must never wait for every bookmaker-odds page. Start the
+    // expensive pagination in the background and return the complete fixture
+    // list immediately. A short browser poll upgrades the rows with odds.
+    getApiFootballOddsForDate(date).catch(() => null);
+  }
+  return {
+    configured: daily.configured,
+    source: 'API_FOOTBALL',
+    fixtures: normalizeFixtureBoard(daily, cachedOdds),
+    warning: cachedOdds?.warning || null,
+    oddsPending: !cachedOdds,
+    oddsPages: cachedOdds?.pages || 0,
+    fetchedAt: daily.fetchedAt || null
+  };
 }
 
 export async function getApiFootballFixtureBoard(date) {
@@ -658,14 +706,12 @@ export async function getApiFootballFixtureBoard(date) {
     getApiFootballDailyFixtures(date),
     getApiFootballOddsForDate(date).catch(error => ({ configured: apiFootballConfigured(), odds: [], warning: error.message }))
   ]);
-  const oddsMap = oddsByFixture(oddsResult.odds || []);
-  const fixtures = daily.fixtures.map(row => normalizeApiFootballFixture(row, oddsMap.get(String(row?.fixture?.id)) || null)).filter(Boolean)
-    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
   return {
     configured: daily.configured,
     source: 'API_FOOTBALL',
-    fixtures,
+    fixtures: normalizeFixtureBoard(daily, oddsResult),
     warning: oddsResult.warning || null,
+    oddsPending: false,
     oddsPages: oddsResult.pages || 0,
     fetchedAt: daily.fetchedAt || null
   };

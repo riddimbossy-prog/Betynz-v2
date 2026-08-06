@@ -108,7 +108,7 @@ try {
   web.stderr.on('data', chunk => { stderr += chunk; process.stderr.write(`[single-service] ${chunk}`); });
 
   const health = await waitJson(`http://127.0.0.1:${webPort}/api/health`);
-  assert.equal(health.body.version, '5.0.11');
+  assert.equal(health.body.version, '5.0.12');
   assert.equal(health.body.configured.apiFootball, true);
   assert.deepEqual(health.body.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'APEX_INTELLIGENCE', 'CONVERGENCE_ROUTE', 'MOMENTUM_STREAK']);
   assert.deepEqual(new Set(Object.values(health.body.sourceRoles)), new Set(['API_FOOTBALL']));
@@ -120,7 +120,16 @@ try {
   const fixtures = await waitJson(`http://127.0.0.1:${webPort}/api/fixtures?date=${day}`);
   assert.equal(fixtures.body.source, 'API_FOOTBALL');
   assert.equal(fixtures.body.fixtures.length, 2);
-  const first = fixtures.body.fixtures.find(row => row.id === '998877');
+  assert.equal(fixtures.body.oddsPending, true);
+  let pricedFixtures = fixtures;
+  const oddsDeadline = Date.now() + 5000;
+  while (Date.now() < oddsDeadline) {
+    const current = pricedFixtures.body.fixtures.find(row => row.id === '998877');
+    if (Number(current?.odds?.homeWin || 0) > 1) break;
+    await new Promise(resolvePromise => setTimeout(resolvePromise, 200));
+    pricedFixtures = await waitJson(`http://127.0.0.1:${webPort}/api/fixtures?date=${day}&odds_refresh=${Date.now()}`);
+  }
+  const first = pricedFixtures.body.fixtures.find(row => row.id === '998877');
   assert.equal(first.odds.homeWin, 1.72);
   assert.equal(first.odds.over25, 1.66);
   assert.equal(first.odds.bttsYes, 1.73);

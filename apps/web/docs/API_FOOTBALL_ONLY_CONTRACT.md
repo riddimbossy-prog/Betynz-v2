@@ -46,10 +46,10 @@ GET /api/wins-carousel?days=14&limit=24
 
 The wins route returns only officially settled `WON` rows. It does not generate or rewrite predictions.
 
-## v5.0.11 five-engine analysis
+## v5.0.12 five-engine analysis
 
 The provider contract remains unchanged. Momentum & Streak consumes the same normalized fixture, exact offered markets and cached last-five home/away venue statistics already used by the statistical engines. It does not create another upstream data source or make browser-side provider calls.
-## v5.0.11 adaptive subscription protection
+## v5.0.12 adaptive subscription protection
 
 All engine enrichment requests share one server-side API-Football queue. The queue deduplicates identical history work, uses a rolling per-minute request budget, and pauses globally when the provider returns a rate-limit signal. Rate limits are detected both from HTTP `429` responses and from API-Football error objects returned with HTTP `200`.
 

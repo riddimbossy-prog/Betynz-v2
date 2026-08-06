@@ -1,4 +1,4 @@
-# Betynz v5.0.11 modern UI
+# Betynz v5.0.12 modern UI
 
 The five active engines share one visual language based on the official Betynz logo.
 

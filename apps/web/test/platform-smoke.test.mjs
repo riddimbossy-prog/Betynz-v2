@@ -106,7 +106,7 @@ test('dashboard experience includes board-aware sections, rolling settled wins a
   assert.match(manifest, /maskable-512\.png/);
   assert.match(manifest, /launch_handler/);
   assert.match(motion, /pwa-launch-splash/);
-  assert.match(sw, /betynz-v5-0-10/);
+  assert.match(sw, /betynz-v5-0-12/);
 });
 
 test('production server boots with API-Football as the only football source', async t => {
@@ -131,7 +131,7 @@ test('production server boots with API-Football as the only football source', as
     if (url.pathname === '/fixtures' && url.searchParams.get('live') === 'all') return send([fixture({ id: 5002, date: kickoff, status: '2H', homeGoals: 2, awayGoals: 1 })]);
     if (url.pathname === '/fixtures' && url.searchParams.get('team') === '101') return send(historyHome);
     if (url.pathname === '/fixtures' && url.searchParams.get('team') === '202') return send(historyAway);
-    if (url.pathname === '/odds') return send([odds(5001)]);
+    if (url.pathname === '/odds') return setTimeout(() => send([odds(5001)]), 1200);
     if (url.pathname === '/standings') return send([{ league: { id: 55, name: 'Premier A', country: 'Ghana', season: 2038, standings: [[]] } }]);
     if (url.pathname === '/teams/statistics') return res.end(JSON.stringify({ response: { form: 'WWDWL', fixtures: { played: { total: 20 } }, goals: {} }, errors: [] }));
     if (url.pathname === '/fixtures/headtohead' || url.pathname === '/predictions' || url.pathname === '/injuries' || url.pathname === '/fixtures/statistics' || url.pathname === '/fixtures/lineups' || url.pathname === '/fixtures/players') return send([]);
@@ -167,7 +167,7 @@ test('production server boots with API-Football as the only football source', as
   t.after(() => child.kill('SIGTERM'));
 
   const health = await (await waitFor(`http://127.0.0.1:${port}/api/health`)).json();
-  assert.equal(health.version, '5.0.11');
+  assert.equal(health.version, '5.0.12');
   assert.equal(health.configured.apiFootball, true);
   assert.deepEqual(health.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'APEX_INTELLIGENCE', 'CONVERGENCE_ROUTE', 'MOMENTUM_STREAK']);
   assert.deepEqual(new Set(Object.values(health.sourceRoles)), new Set(['API_FOOTBALL']));
@@ -183,11 +183,23 @@ test('production server boots with API-Football as the only football source', as
   const settlementResponse = await fetch(`http://127.0.0.1:${port}/api/settlement-status?date=${today}`);
   assert.equal(settlementResponse.status, 200, logs);
 
-  const fixturePayload = await (await fetch(`http://127.0.0.1:${port}/api/fixtures?date=${today}`)).json();
+  const fixtureStarted = Date.now();
+  const firstFixtureResponse = await fetch(`http://127.0.0.1:${port}/api/fixtures?date=${today}`);
+  const fixturePayload = await firstFixtureResponse.json();
+  assert.ok(Date.now() - fixtureStarted < 1000, 'dashboard fixtures must not wait for odds pagination');
   assert.equal(fixturePayload.source, 'API_FOOTBALL');
   assert.equal(fixturePayload.fixtures.length, 1);
-  assert.equal(fixturePayload.fixtures[0].odds.homeWin, 1.70);
+  assert.equal(fixturePayload.oddsPending, true);
   assert.equal(fixturePayload.fixtures[0].home.logo, 'https://img.test/101.png');
+
+  let pricedPayload = fixturePayload;
+  const pricedDeadline = Date.now() + 7000;
+  while (Date.now() < pricedDeadline && Number(pricedPayload.fixtures?.[0]?.odds?.homeWin || 0) <= 1) {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    pricedPayload = await (await fetch(`http://127.0.0.1:${port}/api/fixtures?date=${today}&odds_refresh=${Date.now()}`, { cache: 'no-store' })).json();
+  }
+  assert.equal(pricedPayload.oddsPending, false);
+  assert.equal(pricedPayload.fixtures[0].odds.homeWin, 1.70);
 
   const crestResponse = await fetch(`http://127.0.0.1:${port}/api/media/team/101.png`);
   assert.equal(crestResponse.status, 200, logs);

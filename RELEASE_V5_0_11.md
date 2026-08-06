@@ -1,4 +1,4 @@
-# Betynz v5.0.11 — Render build isolation hotfix
+# Betynz v5.0.12 — Render build isolation hotfix
 
 ## Fixed
 

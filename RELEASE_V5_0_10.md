@@ -1,4 +1,4 @@
-# Betynz v5.0.11 — Adaptive API Rate Recovery
+# Betynz v5.0.12 — Adaptive API Rate Recovery
 
 ## Purpose
 
