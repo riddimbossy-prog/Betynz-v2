@@ -1,0 +1,60 @@
+import { readdir, rm } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
+const removed = [];
+
+async function remove(relativePath) {
+  await rm(resolve(root, relativePath), { recursive: true, force: true });
+  removed.push(relativePath);
+}
+
+const allowedTests = new Set([
+  'market-route.test.mjs',
+  'ppg-route.test.mjs',
+  'convergence.test.mjs',
+  'consensus.test.mjs',
+  'calibration.test.mjs',
+  'settlement.test.mjs',
+  'three-engine-reset.test.mjs',
+  'qualified-picks.test.mjs',
+  'responsive-cinematic.test.mjs',
+  'custom-data-api.test.mjs',
+  'platform-smoke.test.mjs'
+]);
+
+try {
+  const entries = await readdir(resolve(root, 'test'), { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isFile() && allowedTests.has(entry.name)) continue;
+    await remove(`test/${entry.name}`);
+  }
+} catch (error) {
+  if (error?.code !== 'ENOENT') throw error;
+}
+
+const retiredPaths = [
+  'src/engines/atlas8020.mjs',
+  'src/engines/atlas.mjs',
+  'src/engines/oddsThreshold.mjs',
+  'src/engines/counterOdds.mjs',
+  'src/engines/supervisor.mjs',
+  'src/lib/oddsFeed.mjs',
+  'src/lib/apiFootball.mjs',
+  'public/atlas.html',
+  'public/atlas.js',
+  'public/odds-threshold.html',
+  'public/odds-threshold.js',
+  'public/counter-odds.html',
+  'public/counter-odds.js',
+  'public/counter-odds-audit.html',
+  'public/counter-odds-audit.js',
+  'public/best-picks.html',
+  'public/best-picks.js',
+  'public/admin-data-quality.html',
+  'public/admin-data-quality.js'
+];
+
+for (const path of retiredPaths) await remove(path);
+console.log(`custom-data-API cleanup complete. ${removed.length} retired path(s) removed or confirmed absent.`);

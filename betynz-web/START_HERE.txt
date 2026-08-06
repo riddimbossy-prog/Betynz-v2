@@ -1,0 +1,11 @@
+BETYNZ v3.8.0 START HERE
+
+1. Create a blank GitHub repository named betynz-sportybet-api.
+2. Upload the SportyBet API package and deploy its Render Blueprint.
+3. Set SPORTYBET_API_KEY to a long private value.
+4. Create a second blank repository named betynz-web.
+5. Upload this web package and deploy its Render Blueprint.
+6. Set BETYNZ_DATA_API_BASE_URL to the SportyBet API Render URL.
+7. Set BETYNZ_DATA_API_KEY to the exact SPORTYBET_API_KEY value.
+8. Create a fresh Supabase project and run the SQL files in order.
+9. Connect betynz.com to the new web Render service.

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Betynz Admin Sign In</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/admin-login.css">
+</head>
+<body class="login-body">
+  <main class="login-shell">
+    <a class="brand" href="/" aria-label="Betynz home"><span class="brand-mark">B</span><span><b>BETYNZ</b><small>Admin</small></span></a>
+    <section class="login-card">
+      <span class="eyebrow">PROTECTED ADMIN</span>
+      <h1>Sign in to Betynz</h1>
+      <p>Use the Supabase admin account created for Betynz.</p>
+      <form id="login-form">
+        <label>Email<input id="login-email" type="email" autocomplete="username" required></label>
+        <label>Password<input id="login-password" type="password" autocomplete="current-password" required></label>
+        <button id="login-button" class="primary-button" type="submit">Sign in</button>
+      </form>
+      <p id="login-message" class="login-message" aria-live="polite"></p>
+      <a class="back-link" href="/">← Return to fixture board</a>
+    </section>
+  </main>
+  <script src="/admin-login.js" defer></script>
+<script type="module" src="/motion.js?v=3.5.2"></script></body>
+</html>

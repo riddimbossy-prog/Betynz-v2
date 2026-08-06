@@ -1,0 +1,1584 @@
+[
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "dashboard",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 2238,
+      "title": "Betynz \u2014 Consensus Football Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "picks",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 3208,
+      "title": "Betynz Consensus Bankers & Qualified Picks",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "market_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 959,
+      "title": "Betynz Market Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "ppg_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 1361,
+      "title": "Betynz PPG Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "convergence",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 1274,
+      "title": "Betynz Convergence Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "live",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 1066,
+      "title": "Betynz Live Match Centre",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "proof",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 1072,
+      "title": "Betynz Proof",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "performance",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 1093,
+      "title": "Betynz Performance",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "odds_movement",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 1125,
+      "title": "Betynz Odds Movement",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "leagues",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 1195,
+      "title": "Betynz League Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "admin_login",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 740,
+      "title": "Betynz Admin Sign In",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "engine_audit",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 791,
+      "title": "Betynz Engine Audit",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "calibration",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 1268,
+      "title": "Betynz Calibration Lab",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "learning",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflow": false,
+      "height": 740,
+      "title": "Betynz Learning Centre",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "phone_320",
+    "width": 320,
+    "height": 740,
+    "page": "dashboard_modal",
+    "ok": true,
+    "metrics": {
+      "missing": false,
+      "left": 12,
+      "right": 308,
+      "width": 296,
+      "viewport": 320,
+      "overflow": false,
+      "inside": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "dashboard",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 2203,
+      "title": "Betynz \u2014 Consensus Football Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "picks",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 3157,
+      "title": "Betynz Consensus Bankers & Qualified Picks",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "market_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 942,
+      "title": "Betynz Market Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "ppg_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 1307,
+      "title": "Betynz PPG Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "convergence",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 1274,
+      "title": "Betynz Convergence Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "live",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 1066,
+      "title": "Betynz Live Match Centre",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "proof",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 1072,
+      "title": "Betynz Proof",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "performance",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 1076,
+      "title": "Betynz Performance",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "odds_movement",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 1108,
+      "title": "Betynz Odds Movement",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "leagues",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 1178,
+      "title": "Betynz League Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "admin_login",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 882,
+      "title": "Betynz Admin Sign In",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "engine_audit",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 882,
+      "title": "Betynz Engine Audit",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "calibration",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 1251,
+      "title": "Betynz Calibration Lab",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "learning",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 344,
+      "scrollWidth": 344,
+      "overflow": false,
+      "height": 882,
+      "title": "Betynz Learning Centre",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "zfold_cover",
+    "width": 344,
+    "height": 882,
+    "page": "dashboard_modal",
+    "ok": true,
+    "metrics": {
+      "missing": false,
+      "left": 12,
+      "right": 332,
+      "width": 320,
+      "viewport": 344,
+      "overflow": false,
+      "inside": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "dashboard",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 2075,
+      "title": "Betynz \u2014 Consensus Football Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "picks",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 2986,
+      "title": "Betynz Consensus Bankers & Qualified Picks",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "market_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 857,
+      "title": "Betynz Market Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "ppg_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 1003,
+      "title": "Betynz PPG Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "convergence",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 1149,
+      "title": "Betynz Convergence Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "live",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 993,
+      "title": "Betynz Live Match Centre",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "proof",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 937,
+      "title": "Betynz Proof",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "performance",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 955,
+      "title": "Betynz Performance",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "odds_movement",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 1013,
+      "title": "Betynz Odds Movement",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "leagues",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 1046,
+      "title": "Betynz League Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "admin_login",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 829,
+      "title": "Betynz Admin Sign In",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "engine_audit",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 829,
+      "title": "Betynz Engine Audit",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "calibration",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 1176,
+      "title": "Betynz Calibration Lab",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "learning",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 690,
+      "scrollWidth": 690,
+      "overflow": false,
+      "height": 829,
+      "title": "Betynz Learning Centre",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "zfold_inner",
+    "width": 690,
+    "height": 829,
+    "page": "dashboard_modal",
+    "ok": true,
+    "metrics": {
+      "missing": false,
+      "left": 14,
+      "right": 676,
+      "width": 662,
+      "viewport": 690,
+      "overflow": false,
+      "inside": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "dashboard",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1966,
+      "title": "Betynz \u2014 Consensus Football Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "picks",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 2957,
+      "title": "Betynz Consensus Bankers & Qualified Picks",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "market_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1024,
+      "title": "Betynz Market Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "ppg_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1024,
+      "title": "Betynz PPG Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "convergence",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1024,
+      "title": "Betynz Convergence Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "live",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1024,
+      "title": "Betynz Live Match Centre",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "proof",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1024,
+      "title": "Betynz Proof",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "performance",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1024,
+      "title": "Betynz Performance",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "odds_movement",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1024,
+      "title": "Betynz Odds Movement",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "leagues",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1046,
+      "title": "Betynz League Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "admin_login",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1024,
+      "title": "Betynz Admin Sign In",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "engine_audit",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1024,
+      "title": "Betynz Engine Audit",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "calibration",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1156,
+      "title": "Betynz Calibration Lab",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "learning",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 768,
+      "scrollWidth": 768,
+      "overflow": false,
+      "height": 1024,
+      "title": "Betynz Learning Centre",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "tablet_portrait",
+    "width": 768,
+    "height": 1024,
+    "page": "dashboard_modal",
+    "ok": true,
+    "metrics": {
+      "missing": false,
+      "left": 14,
+      "right": 754,
+      "width": 740,
+      "viewport": 768,
+      "overflow": false,
+      "inside": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "dashboard",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 4204,
+      "title": "Betynz \u2014 Consensus Football Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "picks",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 2572,
+      "title": "Betynz Consensus Bankers & Qualified Picks",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "market_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Market Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "ppg_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 769,
+      "title": "Betynz PPG Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "convergence",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 773,
+      "title": "Betynz Convergence Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "live",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Live Match Centre",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "proof",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Proof",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "performance",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 868,
+      "title": "Betynz Performance",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "odds_movement",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Odds Movement",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "leagues",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz League Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "admin_login",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Admin Sign In",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "engine_audit",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Engine Audit",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "calibration",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 1061,
+      "title": "Betynz Calibration Lab",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "learning",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1024,
+      "scrollWidth": 1024,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Learning Centre",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "tablet_landscape",
+    "width": 1024,
+    "height": 768,
+    "page": "dashboard_modal",
+    "ok": true,
+    "metrics": {
+      "missing": false,
+      "left": 14,
+      "right": 1010,
+      "width": 996,
+      "viewport": 1024,
+      "overflow": false,
+      "inside": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "dashboard",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 1710,
+      "title": "Betynz \u2014 Consensus Football Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "picks",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 2344,
+      "title": "Betynz Consensus Bankers & Qualified Picks",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "market_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Market Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "ppg_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz PPG Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "convergence",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Convergence Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "live",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Live Match Centre",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "proof",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Proof",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "performance",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Performance",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "odds_movement",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Odds Movement",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "leagues",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz League Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "admin_login",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Admin Sign In",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "engine_audit",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Engine Audit",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "calibration",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 815,
+      "title": "Betynz Calibration Lab",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "learning",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1366,
+      "scrollWidth": 1366,
+      "overflow": false,
+      "height": 768,
+      "title": "Betynz Learning Centre",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "laptop",
+    "width": 1366,
+    "height": 768,
+    "page": "dashboard_modal",
+    "ok": true,
+    "metrics": {
+      "missing": false,
+      "left": 93,
+      "right": 1273,
+      "width": 1180,
+      "viewport": 1366,
+      "overflow": false,
+      "inside": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "dashboard",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1682,
+      "title": "Betynz \u2014 Consensus Football Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "picks",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 2329,
+      "title": "Betynz Consensus Bankers & Qualified Picks",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "market_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1080,
+      "title": "Betynz Market Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "ppg_route",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1080,
+      "title": "Betynz PPG Route Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "convergence",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1080,
+      "title": "Betynz Convergence Engine",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "live",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1080,
+      "title": "Betynz Live Match Centre",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "proof",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1080,
+      "title": "Betynz Proof",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "performance",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1080,
+      "title": "Betynz Performance",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "odds_movement",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1080,
+      "title": "Betynz Odds Movement",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "leagues",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1080,
+      "title": "Betynz League Intelligence",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "admin_login",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1080,
+      "title": "Betynz Admin Sign In",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "engine_audit",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1080,
+      "title": "Betynz Engine Audit",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "calibration",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1080,
+      "title": "Betynz Calibration Lab",
+      "bottomNav": true
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "learning",
+    "ok": true,
+    "metrics": {
+      "innerWidth": 1920,
+      "scrollWidth": 1920,
+      "overflow": false,
+      "height": 1080,
+      "title": "Betynz Learning Centre",
+      "bottomNav": false
+    }
+  },
+  {
+    "viewport": "wide_desktop",
+    "width": 1920,
+    "height": 1080,
+    "page": "dashboard_modal",
+    "ok": true,
+    "metrics": {
+      "missing": false,
+      "left": 370,
+      "right": 1550,
+      "width": 1180,
+      "viewport": 1920,
+      "overflow": false,
+      "inside": true
+    }
+  }
+]

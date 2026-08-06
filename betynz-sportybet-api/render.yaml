@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: betynz-sportybet-api
+    runtime: node
+    plan: starter
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: SPORTYBET_API_KEY
+        sync: false
+      - key: SPORTYBET_API_KEY_HEADER
+        value: X-API-Key
+      - key: SPORTYBET_COUNTRY
+        value: gh
+      - key: SPORTYBET_PUBLIC_UPCOMING_URL
+        value: "https://www.sportybet.com/api/{country}/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=1&pageNum={page}&pageSize={page_size}"
+      - key: SPORTYBET_PUBLIC_LIVE_URL
+        value: "https://www.sportybet.com/api/{country}/factsCenter/pcLiveEvents?sportId=sr%3Asport%3A1&marketId=1&pageNum={page}&pageSize={page_size}"
+      - key: SPORTYBET_PUBLIC_RESULTS_URL
+        value: "https://www.sportybet.com/api/{country}/factsCenter/pcResults?sportId=sr%3Asport%3A1&date={date}&pageNum={page}&pageSize={page_size}"
+      - key: SPORTYBET_PUBLIC_EVENT_DETAIL_URL
+        value: "https://www.sportybet.com/api/{country}/factsCenter/pcEvent?eventId={event_id}"
+      - key: SPORTYBET_PAGE_SIZE
+        value: 100
+      - key: SPORTYBET_MAX_PAGES
+        value: 10
+      - key: SPORTYBET_TIMEOUT_MS
+        value: 20000
+      - key: SPORTYBET_CACHE_TTL_SECONDS
+        value: 60
+      - key: SPORTYBET_RESULTS_CACHE_TTL_SECONDS
+        value: 300
+      - key: SPORTYBET_HISTORY_LOOKBACK_DAYS
+        value: 120
+      - key: SPORTYBET_MAX_CONCURRENCY
+        value: 2
+      - key: API_RATE_LIMIT_PER_MINUTE
+        value: 180
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://betynz.com,https://www.betynz.com"

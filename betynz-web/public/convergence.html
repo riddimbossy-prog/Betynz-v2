@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#04111b">
+  <title>Betynz Convergence Engine</title>
+  <link rel="stylesheet" href="/styles.css?v=3.5.2">
+</head>
+<body>
+<main class="route-page convergence-page">
+  <header class="route-hero">
+    <div>
+      <a class="back-link" href="/">← Dashboard</a>
+      <a class="back-link" href="/picks.html">★ Qualified Picks</a>
+      <small>FOUR-BLOCK ENGINE</small>
+      <h1>Convergence Engine</h1>
+      <p>Attack, defence, venue performance and the market must independently point to the same football direction.</p>
+    </div>
+    <div class="route-controls">
+      <input id="convergenceDate" type="date">
+      <select id="convergenceDecisionFilter">
+        <option value="ALL">All qualified picks</option>
+        <option value="FIRE">Direct picks</option>
+        <option value="SAFER">Safer picks</option>
+      </select>
+      <button id="convergenceRefresh">Analyse date</button>
+    </div>
+  </header>
+
+  <section class="route-summary">
+    <article><strong id="convFixtures">0</strong><span>Fixtures checked</span></article>
+    <article><strong id="convAnalysed">0</strong><span>Complete samples</span></article>
+    <article><strong id="convFire">0</strong><span>Direct picks</span></article>
+    <article><strong id="convSafer">0</strong><span>Safer picks</span></article>
+  </section>
+
+  <section class="convergence-rules-strip">
+    <article><b>Attack</b><span>Scoring rate and goal production</span></article>
+    <article><b>Defence</b><span>Conceding, clean sheets and blanks</span></article>
+    <article><b>Venue</b><span>Last five home and away profiles</span></article>
+    <article><b>Market</b><span>Normalized 1X2 and goal prices</span></article>
+  </section>
+
+  <section class="route-grid" id="convergenceGrid"><div class="route-empty">Choose a date and analyse the convergence routes.</div></section>
+  <p class="responsible-note">Informational football analysis only. No outcome is guaranteed. Adults only.</p>
+</main>
+<nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+  <a href="/">⌂<span>Board</span></a>
+  <a href="/picks.html">★<span>Picks</span></a>
+  <a href="/market-route.html">◆<span>Market</span></a>
+  <a href="/ppg-route.html">◈<span>PPG</span></a>
+  <a class="active" href="/convergence.html">◎<span>Converge</span></a>
+</nav>
+<script type="module" src="/convergence.js?v=3.5.2"></script>
+<script type="module" src="/motion.js?v=3.5.2"></script></body>
+</html>
