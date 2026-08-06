@@ -1,24 +1,63 @@
 {
-  "name": "Betynz",
+  "id": "/",
+  "name": "Betynz Football Intelligence",
   "short_name": "Betynz",
-  "description": "Seven-day football intelligence with three independent engines, consensus bankers, frozen proof, automatic settlement calibration and cinematic responsive design.",
-  "start_url": "/",
+  "description": "Seven-day football intelligence with three independent engines, consensus bankers, official proof, automatic settlement and performance learning.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#04101a",
-  "theme_color": "#04101a",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#030406",
+  "theme_color": "#050607",
   "orientation": "any",
+  "categories": ["sports", "utilities"],
+  "lang": "en",
+  "dir": "ltr",
+  "launch_handler": { "client_mode": "navigate-existing" },
   "icons": [
     {
       "src": "/assets/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/assets/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/assets/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Qualified Picks",
+      "short_name": "Picks",
+      "url": "/picks.html",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Live Matches",
+      "short_name": "Live",
+      "url": "/live.html",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Settled Proof",
+      "short_name": "Proof",
+      "url": "/proof.html",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

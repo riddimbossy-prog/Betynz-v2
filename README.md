@@ -1,16 +1,12 @@
-# Betynz v5.0.3 — API-Football only
+# Betynz v5.0.4 — API-Football only
 
-Betynz uses API-Football for fixtures, odds, live scores, results, statistics and visuals. Team crests are delivered through a cached same-origin endpoint to avoid browser hotlink failures.
+Betynz is a single-service football intelligence platform with Market Route, PPG Route, Convergence and Consensus. API-Football supplies fixtures, odds, live scores, results, statistics and visuals.
 
-## Core routes
+v5.0.4 adds automatic result settlement, board-aware empty-section hiding, a rolling carousel of officially settled wins, complete favicon/PWA artwork and a lightweight animated launch experience.
 
-```text
-GET /api/health
-GET /api/fixtures?date=YYYY-MM-DD
-GET /api/live
-GET /api/results?date=YYYY-MM-DD
-GET /api/media/team/<TEAM_ID>.png
-GET /api/media/league/<LEAGUE_ID>.png
-```
+See:
 
-The deployment remains one repository, one Render service and one root `render.yaml`.
+- `START_HERE.md`
+- `RELEASE_V5_0_4.md`
+- `BUILD_VALIDATION.md`
+- `DEPLOY_SINGLE_RENDER.md`

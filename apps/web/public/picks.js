@@ -86,6 +86,41 @@ function conflictCard(row) {
 }
 
 function empty(title, text) { return `<div class="picks-empty"><h3>${esc(title)}</h3><p>${esc(text)}</p></div>`; }
+
+function setBoardAwareVisibility({ processing, elite, consensus, qualified, safer, conflicts }) {
+  const groups = [
+    ['eliteStage', elite, 'eliteCount'],
+    ['consensusStage', consensus, 'consensusCount'],
+    ['qualifiedStage', qualified, 'singleCount'],
+    ['saferStage', safer, 'saferCount'],
+    ['conflictStage', conflicts, 'conflictCount']
+  ];
+  for (const [sectionId, rows, countId] of groups) {
+    const section = $(`#${sectionId}`);
+    const countCard = $(`#${countId}`)?.closest('article');
+    const hide = !processing && rows.length === 0;
+    if (section) section.hidden = hide;
+    if (countCard) countCard.hidden = hide;
+  }
+  const nothingVisible = !processing && groups.every(([, rows]) => rows.length === 0);
+  const emptyPanel = $('#picksBoardEmpty');
+  if (emptyPanel) {
+    emptyPanel.hidden = !nothingVisible;
+    if (nothingVisible) {
+      const title = payload?.failed ? 'Analysis could not be completed' : 'Nothing qualified for this view';
+      const text = payload?.failed
+        ? (payload.error || 'Refresh analysis to try again.')
+        : allRows().length
+          ? 'The active filters hide every available pick. Change a filter to bring matching selections back.'
+          : 'No engine route qualified for the selected date. Empty categories are hidden automatically.';
+      emptyPanel.querySelector('h2').textContent = title;
+      emptyPanel.querySelector('p').textContent = text;
+    }
+  }
+  const kpis = document.querySelector('.picks-kpis');
+  if (kpis) kpis.hidden = !processing && groups.every(([, rows]) => rows.length === 0);
+}
+
 function render() {
   if (!payload) return;
   const rows = filteredRows();
@@ -113,6 +148,7 @@ function render() {
   $('#qualifiedList').innerHTML = qualified.length ? qualified.map(row => consensusCard(row, true)).join('') : chooseEmpty('No single-engine qualified picks', 'Complete routes will appear here without being promoted to banker status.', 'Checking complete engine routes…');
   $('#saferList').innerHTML = safer.length ? safer.map(row => consensusCard(row, true)).join('') : chooseEmpty('No safer picks', 'Approved downgrade markets appear here.', 'Checking safer downgrade routes…');
   $('#conflictList').innerHTML = conflicts.length ? conflicts.map(conflictCard).join('') : chooseEmpty('No engine conflicts', 'No opposing qualified directions are visible under this filter.', 'Checking opposing engine directions…');
+  setBoardAwareVisibility({ processing, elite, consensus, qualified, safer, conflicts });
   window.dispatchEvent(new CustomEvent('betynz:content-rendered'));
 }
 

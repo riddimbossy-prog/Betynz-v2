@@ -1,18 +1,18 @@
-const CACHE = 'betynz-v5-0-3';
+const CACHE = 'betynz-v5-0-4';
 const SHELL = [
-  '/', '/styles.css?v=5.0.3', '/motion.js?v=5.0.3', '/app.js?v=5.0.3',
-  '/picks.html', '/picks.js?v=5.0.3',
-  '/market-route.html', '/market-route.js?v=5.0.3',
-  '/ppg-route.html', '/ppg-route.js?v=5.0.3',
-  '/convergence.html', '/convergence.js?v=5.0.3',
-  '/proof.html', '/proof.js?v=5.0.3',
-  '/performance.html', '/performance.js?v=5.0.3',
-  '/live.html', '/live.js?v=5.0.3',
-  '/odds-movement.html', '/odds-movement.js?v=5.0.3',
-  '/leagues.html', '/leagues.js?v=5.0.3',
-  '/admin-engine-audit.html', '/admin-engine-audit.js?v=5.0.3',
-  '/admin-calibration.html', '/admin-calibration.js?v=5.0.3',
-  '/manifest.webmanifest', '/assets/icon-192.png', '/assets/icon-512.png'
+  '/', '/styles.css?v=5.0.4', '/motion.js?v=5.0.4', '/app.js?v=5.0.4',
+  '/picks.html', '/picks.js?v=5.0.4',
+  '/market-route.html', '/market-route.js?v=5.0.4',
+  '/ppg-route.html', '/ppg-route.js?v=5.0.4',
+  '/convergence.html', '/convergence.js?v=5.0.4',
+  '/proof.html', '/proof.js?v=5.0.4',
+  '/performance.html', '/performance.js?v=5.0.4',
+  '/live.html', '/live.js?v=5.0.4',
+  '/odds-movement.html', '/odds-movement.js?v=5.0.4',
+  '/leagues.html', '/leagues.js?v=5.0.4',
+  '/admin-engine-audit.html', '/admin-engine-audit.js?v=5.0.4',
+  '/admin-calibration.html', '/admin-calibration.js?v=5.0.4',
+  '/manifest.webmanifest', '/favicon.ico', '/assets/favicon-16x16.png', '/assets/favicon-32x32.png', '/assets/apple-touch-icon.png', '/assets/icon-192.png', '/assets/icon-512.png', '/assets/maskable-192.png', '/assets/maskable-512.png', '/assets/betynz-mark.png', '/assets/betynz-logo.png', '/assets/pwa-splash-portrait.png', '/assets/pwa-splash-landscape.png'
 ];
 self.addEventListener('install', event => event.waitUntil(
   caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting())

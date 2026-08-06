@@ -84,7 +84,17 @@ services:
       - key: AUTO_SETTLEMENT_ENABLED
         value: "true"
       - key: AUTO_SETTLEMENT_INTERVAL_MINUTES
-        value: "30"
+        value: "10"
+      - key: AUTO_SETTLEMENT_LOOKBACK_DAYS
+        value: "3"
+      - key: SETTLEMENT_TRIGGER_COOLDOWN_SECONDS
+        value: "90"
+      - key: WIN_CAROUSEL_DAYS
+        value: "14"
+      - key: WIN_CAROUSEL_LIMIT
+        value: "24"
+      - key: WIN_CAROUSEL_CACHE_TTL_SECONDS
+        value: "60"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY

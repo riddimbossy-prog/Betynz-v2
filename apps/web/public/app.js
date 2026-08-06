@@ -28,7 +28,8 @@ const state = {
   requestToken: 0,
   consensusPollTimer: null,
   routePollTimer: null,
-  weekCountToken: 0
+  weekCountToken: 0,
+  winsPollTimer: null
 };
 
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
@@ -108,9 +109,14 @@ async function fetchJson(url, options = {}) {
 }
 
 function setHomeSpotlightMessage(message, detail = '') {
+  const spotlight = $('#homePicksSpotlight');
+  if (spotlight) spotlight.hidden = false;
   for (const id of ['homeEliteGrid', 'homeConsensusGrid', 'homeEarlyGrid']) {
     const grid = $(`#${id}`);
-    if (grid) grid.innerHTML = `<div class="spotlight-empty"><b>${esc(message)}</b><span>${esc(detail)}</span></div>`;
+    if (grid) {
+      grid.closest('[data-board-aware]')?.removeAttribute('hidden');
+      grid.innerHTML = `<div class="spotlight-empty"><b>${esc(message)}</b><span>${esc(detail)}</span></div>`;
+    }
   }
 }
 
@@ -256,13 +262,17 @@ function renderList() {
       ? `<span class="route-badge consensus ${consensus.classification === 'ELITE_BANKER' ? 'elite' : 'fire'}">${consensus.agreementCount}/3 · ${esc(consensus.final.label)}</span>`
       : consensus?.classification === 'CONFLICT' ? '<span class="route-badge conflict">ENGINE CONFLICT</span>' : '';
     const status = fixtureStatus(fixture);
+    const hasScore = Number.isFinite(Number(fixture.score?.home)) && Number.isFinite(Number(fixture.score?.away));
+    const scoreMarkup = hasScore && ['LIVE','SETTLED'].includes(status)
+      ? `<b class="board-score">${Number(fixture.score.home)}–${Number(fixture.score.away)}</b><span>${esc(kickoffTime(fixture.kickoff))}</span>`
+      : `<b>${esc(kickoffTime(fixture.kickoff))}</b>`;
     return `<button class="match-row" type="button" data-fixture-id="${esc(fixture.id)}">
       <span class="league-line"><b>${esc(fixture.league?.country || 'International')}</b> · ${esc(fixture.league?.name || 'League')} ${routeBadge} ${ppgBadge} ${consensusBadge}</span>
       <span class="teams-cell">
         <span class="team-line">${teamCrest(fixture.home, fixture.league?.country, fixture.id, 'home')}<b>${esc(fixture.home?.name || 'Home')}</b></span>
         <span class="team-line">${teamCrest(fixture.away, fixture.league?.country, fixture.id, 'away')}<b>${esc(fixture.away?.name || 'Away')}</b></span>
       </span>
-      <span class="kickoff-cell"><b>${esc(kickoffTime(fixture.kickoff))}</b><small class="status-${status.toLowerCase()}">${esc(status)}</small></span>
+      <span class="kickoff-cell">${scoreMarkup}<small class="status-${status.toLowerCase()}">${esc(status)}</small></span>
       <span class="board-1x2">
         <span><small>1</small><b>${odd(fixture.odds?.homeWin)}</b></span>
         <span><small>X</small><b>${odd(fixture.odds?.draw)}</b></span>
@@ -275,6 +285,51 @@ function renderList() {
   $$('.match-row').forEach(button => button.addEventListener('click', () => openMatch(button.dataset.fixtureId)));
   $('#visibleMatches').textContent = `All ${state.filtered.length} matches for this day`;
   $('#loadMoreBtn').hidden = true;
+}
+
+function winCarouselItem(row) {
+  const score = Number.isFinite(Number(row.homeScore)) && Number.isFinite(Number(row.awayScore))
+    ? `${Number(row.homeScore)}–${Number(row.awayScore)}` : 'WON';
+  const agreement = row.recordType === 'CONSENSUS' && row.agreementCount ? `${row.agreementCount}/3 · ` : '';
+  return `<a class="win-carousel-item" href="/proof.html">
+    <span class="win-check">✓</span>
+    <span class="win-copy"><small>${esc(row.country || 'International')} · ${esc(row.league || 'League')}</small><b>${esc(row.home)} ${esc(score)} ${esc(row.away)}</b></span>
+    <span class="win-market"><small>${esc(agreement)}${esc(row.recordType === 'CONSENSUS' ? 'CONSENSUS' : row.engine || 'ENGINE')}</small><strong>${esc(row.selection || row.market || 'Winning pick')} @ ${odd(row.odds)}</strong></span>
+  </a>`;
+}
+
+function renderWinCarousel(payload) {
+  const shell = $('#winCarousel');
+  const track = $('#winCarouselTrack');
+  if (!shell || !track) return;
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  if (!rows.length) {
+    shell.hidden = true;
+    track.innerHTML = '';
+    return;
+  }
+  const items = rows.map(winCarouselItem).join('');
+  // Duplicate the sequence for a seamless CSS-only loop. Screen readers see
+  // only the first copy; the duplicate is decorative.
+  track.innerHTML = `<div class="win-carousel-sequence">${items}</div><div class="win-carousel-sequence" aria-hidden="true">${items}</div>`;
+  track.style.setProperty('--ticker-duration', `${Math.max(24, rows.length * 5)}s`);
+  shell.hidden = false;
+  window.dispatchEvent(new CustomEvent('betynz:content-rendered'));
+}
+
+async function loadWinCarousel(attempt = 0) {
+  clearTimeout(state.winsPollTimer);
+  try {
+    const payload = await fetchJson('/api/wins-carousel?days=14&limit=24', { cache: 'no-store', timeoutMs: 15000 });
+    renderWinCarousel(payload);
+    if (payload?.configured === false && !(payload?.rows || []).length) return;
+    const delay = payload?.rows?.length ? 120000 : 45000;
+    if (attempt < 180) state.winsPollTimer = setTimeout(() => loadWinCarousel(attempt + 1), delay);
+  } catch {
+    const shell = $('#winCarousel');
+    if (shell) shell.hidden = true;
+    if (attempt < 30) state.winsPollTimer = setTimeout(() => loadWinCarousel(attempt + 1), 60000);
+  }
 }
 
 function homeConsensusCard(row, tone = '') {
@@ -310,14 +365,23 @@ function renderHomeBankers(payload) {
   const progress = payload?.progress || {};
   const progressText = `${Number(progress.processed || 0)} of ${Number(progress.total || 0)} processed`;
   eliteGrid.innerHTML = elite.length ? elite.map(row => homeConsensusCard(row, 'elite')).join('') : processing
-    ? `<div class="spotlight-empty"><b>Checking 3/3 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>`
-    : '<div class="spotlight-empty"><b>No 3/3 agreement yet.</b><span>Elite Bankers appear only when all three engines support one safe direction.</span></div>';
+    ? `<div class="spotlight-empty"><b>Checking 3/3 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
   consensusGrid.innerHTML = consensus.length ? consensus.map(row => homeConsensusCard(row, 'consensus')).join('') : processing
-    ? `<div class="spotlight-empty"><b>Checking 2/3 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>`
-    : '<div class="spotlight-empty"><b>No 2/3 agreement yet.</b><span>Consensus Bankers need two independent engines to agree.</span></div>';
+    ? `<div class="spotlight-empty"><b>Checking 2/3 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
   earlyGrid.innerHTML = early.length ? early.map(row => homeConsensusCard(row, 'early')).join('') : processing
-    ? '<div class="spotlight-empty"><b>Preparing early picks…</b><span>The selected date finishes before future dates are scanned.</span></div>'
-    : '<div class="spotlight-empty"><b>No early pick published yet.</b><span>Future selections appear as soon as their required markets and statistics qualify.</span></div>';
+    ? '<div class="spotlight-empty"><b>Preparing early picks…</b><span>The selected date finishes before future dates are scanned.</span></div>' : '';
+
+  const visibility = [
+    ['homeEliteSection', elite.length],
+    ['homeConsensusSection', consensus.length],
+    ['homeEarlySection', early.length]
+  ];
+  for (const [id, count] of visibility) {
+    const section = $(`#${id}`);
+    if (section) section.hidden = !processing && !count;
+  }
+  const spotlight = $('#homePicksSpotlight');
+  if (spotlight) spotlight.hidden = !processing && visibility.every(([, count]) => !count);
   renderList();
   window.dispatchEvent(new CustomEvent('betynz:content-rendered'));
 }
@@ -696,6 +760,7 @@ function setupEvents() {
 
 buildWeekStrip();
 setupEvents();
+loadWinCarousel().catch(() => {});
 loadDate(state.selectedDate);
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});

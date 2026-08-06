@@ -1,34 +1,35 @@
-# Betynz v5.0.3 build validation
+# Betynz v5.0.4 build validation
 
-## Result
+## Passed
 
-- Engine and platform tests: **68/68 passed**
-- Same-origin crest proxy source test: **passed**
-- Functional crest proxy smoke test: **HTTP 200, image/png**
-- API-Football fixtures/odds/live/results contract tests: **passed**
-- Progressive engine-analysis regression: **passed**
-- Release verification: **passed**
-- Single Render verification: **passed**
-- One-service integration smoke test: **passed**
+- Engine/platform suite: **69/69 tests passed**
+- API-Football fixtures, odds, live, results, events, history and crest proxy tests: passed
+- Automatic settlement route and scheduler source verification: passed
+- Rolling wins endpoint and dashboard wiring: passed
+- Board-aware dashboard and Picks visibility: passed
+- Favicon, Apple icon, maskable icons and launch artwork: passed
+- Animated splash and reduced-motion safeguards: passed
+- Responsive phone, Z Fold, tablet and desktop assertions: passed
+- Release verification: passed
+- Single `render.yaml` / one Render service verification: passed
+- API-Football-only integration smoke test: passed
 
-## Crest repair
+## Integration smoke result
 
-The public browser no longer hotlinks API-Football team artwork directly. Team IDs are converted to same-origin URLs such as:
-
-```text
-/api/media/team/101.png
+```json
+{
+  "ok": true,
+  "deployment": "ONE_RENDER_SERVICE",
+  "provider": "API_FOOTBALL",
+  "version": "5.0.4",
+  "engines": ["MARKET_ROUTE", "PPG_ROUTE", "CONVERGENCE_ROUTE"],
+  "fixtures": 2,
+  "live": 1,
+  "results": 1,
+  "events": 1
+}
 ```
 
-The Node server fetches the provider image, verifies that the response is an image, applies a size limit, caches the bytes, deduplicates simultaneous requests and limits media-fetch concurrency. If the image is unavailable, the interface switches to team initials instead of leaving a broken-image icon.
+## Important limitation
 
-## Render structure
-
-- One repository
-- One root `render.yaml`
-- One Render web service
-- `apps/web` is the only application folder
-- API-Football is the only football provider
-
-## Test environment
-
-The provider contract and image delivery were tested with a local API-Football-compatible mock. A real production crest request was not made because the private production key is not available in this environment.
+The integration test used an API-Football-compatible local mock. The production API key and production Supabase project were not available in this environment. Real bookmaker coverage, quota behavior and the populated wins carousel must be confirmed after deployment.

@@ -60,7 +60,7 @@ test('full platform keeps all boards, consensus, calibration and API-Football en
   for (const route of [
     '/api/fixtures-week','/api/market-route-board','/api/ppg-route-board','/api/convergence-route-board',
     '/api/match-intelligence','/api/live','/api/results','/api/proof','/api/performance','/api/odds-movement','/api/leagues',
-    '/api/qualified-picks','/api/consensus-picks','/api/admin/engine-audit','/api/admin/calibration'
+    '/api/qualified-picks','/api/consensus-picks','/api/wins-carousel','/api/settlement-status','/api/admin/engine-audit','/api/admin/calibration'
   ]) assert.match(server, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(server, /getApiFootballFixtureBoard/);
   assert.match(server, /getApiFootballLiveBoard/);
@@ -92,6 +92,21 @@ test('dashboard crests use the same-origin API-Football media proxy with a fallb
   assert.match(app, /\/api\/media\/team\//);
   assert.match(app, /bindCrestFallbacks/);
   assert.match(live, /live-crest/);
+});
+
+test('dashboard experience includes board-aware sections, rolling settled wins and complete PWA branding', async () => {
+  const [index, app, picks, picksJs, manifest, motion, sw] = await Promise.all([
+    read('public/index.html'), read('public/app.js'), read('public/picks.html'), read('public/picks.js'),
+    read('public/manifest.webmanifest'), read('public/motion.js'), read('public/sw.js')
+  ]);
+  assert.match(index, /id="winCarousel"/);
+  assert.match(app, /loadWinCarousel/);
+  assert.match(picks, /data-board-aware/);
+  assert.match(picksJs, /setBoardAwareVisibility/);
+  assert.match(manifest, /maskable-512\.png/);
+  assert.match(manifest, /launch_handler/);
+  assert.match(motion, /pwa-launch-splash/);
+  assert.match(sw, /betynz-v5-0-4/);
 });
 
 test('production server boots with API-Football as the only football source', async t => {
@@ -152,13 +167,21 @@ test('production server boots with API-Football as the only football source', as
   t.after(() => child.kill('SIGTERM'));
 
   const health = await (await waitFor(`http://127.0.0.1:${port}/api/health`)).json();
-  assert.equal(health.version, '5.0.3');
+  assert.equal(health.version, '5.0.4');
   assert.equal(health.configured.apiFootball, true);
   assert.deepEqual(health.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'CONVERGENCE_ROUTE']);
   assert.deepEqual(new Set(Object.values(health.sourceRoles)), new Set(['API_FOOTBALL']));
 
   const config = await (await fetch(`http://127.0.0.1:${port}/api/config`)).json();
   assert.deepEqual(new Set(Object.values(config.dataSources)), new Set(['API-Football']));
+
+  const winsResponse = await fetch(`http://127.0.0.1:${port}/api/wins-carousel?days=14&limit=10`);
+  assert.equal(winsResponse.status, 200, logs);
+  const winsPayload = await winsResponse.json();
+  assert.ok(Array.isArray(winsPayload.rows));
+
+  const settlementResponse = await fetch(`http://127.0.0.1:${port}/api/settlement-status?date=${today}`);
+  assert.equal(settlementResponse.status, 200, logs);
 
   const fixturePayload = await (await fetch(`http://127.0.0.1:${port}/api/fixtures?date=${today}`)).json();
   assert.equal(fixturePayload.source, 'API_FOOTBALL');

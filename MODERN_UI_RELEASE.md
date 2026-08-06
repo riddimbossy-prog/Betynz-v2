@@ -1,7 +1,12 @@
-# Modern prediction interface
+# Betynz v5.0.4 modern UI
 
-Betynz v5.0.3 preserves the premium dark dashboard, official silver-and-orange brand mark, responsive fixture cards, engine status chips, match-intelligence dialog and mobile/Z Fold navigation.
+The premium black, silver and orange interface now includes:
 
-The presentation layer reads only same-origin Betynz endpoints. All fixture, odds, live, results, statistics and visual data behind those endpoints now comes from API-Football.
-
-Responsive safeguards cover phone, tablet, desktop, Z Fold cover and unfolded layouts, safe areas and reduced-motion preferences.
+- Board-aware sections that disappear when empty
+- A rolling strip of officially settled wins
+- Settled/live scorelines on fixture rows
+- Animated KPI updates and section entrances
+- Premium card tilt on fine-pointer devices
+- Animated PWA launch splash
+- New favicon, Apple touch icon, maskable icons and launch artwork
+- Reduced-motion fallbacks for every continuous animation

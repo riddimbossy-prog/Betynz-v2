@@ -32,3 +32,16 @@ The application applies no daily fixture cap. Odds pages continue until `paging.
 ## Public same-origin routes
 
 `/api/fixtures`, `/api/results`, `/api/live`, `/api/live-events` and the engine/intelligence routes expose sanitized normalized data without the private key.
+
+## v5.0.4 settlement and settled-win delivery
+
+API-Football remains the sole football data provider. Official completed fixture results are matched to frozen Supabase predictions and settled as `WON`, `LOST`, `VOID`, `PUSH` or `REVIEW`.
+
+Public read-only routes:
+
+```text
+GET /api/settlement-status?date=YYYY-MM-DD
+GET /api/wins-carousel?days=14&limit=24
+```
+
+The wins route returns only officially settled `WON` rows. It does not generate or rewrite predictions.

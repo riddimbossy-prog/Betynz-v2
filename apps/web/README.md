@@ -1,19 +1,12 @@
-# Betynz Web v5.0.3
+# Betynz Web v5.0.4
 
-The web service uses `src/lib/apiFootball.mjs` as its only football provider adapter.
+The web service uses API-Football for all football data and runs the Market Route, PPG Route, Convergence and Consensus systems.
 
-It exposes same-origin routes for fixtures, engine boards, match intelligence, live scores, incidents, proof, performance, odds movement, league intelligence and protected administration. The browser never receives `API_FOOTBALL_KEY`.
+v5.0.4 adds:
 
-Run locally:
-
-```bash
-cp .env.example .env
-# add API_FOOTBALL_KEY to .env
-npm start
-```
-
-Build and test:
-
-```bash
-npm run build
-```
+- Automatic settlement orchestration
+- Read-only settlement and win-carousel endpoints
+- Board-aware dashboard and Picks sections
+- Rolling settled-win proof on the dashboard
+- Complete favicon and PWA assets
+- Animated launch splash and additional accessible motion

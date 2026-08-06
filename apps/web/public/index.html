@@ -5,8 +5,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#04111b">
   <title>Betynz — Consensus Football Intelligence</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Betynz">
+  <link rel="apple-touch-startup-image" href="/assets/pwa-splash-portrait.png" media="(orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="/assets/pwa-splash-landscape.png" media="(orientation: landscape)">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/styles.css?v=5.0.3">
+  <link rel="stylesheet" href="/styles.css?v=5.0.4">
 </head>
 <body>
 <div class="app-shell">
@@ -49,6 +58,14 @@
       <div class="day-load-state" id="dayLoadState">Loading fixtures…</div>
     </section>
 
+    <section class="win-carousel" id="winCarousel" aria-label="Recent settled wins" hidden>
+      <div class="win-carousel-label"><span>✓</span><div><b>Recent Wins</b><small>Officially settled</small></div></div>
+      <div class="win-carousel-window">
+        <div class="win-carousel-track" id="winCarouselTrack"></div>
+      </div>
+      <a class="win-carousel-proof" href="/proof.html">View proof →</a>
+    </section>
+
     <section class="page">
       <div class="kpis single-engine-kpis">
         <article><i>▣</i><div><strong id="matchCount">0</strong><b>Fixtures</b><span>Selected day</span></div></article>
@@ -62,9 +79,9 @@
           <div><small>THREE ENGINES · SHARED DIRECTION</small><h2>Consensus Command Centre</h2><p>Elite and consensus tips appear early, then freeze before kickoff without rewriting the official selection.</p></div>
           <a href="/picks.html">Open all qualified picks →</a>
         </div>
-        <div class="home-consensus-section"><div class="home-consensus-label"><b>Today’s Elite Bankers</b><span>3/3 agreement</span></div><div class="spotlight-grid elite-home-grid" id="homeEliteGrid"><div class="spotlight-empty">Checking elite agreement…</div></div></div>
-        <div class="home-consensus-section"><div class="home-consensus-label"><b>Today’s Consensus Bankers</b><span>2/3 agreement</span></div><div class="spotlight-grid" id="homeConsensusGrid"><div class="spotlight-empty">Checking consensus routes…</div></div></div>
-        <div class="home-consensus-section"><div class="home-consensus-label"><b>Tomorrow’s Early Picks</b><span>Published before matchday</span></div><div class="spotlight-grid early-home-grid" id="homeEarlyGrid"><div class="spotlight-empty">Checking tomorrow’s early routes…</div></div></div>
+        <div class="home-consensus-section" id="homeEliteSection" data-board-aware><div class="home-consensus-label"><b>Today’s Elite Bankers</b><span>3/3 agreement</span></div><div class="spotlight-grid elite-home-grid" id="homeEliteGrid"><div class="spotlight-empty">Checking elite agreement…</div></div></div>
+        <div class="home-consensus-section" id="homeConsensusSection" data-board-aware><div class="home-consensus-label"><b>Today’s Consensus Bankers</b><span>2/3 agreement</span></div><div class="spotlight-grid" id="homeConsensusGrid"><div class="spotlight-empty">Checking consensus routes…</div></div></div>
+        <div class="home-consensus-section" id="homeEarlySection" data-board-aware><div class="home-consensus-label"><b>Tomorrow’s Early Picks</b><span>Published before matchday</span></div><div class="spotlight-grid early-home-grid" id="homeEarlyGrid"><div class="spotlight-empty">Checking tomorrow’s early routes…</div></div></div>
       </section>
 
       <section class="matches-panel">
@@ -167,7 +184,7 @@
 </dialog>
 
 <nav class="mobile-bottom-nav" aria-label="Mobile navigation"><a class="active" href="/">⌂<span>Board</span></a><a href="/picks.html">★<span>Picks</span></a><a href="/market-route.html">◆<span>Route</span></a><a href="/live.html">◉<span>Live</span></a><a href="/proof.html">✓<span>Proof</span></a></nav>
-<script type="module" src="/motion.js?v=3.5.2"></script>
-<script type="module" src="/app.js?v=3.5.2"></script>
+<script type="module" src="/motion.js?v=5.0.4"></script>
+<script type="module" src="/app.js?v=5.0.4"></script>
 </body>
 </html>

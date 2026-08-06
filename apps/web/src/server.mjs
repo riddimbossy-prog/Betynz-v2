@@ -44,7 +44,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.3';
+const APP_VERSION = '5.0.4';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const CONVERGENCE_ROUTE_CODE = 'CONVERGENCE_ROUTE';
@@ -115,7 +115,7 @@ async function loadApiFootballMedia(kind, id) {
       const keyValue = String(process.env.API_FOOTBALL_KEY || '');
       const headers = {
         accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'user-agent': 'Betynz-Media-Proxy/5.0.3'
+        'user-agent': 'Betynz-Media-Proxy/5.0.4'
       };
       if (keyValue) headers[keyHeader] = keyValue;
       const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
@@ -238,6 +238,89 @@ function captureBoardOdds(fixtures = []) {
   logOddsSnapshots(rows).catch(error => console.error('Odds snapshot failed:', error.message));
 }
 
+const settlementInflight = new Map();
+const settlementState = new Map();
+
+async function requestSettlement(date, options = {}) {
+  if (!safeDate(date)) return { date, configured: false, checked: 0, settled: 0, source: 'INVALID_DATE' };
+  const force = Boolean(options.force);
+  const cooldownMs = Math.max(15, Number(process.env.SETTLEMENT_TRIGGER_COOLDOWN_SECONDS || 90)) * 1000;
+  const previous = settlementState.get(date);
+  if (!force && previous?.finishedAt && Date.now() - previous.finishedAt < cooldownMs) return previous.result;
+  if (settlementInflight.has(date)) return settlementInflight.get(date);
+  const task = settleDate(date).then(result => {
+    settlementState.set(date, { finishedAt: Date.now(), result });
+    return result;
+  }).catch(error => {
+    const result = { date, configured: supabaseConfigured(), checked: 0, settled: 0, consensusSettled: 0, error: error?.message || 'Settlement failed', source: 'SETTLEMENT_ERROR' };
+    settlementState.set(date, { finishedAt: Date.now(), result });
+    return result;
+  }).finally(() => settlementInflight.delete(date));
+  settlementInflight.set(date, task);
+  return task;
+}
+
+function requestRecentSettlements(lookbackDays = 3) {
+  const days = Math.max(1, Math.min(7, Number(lookbackDays) || 3));
+  return Promise.all(Array.from({ length: days }, (_, offset) => requestSettlement(utcDateOffset(-offset))));
+}
+
+function publicWinRow(row, recordType = 'ENGINE') {
+  if (!row || String(row.settlement_status || '').toUpperCase() !== 'WON') return null;
+  return {
+    id: `${recordType}:${row.id || `${row.fixture_id}:${row.engine || row.classification || 'WIN'}`}`,
+    recordType,
+    fixtureId: row.fixture_id,
+    date: row.fixture_date,
+    kickoff: row.kickoff,
+    settledAt: row.settled_at || row.updated_at || row.kickoff,
+    country: row.country || 'International',
+    league: row.league_name || 'League',
+    home: row.home_team || 'Home',
+    away: row.away_team || 'Away',
+    homeScore: row.home_score,
+    awayScore: row.away_score,
+    engine: recordType === 'CONSENSUS' ? CONSENSUS_SYSTEM_CODE : row.engine,
+    classification: row.classification || null,
+    agreementCount: row.agreement_count || null,
+    market: row.market,
+    selection: row.selection_label || row.market,
+    odds: row.odds,
+    profit: row.profit_units
+  };
+}
+
+async function getWinCarousel(days = 14, limit = 24) {
+  const safeDays = Math.max(1, Math.min(60, Number(days) || 14));
+  const safeLimit = Math.max(1, Math.min(60, Number(limit) || 24));
+  const to = utcDateOffset(0);
+  const from = addDays(to, -(safeDays - 1));
+  const key = `win-carousel:${from}:${to}:${safeLimit}`;
+  const cached = cacheGet(key);
+  if (cached) return { ...cached, cache: 'HIT' };
+  // Settlement runs independently so the public dashboard never waits on a
+  // long result scan. The carousel polls and upgrades as official results land.
+  requestRecentSettlements(Math.min(3, safeDays)).catch(() => null);
+  const [engines, consensus] = await Promise.all([
+    getPredictionSnapshots({ from, to, status: 'WON', includePending: false, limit: 2000 }),
+    getConsensusSnapshots({ from, to, status: 'WON', includePending: false, limit: 1000 })
+  ]);
+  const rows = [
+    ...(engines.rows || []).map(row => publicWinRow(row, 'ENGINE')),
+    ...(consensus.rows || []).map(row => publicWinRow(row, 'CONSENSUS'))
+  ].filter(Boolean).sort((a, b) => new Date(b.settledAt || b.kickoff || 0) - new Date(a.settledAt || a.kickoff || 0)).slice(0, safeLimit);
+  const response = {
+    configured: engines.configured || consensus.configured,
+    rows,
+    summary: { wins: rows.length, from, to },
+    settlement: [...settlementState.entries()].map(([date, state]) => ({ date, finishedAt: state.finishedAt, result: state.result })),
+    generatedAt: new Date().toISOString(),
+    cache: 'MISS'
+  };
+  cacheSet(key, response, Math.max(20, Number(process.env.WIN_CAROUSEL_CACHE_TTL_SECONDS || 60)));
+  return response;
+}
+
 const fixtureBoardInflight = new Map();
 
 async function getFastFixtureBoard(date) {
@@ -263,6 +346,7 @@ async function getFastFixtureBoard(date) {
       cache: 'MISS'
     };
     cacheSet(key, response, Number(process.env.FIXTURE_BOARD_CACHE_TTL_SECONDS || 120));
+    if (fixtures.some(item => fixtureStatusForDate(item) === 'SETTLED')) requestSettlement(date).catch(() => null);
     return response;
   })();
   fixtureBoardInflight.set(key, task);
@@ -1232,12 +1316,26 @@ async function apiRoute(req, res, url) {
     }
   }
 
+  if (url.pathname === '/api/settlement-status') {
+    const date = url.searchParams.get('date') || utcDateOffset(-1);
+    if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    const result = await requestSettlement(date, { force: url.searchParams.get('refresh') === '1' });
+    return json(res, 200, { date, ...result, generatedAt: new Date().toISOString() });
+  }
+
+  if (url.pathname === '/api/wins-carousel') {
+    const days = Number(url.searchParams.get('days') || process.env.WIN_CAROUSEL_DAYS || 14);
+    const limit = Number(url.searchParams.get('limit') || process.env.WIN_CAROUSEL_LIMIT || 24);
+    return jsonCached(res, 200, await getWinCarousel(days, limit), 30);
+  }
+
   if (url.pathname === '/api/results') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
     try {
       const results = await getApiFootballResults(date);
       const fixtures = (results.fixtures || []).filter(item => !isSrlFixture(item)).map(publicFixture).filter(Boolean);
+      if (fixtures.some(item => fixtureStatusForDate(item) === 'SETTLED')) requestSettlement(date).catch(() => null);
       return jsonCached(res, 200, { date, configured: results.configured, source: 'API_FOOTBALL', fixtures, generatedAt: new Date().toISOString() }, Number(process.env.RESULTS_CACHE_TTL_SECONDS || 300));
     } catch {
       return json(res, apiFootballConfigured() ? 502 : 503, { error: apiFootballConfigured() ? 'API_FOOTBALL_RESULTS_FAILED' : 'API_FOOTBALL_NOT_CONFIGURED', message: 'The football results feed is temporarily unavailable.' });
@@ -1380,6 +1478,7 @@ async function apiRoute(req, res, url) {
   }
 
   if (url.pathname === '/api/proof') {
+    requestRecentSettlements(3).catch(() => null);
     const from = url.searchParams.get('from') || utcDateOffset(-30);
     const to = url.searchParams.get('to') || utcDateOffset(0);
     const status = String(url.searchParams.get('status') || 'ALL').toUpperCase();
@@ -1402,6 +1501,7 @@ async function apiRoute(req, res, url) {
   }
 
   if (url.pathname === '/api/performance') {
+    requestRecentSettlements(3).catch(() => null);
     const from = url.searchParams.get('from') || utcDateOffset(-90);
     const to = url.searchParams.get('to') || utcDateOffset(0);
     if (!safeDate(from) || !safeDate(to)) return json(res, 400, { error: 'from and to must be YYYY-MM-DD' });
@@ -1504,7 +1604,7 @@ async function apiRoute(req, res, url) {
     const body = await readJsonBody(req);
     const date = String(body.date || url.searchParams.get('date') || utcDateOffset(-1));
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
-    return json(res, 200, await settleDate(date));
+    return json(res, 200, await requestSettlement(date, { force: true }));
   }
 
   if (url.pathname === '/api/admin/visual-diagnostics') {
@@ -1553,8 +1653,9 @@ const server = createServer(async (req, res) => {
 server.listen(port, () => console.log(`Betynz ${APP_VERSION} listening on ${port}`));
 
 if (String(process.env.AUTO_SETTLEMENT_ENABLED || 'true').toLowerCase() === 'true') {
-  const interval = Math.max(10, Number(process.env.AUTO_SETTLEMENT_INTERVAL_MINUTES || 30)) * 60_000;
-  const run = () => Promise.all([utcDateOffset(0), utcDateOffset(-1), utcDateOffset(-2)].map(date => settleDate(date).catch(() => null)));
-  setTimeout(run, 20_000).unref?.();
+  const interval = Math.max(5, Number(process.env.AUTO_SETTLEMENT_INTERVAL_MINUTES || 10)) * 60_000;
+  const lookback = Math.max(1, Math.min(7, Number(process.env.AUTO_SETTLEMENT_LOOKBACK_DAYS || 3)));
+  const run = () => requestRecentSettlements(lookback).catch(() => null);
+  setTimeout(run, 12_000).unref?.();
   setInterval(run, interval).unref?.();
 }

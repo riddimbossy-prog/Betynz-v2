@@ -11,7 +11,7 @@ const required = [
   'src/server.mjs','src/lib/apiFootball.mjs','src/lib/results.mjs','src/lib/venueStats.mjs',
   'src/engines/marketRoute.mjs','src/engines/ppgRoute.mjs','src/engines/convergence.mjs','src/engines/consensus.mjs','src/engines/settlement.mjs',
   'public/index.html','public/app.js','public/styles.css','public/sw.js','public/live.html','public/live.js',
-  'public/assets/betynz-logo.png','public/assets/betynz-mark.png',
+  'public/assets/betynz-logo.png','public/assets/betynz-mark.png','public/assets/favicon-16x16.png','public/assets/favicon-32x32.png','public/assets/apple-touch-icon.png','public/assets/maskable-192.png','public/assets/maskable-512.png','public/assets/pwa-splash-portrait.png','public/assets/pwa-splash-landscape.png','public/favicon.ico',
   'docs/API_FOOTBALL_ONLY_CONTRACT.md','package.json','package-lock.json','.env.example'
 ];
 for (const path of required) await access(resolve(appRoot, path));
@@ -22,8 +22,13 @@ const [server, apiFootball, results, marketRoute, sw, styles, motion, env, rende
   read('public/sw.js'), read('public/styles.css'), read('public/motion.js'), read('.env.example'), readRoot('render.yaml'), readRoot('package.json'), read('package.json'), read('package-lock.json')
 ]);
 
-if (!/const APP_VERSION = '5\.0\.3'/.test(server)) throw new Error('Server version is not 5.0.3.');
+if (!/const APP_VERSION = '5\.0\.4'/.test(server)) throw new Error('Server version is not 5.0.4.');
 if (!/serveApiFootballMedia/.test(server) || !/API_FOOTBALL_MEDIA_BASE_URL/.test(server)) throw new Error('Same-origin crest proxy is missing.');
+if (!/\/api\/wins-carousel/.test(server) || !/requestSettlement/.test(server) || !/requestRecentSettlements/.test(server)) throw new Error('Automatic settlement or rolling win proof route is missing.');
+const [indexHtml, appJs, picksHtml, picksJs, manifest] = await Promise.all([read('public/index.html'), read('public/app.js'), read('public/picks.html'), read('public/picks.js'), read('public/manifest.webmanifest')]);
+if (!/winCarousel/.test(indexHtml) || !/loadWinCarousel/.test(appJs)) throw new Error('Dashboard win carousel is missing.');
+if (!/data-board-aware/.test(picksHtml) || !/setBoardAwareVisibility/.test(picksJs)) throw new Error('Board-aware empty-section hiding is missing.');
+if (!/maskable-512/.test(manifest) || !/launch_handler/.test(manifest) || !/pwa-launch-splash/.test(styles)) throw new Error('PWA icon or animated splash upgrade is missing.');
 for (const token of [
   'getApiFootballFixtureBoard','getApiFootballOddsForDate','getApiFootballLiveBoard','getApiFootballResults',
   'getApiFootballFixtureEvents','getApiFootballIntelligence','enrichApiFootballStatsBoard','enrichApiFootballVisuals','resolveApiFootballTeam'
@@ -32,7 +37,7 @@ if (!/SOLE_FOOTBALL_DATA_PROVIDER/.test(apiFootball)) throw new Error('The sole-
 if (!/ALL_DAILY_FIXTURES_RETURNED_BY_PROVIDER/.test(apiFootball)) throw new Error('Unlimited daily fixture scope is missing.');
 if (!/API_FOOTBALL/.test(results)) throw new Error('Results are not wired to API-Football.');
 if (!/STAT_CONFLICT/.test(marketRoute) || !/statisticalValidation/.test(marketRoute)) throw new Error('Market Route statistical gate is missing.');
-if (!/betynz-v5-0-3/.test(sw)) throw new Error('Service-worker cache was not bumped to v5.0.3.');
+if (!/betynz-v5-0-4/.test(sw)) throw new Error('Service-worker cache was not bumped to v5.0.4.');
 
 for (const requiredKey of ['API_FOOTBALL_KEY','API_FOOTBALL_BASE_URL','API_FOOTBALL_KEY_HEADER','API_FOOTBALL_MAX_ODDS_PAGES']) {
   if (!env.includes(requiredKey) || !render.includes(requiredKey)) throw new Error(`Configuration is missing ${requiredKey}.`);
@@ -43,7 +48,7 @@ if (/API_FOOTBALL_MAX_FIXTURES/.test(render)) throw new Error('A daily fixture c
 const pkg = JSON.parse(pkgText);
 const lock = JSON.parse(lockText);
 const rootPkg = JSON.parse(rootPkgText);
-if (pkg.version !== '5.0.3' || lock.version !== '5.0.3' || rootPkg.version !== '5.0.3') throw new Error('Package versions are not 5.0.3.');
+if (pkg.version !== '5.0.4' || lock.version !== '5.0.4' || rootPkg.version !== '5.0.4') throw new Error('Package versions are not 5.0.4.');
 if (pkg.name !== 'betynz-api-football-only-web' || lock.name !== pkg.name) throw new Error('Web package names do not match.');
 if (rootPkg.name !== 'betynz-api-football-only') throw new Error('Root package name is incorrect.');
 if (!/@media\s*\(max-width:\s*380px\)/.test(styles) || !/@media\s*\(min-width:\s*600px\)\s*and\s*\(max-width:\s*760px\)/.test(styles) || !/@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(styles)) throw new Error('Responsive safeguards are missing.');
@@ -56,4 +61,4 @@ const allowed = [
 ].sort();
 if (JSON.stringify(tests) !== JSON.stringify(allowed)) throw new Error(`Unexpected test files remain: ${tests.join(', ')}`);
 
-console.log('Release verification passed: Betynz 5.0.3 API-Football-only single-service release.');
+console.log('Release verification passed: Betynz 5.0.4 settlement, board-awareness, win carousel and PWA release.');

@@ -4,8 +4,75 @@ const revealSelector = [
   '.kpis article', '.picks-kpis article', '.consensus-stage', '.qualified-stage',
   '.matches-panel', '.match-row', '.spotlight-pick', '.insight-panel', '.performance-cards article',
   '.route-card', '.ppg-match-card', '.convergence-card', '.consensus-pick-card', '.feature-list > *',
-  '.analysis-grid > article', '.venue-card', '.data-table', '.calibration-card', '.audit-fixture'
+  '.analysis-grid > article', '.venue-card', '.data-table', '.calibration-card', '.audit-fixture',
+  '.win-carousel', '.board-aware-empty', '.home-consensus-section'
 ].join(',');
+
+
+const SPLASH_KEY = 'betynz:pwa-splash:5.0.4';
+
+function splashAlreadySeen() {
+  try { return sessionStorage.getItem(SPLASH_KEY) === '1'; } catch { return false; }
+}
+
+function markSplashSeen() {
+  try { sessionStorage.setItem(SPLASH_KEY, '1'); } catch {}
+}
+
+function showLaunchSplash() {
+  if (reduced || splashAlreadySeen() || location.pathname.startsWith('/admin-')) return;
+  const splash = document.createElement('div');
+  splash.className = 'pwa-launch-splash';
+  splash.setAttribute('aria-hidden', 'true');
+  splash.innerHTML = `<div class="pwa-splash-noise"></div><div class="pwa-splash-bolt"></div><div class="pwa-splash-core"><img src="/assets/betynz-mark.png" alt=""><strong>BETYNZ<span>.com</span></strong><small>THREE ENGINES · ONE SHARED DIRECTION</small><i></i></div>`;
+  document.body.appendChild(splash);
+  requestAnimationFrame(() => splash.classList.add('is-visible'));
+  const started = performance.now();
+  const dismiss = () => {
+    const wait = Math.max(0, 1150 - (performance.now() - started));
+    setTimeout(() => {
+      splash.classList.add('is-leaving');
+      markSplashSeen();
+      setTimeout(() => splash.remove(), 650);
+    }, wait);
+  };
+  if (document.readyState === 'complete') dismiss();
+  else window.addEventListener('load', dismiss, { once: true });
+  setTimeout(dismiss, 3200);
+}
+
+function bindMetricAnimations() {
+  const targets = [...document.querySelectorAll('.kpis strong,.picks-kpis strong,.performance-cards strong')];
+  if (!targets.length || reduced) return;
+  const observer = new MutationObserver(entries => {
+    for (const entry of entries) {
+      const node = entry.target;
+      node.classList.remove('metric-pop');
+      void node.offsetWidth;
+      node.classList.add('metric-pop');
+    }
+  });
+  targets.forEach(node => observer.observe(node, { childList: true, characterData: true, subtree: true }));
+}
+
+function bindCardTilt() {
+  if (reduced || !finePointer) return;
+  document.addEventListener('pointermove', event => {
+    const card = event.target.closest('.kpis article,.spotlight-pick,.consensus-pick-card');
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / Math.max(1, rect.width) - 0.5;
+    const y = (event.clientY - rect.top) / Math.max(1, rect.height) - 0.5;
+    card.style.setProperty('--tilt-x', `${(-y * 2.5).toFixed(2)}deg`);
+    card.style.setProperty('--tilt-y', `${(x * 3).toFixed(2)}deg`);
+  }, { passive: true });
+  document.addEventListener('pointerout', event => {
+    const card = event.target.closest('.kpis article,.spotlight-pick,.consensus-pick-card');
+    if (!card || card.contains(event.relatedTarget)) return;
+    card.style.removeProperty('--tilt-x');
+    card.style.removeProperty('--tilt-y');
+  });
+}
 
 function markRevealTargets(root = document) {
   const nodes = [...root.querySelectorAll(revealSelector)];
@@ -73,9 +140,12 @@ function scheduleLightning() {
 }
 
 window.addEventListener('betynz:content-rendered', () => requestAnimationFrame(() => markRevealTargets()));
+showLaunchSplash();
 window.addEventListener('DOMContentLoaded', () => {
   activatePage();
   bindParallax();
   bindPageTransitions();
+  bindMetricAnimations();
+  bindCardTilt();
   scheduleLightning();
 });
