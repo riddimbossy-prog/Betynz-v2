@@ -1,20 +1,29 @@
-# Betynz v5.0.6 — fast four-engine release
+# Betynz v5.0.9 — Five-Engine Logo Edition
 
-Betynz is a single-service football intelligence platform using API-Football for fixtures, odds, live scores, results, statistics and visuals.
+Betynz is an API-Football-only football-analysis platform deployed as one Render web service.
 
-The four independent engines remain:
+## Active engines
 
-1. Market Route — odds structure and market relationships.
-2. PPG Route — exact last-five home and away venue PPG routes.
-3. Convergence — attack, defence, venue and market agreement.
-4. Momentum & Streak — ordered form, scoring, conceding, BTTS and totals sequences.
+1. Market Route
+2. PPG Route
+3. Apex Intelligence
+4. Convergence
+5. Momentum & Streak
 
-v5.0.6 focuses on speed. Priced upcoming fixtures are processed first, engine results are published progressively, league-season history is pooled and cached, future-date counts use a lightweight endpoint, and duplicate analysis work is shared. The games board now uses minimal motion while retaining live-state updates, the settled-wins carousel and an accessibility-safe PWA splash.
+PPG Route remains active as the venue-split specialist. Apex Intelligence is added beside it as a broader multi-factor engine. Each engine works independently and publishes no more than one official market per fixture.
 
-Start with:
+## Consensus
 
-- `START_HERE.md`
-- `RELEASE_V5_0_6.md`
-- `BUILD_VALIDATION.md`
-- `DEPLOY_SINGLE_RENDER.md`
-- `apps/web/docs/MOMENTUM_STREAK_RULES.md`
+- 5/5 compatible agreement: Elite Banker
+- 4/5 compatible agreement: Consensus Banker
+- 2–3/5 compatible agreement: Shared Qualified Pick
+- One independent qualification: Qualified or Safer Pick
+- Opposing qualified directions: Conflict
+
+## Brand system
+
+Every engine page, toolbar chip, navigation item, analysis card and active filter follows the Betynz logo palette: black/charcoal, silver, white and orange. Live, won, lost, review and warning states retain semantic colours for clarity.
+
+## Deployment
+
+The repository contains one `render.yaml` and one Render web service. API-Football is the only football provider. Supabase stores frozen predictions, settlement, proof, performance and learning records.

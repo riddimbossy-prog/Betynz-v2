@@ -15,7 +15,7 @@
   <link rel="apple-touch-startup-image" href="/assets/pwa-splash-portrait.png" media="(orientation: portrait)">
   <link rel="apple-touch-startup-image" href="/assets/pwa-splash-landscape.png" media="(orientation: landscape)">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/styles.css?v=5.0.6">
+  <link rel="stylesheet" href="/styles.css?v=5.0.9">
 </head>
 <body class="cinematic-page">
 <div class="cinematic-sky" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -23,9 +23,9 @@
   <header class="picks-hero cinematic-hero">
     <div>
       <a class="back-link" href="/">← Dashboard</a>
-      <small>FOUR ENGINES · ONE SHARED DIRECTION</small>
+      <small>FIVE ENGINES · ONE SHARED DIRECTION</small>
       <h1>Consensus Bankers</h1>
-      <p>Market Route, PPG Route, Convergence and Momentum & Streak are analysed independently. Elite status requires 4/4 agreement; banker status requires 3/4 compatible agreement.</p>
+      <p>Five independent engines—Market Route, PPG Route, Apex Intelligence, Convergence and Momentum & Streak—are analysed separately. Elite status requires 5/5 agreement; banker status requires 4/5 compatible agreement.</p>
     </div>
     <div class="picks-actions">
       <label>Starting date<input id="picksDate" type="date"></label>
@@ -34,8 +34,8 @@
   </header>
 
   <section class="consensus-kpis picks-kpis">
-    <article class="elite-kpi"><strong id="eliteCount">0</strong><span>Elite Bankers</span><small>Four-engine agreement</small></article>
-    <article class="banker-kpi"><strong id="consensusCount">0</strong><span>Consensus Bankers</span><small>Three-of-four agreement</small></article>
+    <article class="elite-kpi"><strong id="eliteCount">0</strong><span>Elite Bankers</span><small>Five-engine agreement</small></article>
+    <article class="banker-kpi"><strong id="consensusCount">0</strong><span>Consensus Bankers</span><small>Four-of-five agreement</small></article>
     <article><strong id="singleCount">0</strong><span>Qualified Picks</span><small>One complete engine route</small></article>
     <article><strong id="saferCount">0</strong><span>Safer Picks</span><small>Approved downgrade direction</small></article>
     <article class="conflict-kpi"><strong id="conflictCount">0</strong><span>Conflicts</span><small>No shared banker</small></article>
@@ -46,6 +46,7 @@
       <option value="ALL">All engine involvement</option>
       <option value="MARKET_ROUTE">Market Route involved</option>
       <option value="PPG_ROUTE">PPG Route involved</option>
+      <option value="APEX_INTELLIGENCE">Apex Intelligence involved</option>
       <option value="CONVERGENCE_ROUTE">Convergence involved</option>
       <option value="MOMENTUM_STREAK">Momentum & Streak involved</option>
     </select>
@@ -63,17 +64,17 @@
   </section>
 
   <section class="consensus-stage elite-stage" id="eliteStage" data-board-aware>
-    <div class="section-title-row"><div><small>4 / 4 ENGINES AGREE</small><h2>Elite Bankers</h2><p>The safest shared market after complete four-engine agreement.</p></div><span id="eliteState">Checking…</span></div>
+    <div class="section-title-row"><div><small>5 / 5 ENGINES AGREE</small><h2>Elite Bankers</h2><p>The safest shared market after complete five-engine agreement.</p></div><span id="eliteState">Checking…</span></div>
     <div class="consensus-grid elite-grid" id="eliteGrid"><div class="picks-empty">Loading elite bankers…</div></div>
   </section>
 
   <section class="consensus-stage banker-stage" id="consensusStage" data-board-aware>
-    <div class="section-title-row"><div><small>3 / 4 ENGINES AGREE</small><h2>Consensus Bankers</h2><p>Three independent engines support one compatible direction.</p></div><span id="consensusState">Checking…</span></div>
+    <div class="section-title-row"><div><small>4 / 5 ENGINES AGREE</small><h2>Consensus Bankers</h2><p>Four independent engines support one compatible direction.</p></div><span id="consensusState">Checking…</span></div>
     <div class="consensus-grid" id="consensusGrid"><div class="picks-empty">Loading consensus bankers…</div></div>
   </section>
 
   <section class="qualified-stage" id="qualifiedStage" data-board-aware>
-    <div class="section-title-row"><div><small>SHARED OR SINGLE ENGINE QUALIFIED</small><h2>Qualified Picks</h2><p>One or two complete engine routes without enough independent agreement for banker status.</p></div><span id="qualifiedState">Loading…</span></div>
+    <div class="section-title-row"><div><small>SHARED OR SINGLE ENGINE QUALIFIED</small><h2>Qualified Picks</h2><p>One to three complete engine routes without enough independent agreement for banker status.</p></div><span id="qualifiedState">Loading…</span></div>
     <div class="qualified-list" id="qualifiedList"><div class="picks-empty">Loading qualified picks…</div></div>
   </section>
 
@@ -102,7 +103,7 @@
   <a href="/live.html">◉<span>Live</span></a>
   <a href="/proof.html">✓<span>Proof</span></a>
 </nav>
-<script type="module" src="/motion.js?v=5.0.6"></script>
-<script type="module" src="/picks.js?v=5.0.6"></script>
+<script type="module" src="/motion.js?v=5.0.9"></script>
+<script type="module" src="/picks.js?v=5.0.9"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@ The consensus system receives no more than one qualified decision from each engi
 
 - Market Route;
 - PPG Route;
+- Apex Intelligence;
 - Convergence;
 - Momentum & Streak.
 
@@ -14,9 +15,9 @@ Only FIRE or SAFER decisions can enter consensus comparison.
 ## Classifications
 
 ```text
-ELITE_BANKER       = four engines support one compatible direction
-CONSENSUS_BANKER   = three engines support one compatible direction
-QUALIFIED_PICK     = one or two engines support a complete compatible direction
+ELITE_BANKER       = five engines support one compatible direction
+CONSENSUS_BANKER   = four engines support one compatible direction
+QUALIFIED_PICK     = two or three engines support a complete compatible direction
 SAFER_PICK         = one engine produces an approved SAFER decision
 CONFLICT           = qualified engines oppose each other
 HOLD_MISSING_SHARED_PRICE = agreement exists but the shared market cannot be priced
@@ -50,11 +51,7 @@ Team Over 1.5 + Team Over 0.5 → Team Over 0.5
 
 ## Hard conflicts
 
-No banker is published when qualified engines produce:
-
-- Home-result and away-result opposition;
-- Over and Under opposition;
-- BTTS Yes and BTTS No opposition.
+No banker is published when qualified engines produce home-versus-away opposition, Over-versus-Under opposition, or BTTS Yes-versus-BTTS No opposition.
 
 ## Price requirement
 

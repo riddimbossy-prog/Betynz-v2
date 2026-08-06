@@ -28,7 +28,7 @@ test('consensus page clearly separates every public classification', async () =>
 test('public files do not name the private odds provider', async () => {
   const files = [
     'public/index.html', 'public/app.js', 'public/picks.html', 'public/picks.js',
-    'public/market-route.html', 'public/ppg-route.html', 'public/ppg-route.js', 'public/convergence.html', 'public/convergence.js', 'public/odds-movement.html', 'public/odds-movement.js',
+    'public/market-route.html', 'public/apex-intelligence.html', 'public/apex-intelligence.js', 'public/convergence.html', 'public/convergence.js', 'public/odds-movement.html', 'public/odds-movement.js',
     'public/proof.html', 'public/performance.html', 'public/live.html', 'public/leagues.html',
     'public/admin-engine-audit.html', 'public/admin-calibration.html', 'public/motion.js'
   ];

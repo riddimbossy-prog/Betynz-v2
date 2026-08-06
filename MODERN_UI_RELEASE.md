@@ -1,17 +1,15 @@
-# Betynz v5.0.6 modern UI
+# Betynz v5.0.9 modern UI
 
-The premium black, silver and orange interface now exposes four independent engines throughout the application.
+The five active engines share one visual language based on the official Betynz logo.
 
-Added in v5.0.6:
+- Black and charcoal page surfaces
+- Silver borders and secondary controls
+- White primary typography
+- Orange lightning accents, active filters and engine indicators
+- Five-engine agreement meter
+- Consistent engine toolbar and analysis panels
+- Minimal fixture-board movement
+- Responsive desktop, tablet, mobile and foldable layouts
+- Semantic colours reserved for live, won, lost, review and warning states
 
-- Dedicated Momentum & Streak dashboard page
-- Momentum engine chip in the sticky dashboard controls
-- Momentum tab in match intelligence
-- Four-engine agreement meter
-- Four-of-four Elite Banker labels
-- Three-of-four Consensus Banker labels
-- Momentum filter on Qualified Picks
-- Responsive Momentum cards with ordered W/D/L sequences
-- Mobile navigation and PWA cache coverage for the new page
-
-Existing board-aware hiding, rolling settled wins, crest proxying, animated splash and reduced-motion protection remain active.
+PPG Route and Apex Intelligence appear side by side without changing their independent logic.

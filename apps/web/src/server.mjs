@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { loadLocalEnv } from './lib/env.mjs';
 import { analyzeMarketRoute, marketRouteSummary } from './engines/marketRoute.mjs';
 import { analyzePpgRoute, ppgRouteSummary } from './engines/ppgRoute.mjs';
+import { analyzeApexIntelligence, apexIntelligenceSummary } from './engines/apexIntelligence.mjs';
 import { analyzeConvergence, convergenceSummary } from './engines/convergence.mjs';
 import { analyzeMomentumStreak, momentumStreakSummary } from './engines/momentumStreak.mjs';
 import { buildConsensusForFixture, buildConsensusWindow, consensusSummary } from './engines/consensus.mjs';
@@ -46,12 +47,13 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.6';
+const APP_VERSION = '5.0.9';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
+const APEX_INTELLIGENCE_CODE = 'APEX_INTELLIGENCE';
 const CONVERGENCE_ROUTE_CODE = 'CONVERGENCE_ROUTE';
 const MOMENTUM_STREAK_CODE = 'MOMENTUM_STREAK';
-const ENGINE_CODES = [MARKET_ROUTE_CODE, PPG_ROUTE_CODE, CONVERGENCE_ROUTE_CODE, MOMENTUM_STREAK_CODE];
+const ENGINE_CODES = [MARKET_ROUTE_CODE, PPG_ROUTE_CODE, APEX_INTELLIGENCE_CODE, CONVERGENCE_ROUTE_CODE, MOMENTUM_STREAK_CODE];
 const CONSENSUS_SYSTEM_CODE = 'CONSENSUS_SYSTEM';
 const root = fileURLToPath(new URL('../public', import.meta.url));
 const port = Number(process.env.PORT || 10000);
@@ -118,7 +120,7 @@ async function loadApiFootballMedia(kind, id) {
       const keyValue = String(process.env.API_FOOTBALL_KEY || '');
       const headers = {
         accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'user-agent': 'Betynz-Media-Proxy/5.0.6'
+        'user-agent': 'Betynz-Media-Proxy/5.0.9'
       };
       if (keyValue) headers[keyHeader] = keyValue;
       const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
@@ -400,6 +402,7 @@ function publicVenueForm(stats) {
 
 function engineName(engineCode) {
   if (engineCode === PPG_ROUTE_CODE) return 'PPG Route Engine';
+  if (engineCode === APEX_INTELLIGENCE_CODE) return 'Apex Intelligence Engine';
   if (engineCode === CONVERGENCE_ROUTE_CODE) return 'Convergence Engine';
   if (engineCode === MOMENTUM_STREAK_CODE) return 'Momentum & Streak Engine';
   if (engineCode === CONSENSUS_SYSTEM_CODE) return 'Consensus System';
@@ -408,6 +411,7 @@ function engineName(engineCode) {
 
 function engineSummary(engineCode, result) {
   if (engineCode === PPG_ROUTE_CODE) return ppgRouteSummary(result);
+  if (engineCode === APEX_INTELLIGENCE_CODE) return apexIntelligenceSummary(result);
   if (engineCode === CONVERGENCE_ROUTE_CODE) return convergenceSummary(result);
   if (engineCode === MOMENTUM_STREAK_CODE) return momentumStreakSummary(result);
   return marketRouteSummary(result);
@@ -668,12 +672,14 @@ async function getStatsRouteBoards(date) {
 
     const marketMap = new Map();
     const ppgMap = new Map();
+    const apexMap = new Map();
     const convergenceMap = new Map();
     const momentumMap = new Map();
     for (const fixture of fixtures) {
       const id = String(fixture.id);
       marketMap.set(id, routeItem(fixture, null, analyzeMarketRoute));
       ppgMap.set(id, routeItem(fixture, null, analyzePpgRoute));
+      apexMap.set(id, routeItem(fixture, null, analyzeApexIntelligence));
       convergenceMap.set(id, routeItem(fixture, null, analyzeConvergence));
       momentumMap.set(id, routeItem(fixture, null, analyzeMomentumStreak));
     }
@@ -683,6 +689,7 @@ async function getStatsRouteBoards(date) {
       market.statisticsSource = complete ? 'API_FOOTBALL' : 'PENDING_SHARED_ENRICHMENT';
       const snapshot = {
         ppg: progressiveEngineResponse({ date, engine: 'PPG Route Engine', items: ppgMap, processed, total, complete, failed, warning, enrichmentSource }),
+        apex: progressiveEngineResponse({ date, engine: 'Apex Intelligence Engine', items: apexMap, processed, total, complete, failed, warning, enrichmentSource }),
         convergence: progressiveEngineResponse({ date, engine: 'Convergence Engine', items: convergenceMap, processed, total, complete, failed, warning, enrichmentSource }),
         momentum: progressiveEngineResponse({ date, engine: 'Momentum & Streak Engine', items: momentumMap, processed, total, complete, failed, warning, enrichmentSource })
       };
@@ -705,6 +712,7 @@ async function getStatsRouteBoards(date) {
           if (id) {
             marketMap.set(id, routeItem(result, stats, analyzeMarketRoute));
             ppgMap.set(id, routeItem(result, stats, analyzePpgRoute));
+            apexMap.set(id, routeItem(result, stats, analyzeApexIntelligence));
             convergenceMap.set(id, routeItem(result, stats, analyzeConvergence));
             momentumMap.set(id, routeItem(result, stats, analyzeMomentumStreak));
           }
@@ -720,13 +728,14 @@ async function getStatsRouteBoards(date) {
       warning: enrichment.warning || board.warning || null,
       enrichmentSource: enrichment.enrichmentSource || 'API_FOOTBALL_VENUE_HISTORY'
     });
-    cacheSet(key, result, Number(process.env.STATS_ROUTE_CACHE_TTL_SECONDS || process.env.PPG_ROUTE_CACHE_TTL_SECONDS || 1800));
+    cacheSet(key, result, Number(process.env.STATS_ROUTE_CACHE_TTL_SECONDS || 1800));
 
     // Persistence is intentionally detached from the public response. The UI
     // receives completed predictions first; Supabase writes finish afterward.
     Promise.allSettled([
       storePredictions(date, [...marketMap.values()].filter(Boolean), MARKET_ROUTE_CODE),
       storePredictions(date, [...ppgMap.values()].filter(Boolean), PPG_ROUTE_CODE),
+      storePredictions(date, [...apexMap.values()].filter(Boolean), APEX_INTELLIGENCE_CODE),
       storePredictions(date, [...convergenceMap.values()].filter(Boolean), CONVERGENCE_ROUTE_CODE),
       storePredictions(date, [...momentumMap.values()].filter(Boolean), MOMENTUM_STREAK_CODE)
     ]).catch(() => null);
@@ -740,6 +749,11 @@ async function getStatsRouteBoards(date) {
 async function getPpgRouteBoard(date) {
   const bundle = await getStatsRouteBoards(date);
   return bundle.ppg;
+}
+
+async function getApexIntelligenceBoard(date) {
+  const bundle = await getStatsRouteBoards(date);
+  return bundle.apex;
 }
 
 async function getConvergenceRouteBoard(date) {
@@ -778,11 +792,12 @@ function waitingStatsResponse(date, engine, fixtures = [], analyser) {
 
 async function ensureStatsRouteView(date) {
   const existing = statsRouteViewSnapshots.get(date);
-  if (existing?.ppg?.complete && existing?.convergence?.complete && existing?.momentum?.complete) return existing;
+  if (existing?.ppg?.complete && existing?.apex?.complete && existing?.convergence?.complete && existing?.momentum?.complete) return existing;
   if (!existing) {
     const board = await getFastFixtureBoard(date);
     statsRouteViewSnapshots.set(date, {
       ppg: waitingStatsResponse(date, 'PPG Route Engine', board.fixtures || [], analyzePpgRoute),
+      apex: waitingStatsResponse(date, 'Apex Intelligence Engine', board.fixtures || [], analyzeApexIntelligence),
       convergence: waitingStatsResponse(date, 'Convergence Engine', board.fixtures || [], analyzeConvergence),
       momentum: waitingStatsResponse(date, 'Momentum & Streak Engine', board.fixtures || [], analyzeMomentumStreak)
     });
@@ -791,6 +806,7 @@ async function ensureStatsRouteView(date) {
     const task = getStatsRouteBoards(date).then(bundle => {
       const complete = {
         ppg: { ...bundle.ppg, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.ppg.summary?.eligible || 0, total: bundle.ppg.summary?.eligible || 0, percent: 100 } },
+        apex: { ...bundle.apex, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.apex.summary?.eligible || 0, total: bundle.apex.summary?.eligible || 0, percent: 100 } },
         convergence: { ...bundle.convergence, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.convergence.summary?.eligible || 0, total: bundle.convergence.summary?.eligible || 0, percent: 100 } },
         momentum: { ...bundle.momentum, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.momentum.summary?.eligible || 0, total: bundle.momentum.summary?.eligible || 0, percent: 100 } }
       };
@@ -800,6 +816,7 @@ async function ensureStatsRouteView(date) {
       const current = statsRouteViewSnapshots.get(date) || {};
       const failed = {
         ppg: { ...(current.ppg || {}), complete: true, failed: true, error: error.message || 'PPG analysis failed', progress: { stage: 'FAILED', processed: 0, total: current.ppg?.summary?.fixtures || 0, percent: 0 } },
+        apex: { ...(current.apex || {}), complete: true, failed: true, error: error.message || 'Apex analysis failed', progress: { stage: 'FAILED', processed: 0, total: current.apex?.summary?.fixtures || 0, percent: 0 } },
         convergence: { ...(current.convergence || {}), complete: true, failed: true, error: error.message || 'Convergence analysis failed', progress: { stage: 'FAILED', processed: 0, total: current.convergence?.summary?.fixtures || 0, percent: 0 } },
         momentum: { ...(current.momentum || {}), complete: true, failed: true, error: error.message || 'Momentum analysis failed', progress: { stage: 'FAILED', processed: 0, total: current.momentum?.summary?.fixtures || 0, percent: 0 } }
       };
@@ -814,6 +831,11 @@ async function ensureStatsRouteView(date) {
 async function getPpgRouteView(date) {
   const snapshot = await ensureStatsRouteView(date);
   return snapshot.ppg;
+}
+
+async function getApexIntelligenceView(date) {
+  const snapshot = await ensureStatsRouteView(date);
+  return snapshot.apex;
 }
 
 async function getConvergenceRouteView(date) {
@@ -955,6 +977,7 @@ async function getQualifiedPicksWindow(from, days = 7) {
       try {
         const bundle = await getStatsRouteBoards(date);
         statsPicks.push(...(bundle.ppg.qualified || []).map(item => publicQualifiedPick(item, date, PPG_ROUTE_CODE)).filter(Boolean));
+        statsPicks.push(...(bundle.apex.qualified || []).map(item => publicQualifiedPick(item, date, APEX_INTELLIGENCE_CODE)).filter(Boolean));
         statsPicks.push(...(bundle.convergence.qualified || []).map(item => publicQualifiedPick(item, date, CONVERGENCE_ROUTE_CODE)).filter(Boolean));
         statsPicks.push(...(bundle.momentum.qualified || []).map(item => publicQualifiedPick(item, date, MOMENTUM_STREAK_CODE)).filter(Boolean));
       } catch {}
@@ -1029,6 +1052,7 @@ function partialConsensusResponse(from, days, marketBoard, statsSnapshot) {
   const enginePicksInternal = [
     ...(marketBoard?.qualified || []).map(item => publicQualifiedPick(item, from, MARKET_ROUTE_CODE)).filter(Boolean),
     ...(statsSnapshot?.ppg?.qualified || []).map(item => publicQualifiedPick(item, from, PPG_ROUTE_CODE)).filter(Boolean),
+    ...(statsSnapshot?.apex?.qualified || []).map(item => publicQualifiedPick(item, from, APEX_INTELLIGENCE_CODE)).filter(Boolean),
     ...(statsSnapshot?.convergence?.qualified || []).map(item => publicQualifiedPick(item, from, CONVERGENCE_ROUTE_CODE)).filter(Boolean),
     ...(statsSnapshot?.momentum?.qualified || []).map(item => publicQualifiedPick(item, from, MOMENTUM_STREAK_CODE)).filter(Boolean)
   ];
@@ -1045,9 +1069,9 @@ function partialConsensusResponse(from, days, marketBoard, statsSnapshot) {
   const holds = consensusRows.filter(item => item.classification === 'HOLD_MISSING_SHARED_PRICE');
   const publishable = [...elite, ...consensusBankers, ...singleQualified, ...saferConsensus];
   const bankers = [...elite, ...consensusBankers];
-  const statsComplete = Boolean(statsSnapshot?.ppg?.complete && statsSnapshot?.convergence?.complete && statsSnapshot?.momentum?.complete);
-  const fixtureTotal = Number(statsSnapshot?.ppg?.summary?.fixtures || marketBoard?.summary?.fixtures || 0);
-  const fixtureProcessed = statsComplete ? fixtureTotal : Number(statsSnapshot?.ppg?.progress?.processed || statsSnapshot?.ppg?.summary?.analysed || 0);
+  const statsComplete = Boolean(statsSnapshot?.ppg?.complete && statsSnapshot?.apex?.complete && statsSnapshot?.convergence?.complete && statsSnapshot?.momentum?.complete);
+  const fixtureTotal = Number(statsSnapshot?.ppg?.summary?.fixtures || statsSnapshot?.apex?.summary?.fixtures || marketBoard?.summary?.fixtures || 0);
+  const fixtureProcessed = statsComplete ? fixtureTotal : Number(statsSnapshot?.ppg?.progress?.processed || statsSnapshot?.apex?.progress?.processed || statsSnapshot?.apex?.summary?.analysed || 0);
   const total = safeDays === 1 ? fixtureTotal : safeDays;
   const processed = safeDays === 1 ? fixtureProcessed : (statsComplete ? 1 : 0);
   return {
@@ -1152,6 +1176,7 @@ async function getEngineAudit(date) {
   }
   add(market.all, MARKET_ROUTE_CODE);
   add(stats.ppg.all, PPG_ROUTE_CODE);
+  add(stats.apex.all, APEX_INTELLIGENCE_CODE);
   add(stats.convergence.all, CONVERGENCE_ROUTE_CODE);
   add(stats.momentum.all, MOMENTUM_STREAK_CODE);
 
@@ -1272,7 +1297,7 @@ async function apiRoute(req, res, url) {
   if (url.pathname === '/api/config') return json(res, 200, {
     appName: process.env.APP_NAME || 'Betynz',
     version: APP_VERSION,
-    engines: ['Market Route Engine', 'PPG Route Engine', 'Convergence Engine', 'Momentum & Streak Engine'],
+    engines: ['Market Route Engine', 'PPG Route Engine', 'Apex Intelligence Engine', 'Convergence Engine', 'Momentum & Streak Engine'],
     systems: ['Consensus Bankers', 'Settlement Calibration'],
     consensusFreezeMinutes: Math.max(5, Number(process.env.CONSENSUS_FREEZE_MINUTES || 30)),
     dataSources: { fixtures: 'API-Football', odds: 'API-Football', statistics: 'API-Football', visuals: 'API-Football', live: 'API-Football', results: 'API-Football' },
@@ -1433,6 +1458,12 @@ async function apiRoute(req, res, url) {
     return jsonCached(res, 200, await getPpgRouteView(date), 5);
   }
 
+  if (url.pathname === '/api/apex-intelligence-board') {
+    const date = url.searchParams.get('date') || utcDateOffset(0);
+    if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    return jsonCached(res, 200, await getApexIntelligenceView(date), 5);
+  }
+
   if (url.pathname === '/api/convergence-route-board') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
@@ -1483,11 +1514,13 @@ async function apiRoute(req, res, url) {
       }
       const engine = analyzeMarketRoute(fixture, stats);
       const ppgEngine = analyzePpgRoute(fixture, stats);
+      const apexEngine = analyzeApexIntelligence(fixture, stats);
       const convergenceEngine = analyzeConvergence(fixture, stats);
       const momentumEngine = analyzeMomentumStreak(fixture, stats);
       const selectedPicks = [
         publicQualifiedPick({ fixture, engine }, date, MARKET_ROUTE_CODE),
         publicQualifiedPick({ fixture, engine: ppgEngine }, date, PPG_ROUTE_CODE),
+        publicQualifiedPick({ fixture, engine: apexEngine }, date, APEX_INTELLIGENCE_CODE),
         publicQualifiedPick({ fixture, engine: convergenceEngine }, date, CONVERGENCE_ROUTE_CODE),
         publicQualifiedPick({ fixture, engine: momentumEngine }, date, MOMENTUM_STREAK_CODE)
       ].filter(Boolean);
@@ -1507,6 +1540,7 @@ async function apiRoute(req, res, url) {
       await Promise.all([
         storePredictions(date, [{ fixture, engine }], MARKET_ROUTE_CODE),
         storePredictions(date, [{ fixture, engine: ppgEngine }], PPG_ROUTE_CODE),
+        storePredictions(date, [{ fixture, engine: apexEngine }], APEX_INTELLIGENCE_CODE),
         storePredictions(date, [{ fixture, engine: convergenceEngine }], CONVERGENCE_ROUTE_CODE),
         storePredictions(date, [{ fixture, engine: momentumEngine }], MOMENTUM_STREAK_CODE),
         storeConsensusRows([consensusEngine])
@@ -1516,6 +1550,7 @@ async function apiRoute(req, res, url) {
         fixture: publicFixture(fixture),
         engine,
         ppgEngine,
+        apexEngine,
         convergenceEngine,
         momentumEngine,
         consensusEngine,
@@ -1524,7 +1559,7 @@ async function apiRoute(req, res, url) {
         statisticsSource: stats?.homeSplit || stats?.awaySplit ? 'API_FOOTBALL' : null,
         enrichmentSource: apiStats?.mapped ? 'API_FOOTBALL' : null,
         apiFootball: apiStats ? { mapped: Boolean(apiStats.mapped), mappingConfidence: apiStats.mappingConfidence || 0, fixture: apiStats.fixture || null, standings: apiStats.standings || null, teamStatistics: apiStats.teamStatistics || null, h2h: apiStats.h2h || [], predictions: apiStats.predictions || null, injuries: apiStats.injuries || [], fixtureStatistics: apiStats.fixtureStatistics || [], lineups: apiStats.lineups || [], events: apiStats.events || [], players: apiStats.players || [] } : null,
-        note: 'Four independent engines are measured separately. The Consensus System publishes the safest shared market only when their directions agree.',
+        note: 'Five independent engines are measured separately. The Consensus System publishes the safest shared market only when their directions agree.',
         loadMs: Date.now() - started,
         cache: 'MISS'
       };

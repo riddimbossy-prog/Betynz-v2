@@ -75,8 +75,6 @@ services:
         value: "20"
       - key: RESULTS_CACHE_TTL_SECONDS
         value: "300"
-      - key: PPG_ROUTE_CACHE_TTL_SECONDS
-        value: "1800"
       - key: CONVERGENCE_ROUTE_CACHE_TTL_SECONDS
         value: "1800"
       - key: STATS_ROUTE_CACHE_TTL_SECONDS

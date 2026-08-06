@@ -18,7 +18,7 @@ async function load() {
     $('#proofState').textContent = payload.configured ? 'Frozen records loaded' : 'Supabase is not configured';
     const rows = payload.rows || [];
     $('#proofList').innerHTML = rows.length ? rows.map(row => {
-      const engineName = row.engine === 'PPG_ROUTE' ? 'PPG ROUTE' : row.engine === 'CONVERGENCE_ROUTE' ? 'CONVERGENCE' : row.engine === 'CONSENSUS_SYSTEM' ? `CONSENSUS · ${String(row.classification||'').replaceAll('_',' ')}` : 'MARKET ROUTE';
+      const engineName = row.engine === 'PPG_ROUTE' ? 'PPG ROUTE' : row.engine === 'APEX_INTELLIGENCE' ? 'APEX INTELLIGENCE' : row.engine === 'CONVERGENCE_ROUTE' ? 'CONVERGENCE' : row.engine === 'MOMENTUM_STREAK' ? 'MOMENTUM & STREAK' : row.engine === 'CONSENSUS_SYSTEM' ? `CONSENSUS · ${String(row.classification||'').replaceAll('_',' ')}` : 'MARKET ROUTE';
       return `<article class="proof-row ${row.recordType === 'CONSENSUS' ? 'consensus-proof-row' : ''}"><div class="proof-main"><span class="proof-status ${String(row.status || 'pending').toLowerCase()}">${esc(row.status)}</span><div><small>${engineName} · ${esc(row.league || 'Competition')}</small><h3>${esc(row.home)} <span>vs</span> ${esc(row.away)}</h3><p>${esc(row.selection || row.market)} @ <b>${Number(row.odds || 0).toFixed(2)}</b> · ${esc(row.decision || 'FIRE')} · Grade ${esc(row.grade || '—')}</p></div></div><div class="proof-result"><b>${row.homeScore == null ? '—' : `${row.homeScore}–${row.awayScore}`}</b><span>${fmt(row.kickoff)}</span><small>Frozen ${fmt(row.frozenAt)}</small></div></article>`;
     }).join('') : '<div class="empty-state">No frozen engine or consensus predictions match these filters.</div>';
     window.dispatchEvent(new CustomEvent('betynz:content-rendered')); 

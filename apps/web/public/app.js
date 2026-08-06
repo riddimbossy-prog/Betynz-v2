@@ -22,6 +22,7 @@ const state = {
   selected: null,
   routeByFixture: new Map(),
   ppgByFixture: new Map(),
+  apexByFixture: new Map(),
   convergenceByFixture: new Map(),
   momentumByFixture: new Map(),
   consensusByFixture: new Map(),
@@ -128,6 +129,7 @@ async function loadDate(date, force = false) {
   state.filtered = [];
   state.routeByFixture = new Map();
   state.ppgByFixture = new Map();
+  state.apexByFixture = new Map();
   state.convergenceByFixture = new Map();
   state.momentumByFixture = new Map();
   state.consensusByFixture = new Map();
@@ -171,7 +173,7 @@ async function loadDate(date, force = false) {
     state.fixtures = [];
     state.filtered = [];
     state.routeByFixture = new Map();
-    state.ppgByFixture = new Map();
+    state.apexByFixture = new Map();
     state.convergenceByFixture = new Map();
   state.momentumByFixture = new Map();
     state.visualByFixture = new Map();
@@ -252,8 +254,9 @@ function renderList() {
     const id = String(fixture.id);
     const route = state.routeByFixture.get(id);
     const ppg = state.ppgByFixture.get(id);
+    const apex = state.apexByFixture.get(id);
     const consensus = state.consensusByFixture.get(id);
-    return [id, fixture.home?.id, fixture.away?.id, route?.decision, route?.selection?.market, ppg?.decision, ppg?.selection?.market, consensus?.classification, consensus?.final?.market].join(':');
+    return [id, fixture.home?.id, fixture.away?.id, route?.decision, route?.selection?.market, ppg?.decision, ppg?.selection?.market, apex?.decision, apex?.selection?.market, consensus?.classification, consensus?.final?.market].join(':');
   }).join('|');
   if (state.listSignature === signature && list.children.length) return;
   state.listSignature = signature;
@@ -266,6 +269,7 @@ function renderList() {
   list.innerHTML = visible.map(fixture => {
     const route = state.routeByFixture.get(String(fixture.id));
     const ppg = state.ppgByFixture.get(String(fixture.id));
+    const apex = state.apexByFixture.get(String(fixture.id));
     const routeBadge = route?.selection
       ? `<span class="route-badge ${route.decision === 'SAFER' ? 'safer' : 'fire'}">MARKET · ${route.decision === 'SAFER' ? 'SAFER' : 'FIRE'} · ${esc(route.selection.label)}</span>`
       : route?.decision === 'CONFLICT'
@@ -274,9 +278,12 @@ function renderList() {
     const ppgBadge = ppg?.selection
       ? `<span class="route-badge ppg ${ppg.decision === 'SAFER' ? 'safer' : 'fire'}">PPG · ${esc(ppg.selection.label)}</span>`
       : '';
+    const apexBadge = apex?.selection
+      ? `<span class="route-badge apex ${apex.decision === 'SAFER' ? 'safer' : 'fire'}">APEX · ${esc(apex.selection.label)}</span>`
+      : '';
     const consensus = state.consensusByFixture.get(String(fixture.id));
     const consensusBadge = consensus?.final && ['ELITE_BANKER','CONSENSUS_BANKER'].includes(consensus.classification)
-      ? `<span class="route-badge consensus ${consensus.classification === 'ELITE_BANKER' ? 'elite' : 'fire'}">${consensus.agreementCount}/4 · ${esc(consensus.final.label)}</span>`
+      ? `<span class="route-badge consensus ${consensus.classification === 'ELITE_BANKER' ? 'elite' : 'fire'}">${consensus.agreementCount}/5 · ${esc(consensus.final.label)}</span>`
       : consensus?.classification === 'CONFLICT' ? '<span class="route-badge conflict">ENGINE CONFLICT</span>' : '';
     const status = fixtureStatus(fixture);
     const hasScore = Number.isFinite(Number(fixture.score?.home)) && Number.isFinite(Number(fixture.score?.away));
@@ -284,7 +291,7 @@ function renderList() {
       ? `<b class="board-score">${Number(fixture.score.home)}–${Number(fixture.score.away)}</b><span>${esc(kickoffTime(fixture.kickoff))}</span>`
       : `<b>${esc(kickoffTime(fixture.kickoff))}</b>`;
     return `<button class="match-row" type="button" data-fixture-id="${esc(fixture.id)}">
-      <span class="league-line"><b>${esc(fixture.league?.country || 'International')}</b> · ${esc(fixture.league?.name || 'League')} ${routeBadge} ${ppgBadge} ${consensusBadge}</span>
+      <span class="league-line"><b>${esc(fixture.league?.country || 'International')}</b> · ${esc(fixture.league?.name || 'League')} ${routeBadge} ${ppgBadge} ${apexBadge} ${consensusBadge}</span>
       <span class="teams-cell">
         <span class="team-line">${teamCrest(fixture.home, fixture.league?.country, fixture.id, 'home')}<b>${esc(fixture.home?.name || 'Home')}</b></span>
         <span class="team-line">${teamCrest(fixture.away, fixture.league?.country, fixture.id, 'away')}<b>${esc(fixture.away?.name || 'Away')}</b></span>
@@ -307,7 +314,7 @@ function renderList() {
 function winCarouselItem(row) {
   const score = Number.isFinite(Number(row.homeScore)) && Number.isFinite(Number(row.awayScore))
     ? `${Number(row.homeScore)}–${Number(row.awayScore)}` : 'WON';
-  const agreement = row.recordType === 'CONSENSUS' && row.agreementCount ? `${row.agreementCount}/4 · ` : '';
+  const agreement = row.recordType === 'CONSENSUS' && row.agreementCount ? `${row.agreementCount}/5 · ` : '';
   return `<a class="win-carousel-item" href="/proof.html">
     <span class="win-check">✓</span>
     <span class="win-copy"><small>${esc(row.country || 'International')} · ${esc(row.league || 'League')}</small><b>${esc(row.home)} ${esc(score)} ${esc(row.away)}</b></span>
@@ -356,7 +363,7 @@ function homeConsensusCard(row, tone = '') {
     <small>${esc(row.country || 'International')} · ${esc(row.league || 'League')} · ${esc(kickoffTime(row.kickoff))}</small>
     <h3>${esc(row.home?.name || 'Home')} <i>vs</i> ${esc(row.away?.name || 'Away')}</h3>
     <div class="home-official-tip"><span>OFFICIAL TIP</span><strong>${esc(final.label || final.market || 'Qualified direction')}</strong><b>${odd(final.odds)}</b></div>
-    <p>${Number(row.agreementCount || 0)}/4 engines agree · ${row.status === 'FROZEN' ? 'Frozen' : 'Early provisional'}</p>
+    <p>${Number(row.agreementCount || 0)}/5 engines agree · ${row.status === 'FROZEN' ? 'Frozen' : 'Early provisional'}</p>
   </a>`;
 }
 
@@ -382,9 +389,9 @@ function renderHomeBankers(payload) {
   const progress = payload?.progress || {};
   const progressText = `${Number(progress.processed || 0)} of ${Number(progress.total || 0)} processed`;
   eliteGrid.innerHTML = elite.length ? elite.map(row => homeConsensusCard(row, 'elite')).join('') : processing
-    ? `<div class="spotlight-empty"><b>Checking 4/4 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
+    ? `<div class="spotlight-empty"><b>Checking 5/5 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
   consensusGrid.innerHTML = consensus.length ? consensus.map(row => homeConsensusCard(row, 'consensus')).join('') : processing
-    ? `<div class="spotlight-empty"><b>Checking 3/4 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
+    ? `<div class="spotlight-empty"><b>Checking 4/5 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
   earlyGrid.innerHTML = early.length ? early.map(row => homeConsensusCard(row, 'early')).join('') : processing
     ? '<div class="spotlight-empty"><b>Preparing early picks…</b><span>The selected date finishes before future dates are scanned.</span></div>' : '';
 
@@ -506,6 +513,7 @@ function openMatch(id) {
   renderAllOdds(fixture.odds || {});
   renderEngine(state.routeByFixture.get(String(fixture.id)) || null);
   renderPpgEngine(state.ppgByFixture.get(String(fixture.id)) || null);
+  renderApexEngine(state.apexByFixture.get(String(fixture.id)) || null);
   renderConvergenceEngine(state.convergenceByFixture.get(String(fixture.id)) || null);
   renderMomentumEngine(state.momentumByFixture.get(String(fixture.id)) || null);
   renderConsensusEngine(state.consensusByFixture.get(String(fixture.id)) || null);
@@ -531,11 +539,13 @@ async function loadIntelligence(fixture) {
   if (!state.selected || String(state.selected.id) !== String(fixture.id)) return;
   if (!payload.available) return renderEngineError();
   state.ppgByFixture.set(String(fixture.id), payload.ppgEngine || null);
+  state.apexByFixture.set(String(fixture.id), payload.apexEngine || null);
   state.convergenceByFixture.set(String(fixture.id), payload.convergenceEngine || null);
   state.momentumByFixture.set(String(fixture.id), payload.momentumEngine || null);
   state.consensusByFixture.set(String(fixture.id), payload.consensusEngine || null);
   renderEngine(payload.engine);
   renderPpgEngine(payload.ppgEngine);
+  renderApexEngine(payload.apexEngine);
   renderConvergenceEngine(payload.convergenceEngine);
   renderMomentumEngine(payload.momentumEngine);
   renderConsensusEngine(payload.consensusEngine);
@@ -550,6 +560,7 @@ function renderEngineError() {
   $('#routeScore').textContent = '—';
   $('#routeChecks').innerHTML = '';
   renderPpgEngineError();
+  renderApexEngineError();
   renderConvergenceEngineError();
   renderMomentumEngineError();
   renderConsensusEngineError();
@@ -634,6 +645,51 @@ function renderPpgEngine(engine) {
   $('#ppgResultCard').className = `route-result-card ppg-result-card ${String(selection?.decision || engine.decision || '').toLowerCase()}`;
   $('#ppgChecks').innerHTML = (route?.checks || []).map(item => `<div class="route-check ${item.pass ? 'pass' : 'fail'}"><span>${item.pass ? '✓' : '×'}</span><div><b>${esc(item.label)}</b><small>${esc(item.actual)} · required ${esc(item.rule)}</small></div></div>`).join('') || '<div class="empty-state">No PPG checks available.</div>';
   $('#ppgReasons').innerHTML = (selection?.reasons || [engine.explanation]).filter(Boolean).map(reason => `<li>${esc(reason)}</li>`).join('');
+}
+
+
+function renderApexEngineError() {
+  $('#apexSelection').textContent = 'Apex intelligence unavailable';
+  $('#apexExplanation').textContent = 'The composite evidence could not be loaded for this match.';
+  $('#apexDecision').textContent = 'UNAVAILABLE';
+  $('#apexScore').textContent = '—';
+  $('#apexDataQuality').textContent = '—';
+  $('#apexEvidenceFamilies').textContent = '—';
+  $('#apexRouteName').textContent = 'No Apex route';
+  $('#apexPrice').textContent = 'Odds —';
+  $('#apexChecks').innerHTML = '';
+  $('#apexReasons').innerHTML = '<li>Composite team evidence is unavailable.</li>';
+}
+
+function renderApexEngine(engine) {
+  if (!engine) {
+    $('#apexSelection').textContent = 'Building composite evidence…';
+    $('#apexExplanation').textContent = 'Apex combines strength, form, momentum, attack, defence and exact market confirmation.';
+    $('#apexDecision').textContent = 'WAITING';
+    $('#apexScore').textContent = '—';
+    $('#apexDataQuality').textContent = '—';
+    $('#apexEvidenceFamilies').textContent = '—';
+    $('#apexRouteName').textContent = 'No Apex route yet';
+    $('#apexPrice').textContent = 'Odds —';
+    $('#apexChecks').innerHTML = '<div class="loading">Loading composite evidence…</div>';
+    $('#apexReasons').innerHTML = '<li>Five verified home and away venue matches are required.</li>';
+    return;
+  }
+  const selection = engine.selection;
+  const candidate = selection
+    ? (engine.candidates || []).find(item => item.id === selection.routeId)
+    : [...(engine.candidates || [])].sort((a, b) => Number(b.score || 0) - Number(a.score || 0))[0];
+  $('#apexSelection').textContent = selection?.label || (engine.decision === 'CONFLICT' ? 'No Pick — Composite Conflict' : engine.decision === 'WAITING' ? 'Waiting for complete evidence' : 'No qualifying Apex route');
+  $('#apexExplanation').textContent = engine.explanation || 'No Apex route qualified.';
+  $('#apexDecision').textContent = selection?.decision || engine.decision || 'NO SIGNAL';
+  $('#apexScore').textContent = selection?.score ? `${selection.score}%` : candidate?.score ? `${candidate.score}%` : '—';
+  $('#apexDataQuality').textContent = `${Number(engine.dataQuality || 0)}%`;
+  $('#apexEvidenceFamilies').textContent = String(selection?.evidenceFamilies || candidate?.familyCount || '—');
+  $('#apexRouteName').textContent = selection?.routeName || candidate?.name || 'No Apex route';
+  $('#apexPrice').textContent = selection?.odds ? `Odds ${odd(selection.odds)}` : 'Odds —';
+  $('#apexResultCard').className = `route-result-card apex-result-card ${String(selection?.decision || engine.decision || '').toLowerCase()}`;
+  $('#apexChecks').innerHTML = (candidate?.checks || []).map(item => `<div class="route-check ${item.pass && !item.contradiction ? 'pass' : 'fail'}"><span>${item.pass && !item.contradiction ? '✓' : '×'}</span><div><b>${esc(item.label)}</b><small>${esc(item.actual)} · required ${esc(item.rule)}</small></div></div>`).join('') || '<div class="empty-state">No Apex checks available.</div>';
+  $('#apexReasons').innerHTML = (selection?.reasons || [engine.explanation]).filter(Boolean).map(reason => `<li>${esc(reason)}</li>`).join('');
 }
 
 
@@ -727,12 +783,12 @@ function renderMomentumEngine(engine) {
 
 function renderConsensusEngineError() {
   $('#consensusSelection').textContent = 'Consensus unavailable';
-  $('#consensusExplanation').textContent = 'The four engine decisions could not be compared for this match.';
+  $('#consensusExplanation').textContent = 'The five engine decisions could not be compared for this match.';
   $('#consensusDecision').textContent = 'UNAVAILABLE';
   $('#consensusScore').textContent = '—';
   $('#consensusMarket').textContent = 'No shared market';
   $('#consensusPrice').textContent = '—';
-  $('#consensusAgreement').textContent = '0/4 engines agree';
+  $('#consensusAgreement').textContent = '0/5 engines agree';
   $('#consensusFreeze').textContent = 'Unavailable';
   $('#consensusMeter').style.width = '0%';
   $('#consensusEnginePicks').innerHTML = '';
@@ -747,7 +803,7 @@ function renderConsensusEngine(engine) {
     $('#consensusScore').textContent = '—';
     $('#consensusMarket').textContent = 'No shared market yet';
     $('#consensusPrice').textContent = '—';
-    $('#consensusAgreement').textContent = '0/4 engines agree';
+    $('#consensusAgreement').textContent = '0/5 engines agree';
     $('#consensusFreeze').textContent = 'Provisional';
     $('#consensusMeter').style.width = '0%';
     $('#consensusEnginePicks').innerHTML = '<span class="engine-proof-chip"><b>Waiting</b><small>Engine routes are still loading</small></span>';
@@ -762,9 +818,9 @@ function renderConsensusEngine(engine) {
   $('#consensusScore').textContent = Number(engine.score || 0) ? `${Number(engine.score).toFixed(0)}%` : '—';
   $('#consensusMarket').textContent = final?.label || 'No shared market';
   $('#consensusPrice').textContent = final?.odds ? odd(final.odds) : '—';
-  $('#consensusAgreement').textContent = `${Number(engine.agreementCount || 0)}/4 engines agree`;
+  $('#consensusAgreement').textContent = `${Number(engine.agreementCount || 0)}/5 engines agree`;
   $('#consensusFreeze').textContent = engine.status === 'FROZEN' ? 'Frozen before kickoff' : `Provisional · freezes ${engine.freezeMinutes || 30} min before kickoff`;
-  $('#consensusMeter').style.width = `${Math.max(0, Math.min(100, Number(engine.agreementCount || 0) / 4 * 100))}%`;
+  $('#consensusMeter').style.width = `${Math.max(0, Math.min(100, Number(engine.agreementCount || 0) / 5 * 100))}%`;
   $('#consensusResultCard').className = `route-result-card consensus-result-card ${classification.toLowerCase().replaceAll('_', '-')}`;
   $('#consensusEnginePicks').innerHTML = (engine.enginePicks || []).map(item => `<span class="engine-proof-chip ${item.decision === 'FIRE' ? 'fire' : 'safer'}"><b>${esc(item.engineName || item.engine)}</b><small>${esc(item.label || item.market)} · ${esc(item.decision || '')}</small></span>`).join('') || '<span class="engine-proof-chip"><b>No qualified engines</b><small>Waiting for a complete route</small></span>';
   $('#consensusConflicts').innerHTML = (engine.conflictReasons || []).map(reason => `<p>× ${esc(reason)}</p>`).join('');
@@ -779,7 +835,7 @@ function highlightFavourite(side) {
 function renderVenueForm(venueForm) {
   const grid = $('#venueFormGrid');
   if (!venueForm?.home && !venueForm?.away) {
-    grid.innerHTML = '<div class="empty-state"><h3>Venue form is not available yet</h3><p>The Market Route can still read odds, but the PPG Route waits until both five-match venue samples are available.</p></div>';
+    grid.innerHTML = '<div class="empty-state"><h3>Venue form is not available yet</h3><p>Market Route can still read odds, while Apex waits for both complete five-match venue samples.</p></div>';
     return;
   }
   grid.innerHTML = [
@@ -829,7 +885,16 @@ function setupEvents() {
   $('#refreshBtn').addEventListener('click', () => loadDate(state.selectedDate, true));
   $('#dateInput').addEventListener('change', event => loadDate(event.target.value));
   $('#leagueFilter').addEventListener('change', applyFilters);
-  $('#statusFilter').addEventListener('change', applyFilters);
+  $('#statusFilter').addEventListener('change', event => {
+    const quick = $('#quickStatusFilter');
+    if (quick) quick.value = event.target.value;
+    applyFilters();
+  });
+  $('#quickStatusFilter')?.addEventListener('change', event => {
+    $('#statusFilter').value = event.target.value;
+    applyFilters();
+    $('#matchList')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
   $('#searchInput').addEventListener('input', applyFilters);
   $('#closeMatchDialog').addEventListener('click', closeDialog);
   $('#matchIntelDialog').addEventListener('click', event => { if (event.target === $('#matchIntelDialog')) closeDialog(); });

@@ -58,7 +58,7 @@ function odds(fixtureId) {
 test('full platform keeps all boards, consensus, calibration and API-Football endpoints', async () => {
   const server = await read('src/server.mjs');
   for (const route of [
-    '/api/fixtures-week','/api/market-route-board','/api/ppg-route-board','/api/convergence-route-board',
+    '/api/fixtures-week','/api/market-route-board','/api/apex-intelligence-board','/api/convergence-route-board',
     '/api/match-intelligence','/api/live','/api/results','/api/proof','/api/performance','/api/odds-movement','/api/leagues',
     '/api/qualified-picks','/api/consensus-picks','/api/wins-carousel','/api/settlement-status','/api/admin/engine-audit','/api/admin/calibration'
   ]) assert.match(server, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -106,7 +106,7 @@ test('dashboard experience includes board-aware sections, rolling settled wins a
   assert.match(manifest, /maskable-512\.png/);
   assert.match(manifest, /launch_handler/);
   assert.match(motion, /pwa-launch-splash/);
-  assert.match(sw, /betynz-v5-0-6/);
+  assert.match(sw, /betynz-v5-0-9/);
 });
 
 test('production server boots with API-Football as the only football source', async t => {
@@ -167,9 +167,9 @@ test('production server boots with API-Football as the only football source', as
   t.after(() => child.kill('SIGTERM'));
 
   const health = await (await waitFor(`http://127.0.0.1:${port}/api/health`)).json();
-  assert.equal(health.version, '5.0.6');
+  assert.equal(health.version, '5.0.9');
   assert.equal(health.configured.apiFootball, true);
-  assert.deepEqual(health.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'CONVERGENCE_ROUTE', 'MOMENTUM_STREAK']);
+  assert.deepEqual(health.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'APEX_INTELLIGENCE', 'CONVERGENCE_ROUTE', 'MOMENTUM_STREAK']);
   assert.deepEqual(new Set(Object.values(health.sourceRoles)), new Set(['API_FOOTBALL']));
 
   const config = await (await fetch(`http://127.0.0.1:${port}/api/config`)).json();
@@ -198,13 +198,13 @@ test('production server boots with API-Football as the only football source', as
   assert.equal(livePayload.source, 'API_FOOTBALL');
   assert.equal(livePayload.fixtures[0].minute, 67);
 
-  for (const route of ['ppg-route-board','convergence-route-board']) {
+  for (const route of ['apex-intelligence-board','convergence-route-board']) {
     const response = await fetch(`http://127.0.0.1:${port}/api/${route}?date=${today}`);
     assert.equal(response.status, 200, logs);
     assert.ok(Array.isArray((await response.json()).all));
   }
 
-  for (const path of ['/', '/picks.html', '/convergence.html', '/ppg-route.html', '/admin-engine-audit.html', '/admin-calibration.html']) {
+  for (const path of ['/', '/picks.html', '/convergence.html', '/apex-intelligence.html', '/admin-engine-audit.html', '/admin-calibration.html']) {
     const response = await fetch(`http://127.0.0.1:${port}${path}`);
     assert.equal(response.status, 200);
   }

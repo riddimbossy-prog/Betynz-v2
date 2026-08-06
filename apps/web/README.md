@@ -1,14 +1,17 @@
-# Betynz web v5.0.6
+# Betynz web — v5.0.9
 
-API-Football-only four-engine web application.
+API-Football-only five-engine football-analysis application.
 
-Speed changes in v5.0.6:
+## Active engines
 
-- Progressive per-fixture engine publication
-- Priced upcoming fixtures first
-- Shared league-season history pools with team fallback
-- Lightweight future date counts
-- Shared in-flight requests and stronger caching
-- Minimal games-board motion
+1. Market Route
+2. PPG Route
+3. Apex Intelligence
+4. Convergence
+5. Momentum & Streak
 
-Run `npm run build` from the repository root for the full release verification.
+PPG Route remains an independent venue-split specialist. Apex Intelligence complements it with a broader multi-factor decision path. Every engine publishes at most one official selection per fixture.
+
+The public interface uses the Betynz logo palette: black and charcoal surfaces, silver borders, white text and orange accents. Semantic colours remain reserved for live, won, lost, warning and review states.
+
+API keys and Supabase service credentials stay server-side.

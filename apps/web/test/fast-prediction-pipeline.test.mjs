@@ -164,7 +164,7 @@ test('a qualified prediction is published while a slower fixture is still proces
   let partial = null;
   const end = Date.now() + 2200;
   while (Date.now() < end) {
-    const response = await fetch(`http://127.0.0.1:${port}/api/ppg-route-board?date=${date}`);
+    const response = await fetch(`http://127.0.0.1:${port}/api/apex-intelligence-board?date=${date}`);
     const body = await response.json();
     if (!body.complete && (body.qualified || []).length >= 1 && Number(body.progress?.processed || 0) >= 1) {
       partial = body;

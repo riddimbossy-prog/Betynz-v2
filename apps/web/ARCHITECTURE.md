@@ -1,18 +1,20 @@
-# Betynz v5.0.6 architecture
-
-One Node web service hosts the public application and server API.
+# Betynz v5.0.9 architecture
 
 ```text
 API-Football
-  -> fixture and odds cache
-  -> lightweight daily fixture counts
-  -> shared league-season history pools
-  -> team-history fallback only when needed
-  -> progressive four-engine snapshots
-  -> Consensus, proof, settlement and learning
-  -> public dashboard/PWA
+  -> fixtures, odds, live scores, results, crests and statistics
+  -> normalized fixture board
+  -> shared cached history and intelligence layer
+  -> progressive five-engine snapshots
+       Market Route
+       PPG Route
+       Apex Intelligence
+       Convergence
+       Momentum & Streak
+  -> five-engine Consensus
+  -> frozen predictions, settlement, proof and learning
 ```
 
-Market Route can publish from the odds layer while deeper venue evidence continues. PPG Route, Convergence and Momentum & Streak reuse the same cached venue-history work. The browser receives progress and partial completed results instead of waiting for the entire daily board.
+The application is deployed from one repository through one Render web service and one root `render.yaml`.
 
-The games board renders stable rows with minimal motion. Live status, scores and prediction states can update without rebuilding the full fixture list when its signature is unchanged.
+PPG and Apex share cached venue-history inputs but analyse them independently. PPG applies its specialist venue-split rules. Apex requires several independent evidence families and cannot qualify from PPG alone.

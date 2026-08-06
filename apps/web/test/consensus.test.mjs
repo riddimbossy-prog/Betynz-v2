@@ -8,16 +8,16 @@ const fixture = {
 };
 const pick = (engine, market, decision = 'FIRE', score = 82, odds = 1.5) => ({ engine, engineName: engine, market, label: market, decision, score, odds });
 
-test('four matching result engines create an Elite Banker', () => {
-  const result = buildConsensusForFixture({ fixture, picks: [pick('MARKET_ROUTE','HOME_WIN'), pick('PPG_ROUTE','HOME_WIN'), pick('CONVERGENCE_ROUTE','HOME_WIN'), pick('MOMENTUM_STREAK','HOME_WIN')], odds: { homeWin: 1.52 } });
+test('five matching result engines create an Elite Banker', () => {
+  const result = buildConsensusForFixture({ fixture, picks: [pick('MARKET_ROUTE','HOME_WIN'), pick('PPG_ROUTE','HOME_WIN'), pick('APEX_INTELLIGENCE','HOME_WIN'), pick('CONVERGENCE_ROUTE','HOME_WIN'), pick('MOMENTUM_STREAK','HOME_WIN')], odds: { homeWin: 1.52 } });
   assert.equal(result.classification, 'ELITE_BANKER');
-  assert.equal(result.agreementCount, 4);
+  assert.equal(result.agreementCount, 5);
   assert.equal(result.final.market, 'HOME_WIN');
   assert.equal(result.final.odds, 1.52);
 });
 
-test('three compatible result engines create a Consensus Banker on the safer 1X market', () => {
-  const result = buildConsensusForFixture({ fixture, picks: [pick('MARKET_ROUTE','HOME_WIN'), pick('PPG_ROUTE','DOUBLE_CHANCE_1X'), pick('MOMENTUM_STREAK','HOME_WIN')], odds: { doubleChance1X: 1.18 } });
+test('four compatible result engines create a Consensus Banker on the safer 1X market', () => {
+  const result = buildConsensusForFixture({ fixture, picks: [pick('MARKET_ROUTE','HOME_WIN'), pick('PPG_ROUTE','HOME_WIN'), pick('APEX_INTELLIGENCE','DOUBLE_CHANCE_1X'), pick('MOMENTUM_STREAK','HOME_WIN')], odds: { doubleChance1X: 1.18 } });
   assert.equal(result.classification, 'CONSENSUS_BANKER');
   assert.equal(result.final.market, 'DOUBLE_CHANCE_1X');
   assert.equal(result.final.odds, 1.18);
@@ -30,14 +30,14 @@ test('two compatible goal engines agree on Over 1.5 as a shared qualified pick',
 });
 
 test('opposite Over and Under directions are rejected as conflict', () => {
-  const result = buildConsensusForFixture({ fixture, picks: [pick('MARKET_ROUTE','OVER_2_5'), pick('PPG_ROUTE','UNDER_2_5')] });
+  const result = buildConsensusForFixture({ fixture, picks: [pick('MARKET_ROUTE','OVER_2_5'), pick('APEX_INTELLIGENCE','UNDER_2_5')] });
   assert.equal(result.classification, 'CONFLICT');
   assert.equal(result.conflict, true);
   assert.match(result.conflictReasons.join(' '), /Over and Under/);
 });
 
 test('agreement without the shared safer price is held, not published as banker', () => {
-  const result = buildConsensusForFixture({ fixture, picks: [pick('MARKET_ROUTE','HOME_WIN','FIRE',82,null), pick('PPG_ROUTE','DOUBLE_CHANCE_1X','FIRE',82,null)] });
+  const result = buildConsensusForFixture({ fixture, picks: [pick('MARKET_ROUTE','HOME_WIN','FIRE',82,null), pick('APEX_INTELLIGENCE','DOUBLE_CHANCE_1X','FIRE',82,null)] });
   assert.equal(result.classification, 'HOLD_MISSING_SHARED_PRICE');
 });
 
@@ -51,6 +51,7 @@ test('window groups one decision per engine and summary classifies rows', () => 
   const rows = buildConsensusWindow([
     { ...pick('MARKET_ROUTE','HOME_WIN'), ...fixture, league:'League', _odds:{homeWin:1.5} },
     { ...pick('PPG_ROUTE','HOME_WIN'), ...fixture, league:'League', _odds:{homeWin:1.5} },
+    { ...pick('APEX_INTELLIGENCE','HOME_WIN'), ...fixture, league:'League', _odds:{homeWin:1.5} },
     { ...pick('CONVERGENCE_ROUTE','HOME_WIN'), ...fixture, league:'League', _odds:{homeWin:1.5} },
     { ...pick('MOMENTUM_STREAK','HOME_WIN'), ...fixture, league:'League', _odds:{homeWin:1.5} }
   ]);

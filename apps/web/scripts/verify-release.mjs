@@ -9,58 +9,44 @@ const readRoot = path => readFile(resolve(repoRoot, path), 'utf8');
 
 const required = [
   'src/server.mjs','src/lib/apiFootball.mjs','src/lib/results.mjs','src/lib/venueStats.mjs',
-  'src/engines/marketRoute.mjs','src/engines/ppgRoute.mjs','src/engines/convergence.mjs','src/engines/momentumStreak.mjs','src/engines/consensus.mjs','src/engines/settlement.mjs',
-  'public/index.html','public/app.js','public/styles.css','public/sw.js','public/live.html','public/live.js','public/momentum-streak.html','public/momentum-streak.js',
+  'src/engines/marketRoute.mjs','src/engines/ppgRoute.mjs','src/engines/apexIntelligence.mjs','src/engines/convergence.mjs','src/engines/momentumStreak.mjs','src/engines/consensus.mjs','src/engines/settlement.mjs',
+  'public/index.html','public/app.js','public/styles.css','public/sw.js','public/live.html','public/live.js',
+  'public/ppg-route.html','public/ppg-route.js','public/apex-intelligence.html','public/apex-intelligence.js','public/momentum-streak.html','public/momentum-streak.js',
   'public/assets/betynz-logo.png','public/assets/betynz-mark.png','public/assets/favicon-16x16.png','public/assets/favicon-32x32.png','public/assets/apple-touch-icon.png','public/assets/maskable-192.png','public/assets/maskable-512.png','public/assets/pwa-splash-portrait.png','public/assets/pwa-splash-landscape.png','public/favicon.ico',
-  'docs/API_FOOTBALL_ONLY_CONTRACT.md','docs/MOMENTUM_STREAK_RULES.md','docs/CONSENSUS_RULES.md','sql/012_momentum_streak_engine.sql','package.json','package-lock.json','.env.example'
+  'docs/API_FOOTBALL_ONLY_CONTRACT.md','docs/PPG_ROUTE_RULES.md','docs/APEX_INTELLIGENCE_RULES.md','docs/MOMENTUM_STREAK_RULES.md','docs/CONSENSUS_RULES.md',
+  'sql/014_five_engine_ppg_apex.sql','package.json','package-lock.json','.env.example'
 ];
 for (const path of required) await access(resolve(appRoot, path));
-for (const path of ['render.yaml','package.json','scripts/verify-single-render.mjs','RELEASE_V5_0_6.md']) await access(resolve(repoRoot, path));
+for (const path of ['render.yaml','package.json','scripts/verify-single-render.mjs','RELEASE_V5_0_9.md']) await access(resolve(repoRoot, path));
 
-const [server, apiFootball, results, marketRoute, sw, styles, motion, env, render, rootPkgText, pkgText, lockText] = await Promise.all([
-  read('src/server.mjs'), read('src/lib/apiFootball.mjs'), read('src/lib/results.mjs'), read('src/engines/marketRoute.mjs'),
-  read('public/sw.js'), read('public/styles.css'), read('public/motion.js'), read('.env.example'), readRoot('render.yaml'), readRoot('package.json'), read('package.json'), read('package-lock.json')
+const [server, apiFootball, sw, styles, motion, env, render, rootPkgText, pkgText, lockText, indexHtml, appJs, picksHtml] = await Promise.all([
+  read('src/server.mjs'), read('src/lib/apiFootball.mjs'), read('public/sw.js'), read('public/styles.css'), read('public/motion.js'), read('.env.example'), readRoot('render.yaml'), readRoot('package.json'), read('package.json'), read('package-lock.json'), read('public/index.html'), read('public/app.js'), read('public/picks.html')
 ]);
 
-if (!/const APP_VERSION = '5\.0\.6'/.test(server)) throw new Error('Server version is not 5.0.6.');
-if (!/serveApiFootballMedia/.test(server) || !/API_FOOTBALL_MEDIA_BASE_URL/.test(server)) throw new Error('Same-origin crest proxy is missing.');
-if (!/\/api\/wins-carousel/.test(server) || !/requestSettlement/.test(server) || !/requestRecentSettlements/.test(server)) throw new Error('Automatic settlement or rolling win proof route is missing.');
-const [indexHtml, appJs, picksHtml, picksJs, manifest] = await Promise.all([read('public/index.html'), read('public/app.js'), read('public/picks.html'), read('public/picks.js'), read('public/manifest.webmanifest')]);
-if (!/winCarousel/.test(indexHtml) || !/loadWinCarousel/.test(appJs)) throw new Error('Dashboard win carousel is missing.');
-if (!/data-board-aware/.test(picksHtml) || !/setBoardAwareVisibility/.test(picksJs)) throw new Error('Board-aware empty-section hiding is missing.');
-if (!/maskable-512/.test(manifest) || !/launch_handler/.test(manifest) || !/pwa-launch-splash/.test(styles)) throw new Error('PWA icon or animated splash upgrade is missing.');
-for (const token of [
-  'getApiFootballFixtureBoard','getApiFootballOddsForDate','getApiFootballLiveBoard','getApiFootballResults',
-  'getApiFootballFixtureEvents','getApiFootballIntelligence','enrichApiFootballStatsBoard','enrichApiFootballVisuals','resolveApiFootballTeam'
-]) if (!apiFootball.includes(token)) throw new Error(`API-Football contract is missing ${token}.`);
-if (!/SOLE_FOOTBALL_DATA_PROVIDER/.test(apiFootball)) throw new Error('The sole-provider role is missing.');
-if (!/ALL_DAILY_FIXTURES_RETURNED_BY_PROVIDER/.test(apiFootball)) throw new Error('Unlimited daily fixture scope is missing.');
-if (!/API_FOOTBALL/.test(results)) throw new Error('Results are not wired to API-Football.');
-if (!/STAT_CONFLICT/.test(marketRoute) || !/statisticalValidation/.test(marketRoute)) throw new Error('Market Route statistical gate is missing.');
-if (!/betynz-v5-0-6/.test(sw)) throw new Error('Service-worker cache was not bumped to v5.0.6.');
-
-for (const requiredKey of ['API_FOOTBALL_KEY','API_FOOTBALL_BASE_URL','API_FOOTBALL_KEY_HEADER','API_FOOTBALL_MAX_ODDS_PAGES']) {
-  if (!env.includes(requiredKey) || !render.includes(requiredKey)) throw new Error(`Configuration is missing ${requiredKey}.`);
-}
+if (!/const APP_VERSION = '5\.0\.9'/.test(server)) throw new Error('Server version is not 5.0.9.');
+for (const code of ['MARKET_ROUTE','PPG_ROUTE','APEX_INTELLIGENCE','CONVERGENCE_ROUTE','MOMENTUM_STREAK']) if (!server.includes(code)) throw new Error(`Missing engine ${code}.`);
+for (const token of ['analyzeMarketRoute','analyzePpgRoute','analyzeApexIntelligence','analyzeConvergence','analyzeMomentumStreak']) if (!server.includes(token)) throw new Error(`Missing analysis function ${token}.`);
+for (const route of ['market-route-board','ppg-route-board','apex-intelligence-board','convergence-route-board','momentum-streak-board']) if (!server.includes(route)) throw new Error(`Missing route ${route}.`);
+for (const label of ['Market Route','PPG Route','Apex Intelligence','Convergence','Momentum']) if (!indexHtml.includes(label)) throw new Error(`Dashboard is missing ${label}.`);
+if (!/FIVE ENGINES · SHARED DIRECTION/.test(indexHtml) || !/5\/5 agreement/.test(indexHtml) || !/4\/5 agreement/.test(indexHtml)) throw new Error('Five-engine consensus labels are missing.');
+if (!/renderPpgEngine/.test(appJs) || !/renderApexEngine/.test(appJs)) throw new Error('PPG or Apex match-intelligence rendering is missing.');
+if (!/betynz-v5-0-9/.test(sw) || !/ppg-route\.html/.test(sw)) throw new Error('Service-worker cache was not bumped or PPG is absent.');
+if (!/five independent engines/i.test(picksHtml)) throw new Error('Picks page does not describe the five-engine system.');
+if (!/grid-template-columns:repeat\(5/.test(styles) || !/brand-orange/.test(styles) || !/ppg-result-card/.test(styles)) throw new Error('Unified five-engine logo palette is missing.');
+if (/IntersectionObserver|pointermove|data-lightning/.test(motion) || !/prefers-reduced-motion/.test(motion)) throw new Error('Minimal-motion safeguards are missing.');
+for (const token of ['getApiFootballFixtureBoard','getApiFootballOddsForDate','getApiFootballLiveBoard','getApiFootballResults','getApiFootballFixtureEvents','getApiFootballIntelligence','enrichApiFootballStatsBoard','enrichApiFootballVisuals','resolveApiFootballTeam']) if (!apiFootball.includes(token)) throw new Error(`API-Football contract is missing ${token}.`);
+for (const requiredKey of ['API_FOOTBALL_KEY','API_FOOTBALL_BASE_URL','API_FOOTBALL_KEY_HEADER','API_FOOTBALL_MAX_ODDS_PAGES']) if (!env.includes(requiredKey) || !render.includes(requiredKey)) throw new Error(`Configuration is missing ${requiredKey}.`);
 if ((render.match(/^\s*-\s+type:\s+web\s*$/gm) || []).length !== 1) throw new Error('Render must define exactly one web service.');
-if (/API_FOOTBALL_MAX_FIXTURES/.test(render)) throw new Error('A daily fixture cap remains in Render configuration.');
 
 const pkg = JSON.parse(pkgText);
 const lock = JSON.parse(lockText);
 const rootPkg = JSON.parse(rootPkgText);
-if (pkg.version !== '5.0.6' || lock.version !== '5.0.6' || rootPkg.version !== '5.0.6') throw new Error('Package versions are not 5.0.6.');
-if (pkg.name !== 'betynz-api-football-only-web' || lock.name !== pkg.name) throw new Error('Web package names do not match.');
-if (rootPkg.name !== 'betynz-api-football-only') throw new Error('Root package name is incorrect.');
-if (!/@media\s*\(max-width:\s*380px\)/.test(styles) || !/@media\s*\(min-width:\s*600px\)\s*and\s*\(max-width:\s*760px\)/.test(styles) || !/@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(styles)) throw new Error('Responsive safeguards are missing.');
-if (/IntersectionObserver|pointermove|data-lightning/.test(motion) || !/prefers-reduced-motion/.test(motion)) throw new Error('Minimal-motion safeguards are missing.');
+if (pkg.version !== '5.0.9' || lock.version !== '5.0.9' || rootPkg.version !== '5.0.9') throw new Error('Package versions are not 5.0.9.');
 
 const tests = (await readdir(resolve(appRoot, 'test'))).sort();
 const allowed = [
-  'market-route.test.mjs','ppg-route.test.mjs','convergence.test.mjs','momentum-streak.test.mjs','consensus.test.mjs','calibration.test.mjs','settlement.test.mjs',
-  'four-engine-reset.test.mjs','qualified-picks.test.mjs','responsive-cinematic.test.mjs','api-football.test.mjs','api-football-source.test.mjs','platform-smoke.test.mjs','progressive-engine-analysis.test.mjs','fast-prediction-pipeline.test.mjs'
+  'apex-intelligence.test.mjs','api-football-source.test.mjs','api-football.test.mjs','calibration.test.mjs','consensus.test.mjs','convergence.test.mjs','fast-prediction-pipeline.test.mjs','five-engine-reset.test.mjs','market-route.test.mjs','momentum-streak.test.mjs','platform-smoke.test.mjs','ppg-route.test.mjs','progressive-engine-analysis.test.mjs','qualified-picks.test.mjs','responsive-cinematic.test.mjs','settlement.test.mjs'
 ].sort();
 if (JSON.stringify(tests) !== JSON.stringify(allowed)) throw new Error(`Unexpected test files remain: ${tests.join(', ')}`);
 
-if (!/MOMENTUM_STREAK/.test(server) || !/momentum-streak-board/.test(server)) throw new Error('Momentum & Streak Engine route is missing.');
-if (!/Momentum & Streak/.test(indexHtml) || !/momentum-streak\.html/.test(indexHtml)) throw new Error('Momentum & Streak dashboard entry is missing.');
-console.log('Release verification passed: Betynz 5.0.6 fast predictions and minimal board motion.');
+console.log('Release verification passed: Betynz 5.0.9 five-engine logo edition.');

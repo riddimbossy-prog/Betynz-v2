@@ -1,6 +1,6 @@
 # Convergence Engine
 
-The Convergence Engine is independent from Market Route and PPG Route.
+The Convergence Engine is independent from Market Route and Apex Intelligence.
 
 It scores four evidence blocks, each worth 25 points:
 
