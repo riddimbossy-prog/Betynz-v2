@@ -3,6 +3,9 @@ const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&am
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
 const today = new Date().toISOString().slice(0, 10);
 let payload = null;
+let pollTimer = null;
+let requestVersion = 0;
+let requestedDays = 1;
 
 function engineName(code) {
   if (code === 'PPG_ROUTE') return 'PPG Route';
@@ -91,27 +94,57 @@ function render() {
   const qualified = rows.filter(row => row.classification === 'QUALIFIED_PICK');
   const safer = rows.filter(row => row.classification === 'SAFER_PICK');
   const conflicts = rows.filter(row => row.classification === 'CONFLICT');
+  const processing = !payload.complete && !payload.failed;
+  const progress = payload.progress || {};
+  const progressText = `${Number(progress.processed || 0)} of ${Number(progress.total || 0)} ${requestedDays === 1 ? 'fixtures' : 'days'} processed`;
 
-  $('#eliteState').textContent = `${elite.length} shown`;
-  $('#consensusState').textContent = `${consensus.length} shown`;
-  $('#qualifiedState').textContent = `${qualified.length} shown`;
-  $('#saferState').textContent = `${safer.length} shown`;
-  $('#conflictState').textContent = `${conflicts.length} shown`;
-  $('#eliteGrid').innerHTML = elite.length ? elite.map(row => consensusCard(row)).join('') : empty('No Elite Banker matches this filter', 'Three independent engines must support the same safe direction.');
-  $('#consensusGrid').innerHTML = consensus.length ? consensus.map(row => consensusCard(row)).join('') : empty('No Consensus Banker matches this filter', 'Two independent engines must agree before banker status appears.');
-  $('#qualifiedList').innerHTML = qualified.length ? qualified.map(row => consensusCard(row, true)).join('') : empty('No single-engine qualified picks', 'Complete routes will appear here without being promoted to banker status.');
-  $('#saferList').innerHTML = safer.length ? safer.map(row => consensusCard(row, true)).join('') : empty('No safer picks', 'Approved downgrade markets appear here.');
-  $('#conflictList').innerHTML = conflicts.length ? conflicts.map(conflictCard).join('') : empty('No engine conflicts', 'No opposing qualified directions are visible under this filter.');
+  $('#eliteState').textContent = processing ? 'Checking…' : `${elite.length} shown`;
+  $('#consensusState').textContent = processing ? 'Checking…' : `${consensus.length} shown`;
+  $('#qualifiedState').textContent = processing ? 'Loading…' : `${qualified.length} shown`;
+  $('#saferState').textContent = processing ? 'Loading…' : `${safer.length} shown`;
+  $('#conflictState').textContent = processing ? 'Checking…' : `${conflicts.length} shown`;
+
+  const processingEmpty = title => empty(title, `${progressText}. Results update automatically.`);
+  const failedEmpty = title => empty(title, payload.error || 'Refresh analysis to try again.');
+  const chooseEmpty = (finishedTitle, finishedText, loadingTitle) => payload.failed ? failedEmpty('Analysis could not be completed') : processing ? processingEmpty(loadingTitle) : empty(finishedTitle, finishedText);
+
+  $('#eliteGrid').innerHTML = elite.length ? elite.map(row => consensusCard(row)).join('') : chooseEmpty('No Elite Banker matches this filter', 'Three independent engines must support the same safe direction.', 'Checking 3/3 engine agreement…');
+  $('#consensusGrid').innerHTML = consensus.length ? consensus.map(row => consensusCard(row)).join('') : chooseEmpty('No Consensus Banker matches this filter', 'Two independent engines must agree before banker status appears.', 'Checking 2/3 engine agreement…');
+  $('#qualifiedList').innerHTML = qualified.length ? qualified.map(row => consensusCard(row, true)).join('') : chooseEmpty('No single-engine qualified picks', 'Complete routes will appear here without being promoted to banker status.', 'Checking complete engine routes…');
+  $('#saferList').innerHTML = safer.length ? safer.map(row => consensusCard(row, true)).join('') : chooseEmpty('No safer picks', 'Approved downgrade markets appear here.', 'Checking safer downgrade routes…');
+  $('#conflictList').innerHTML = conflicts.length ? conflicts.map(conflictCard).join('') : chooseEmpty('No engine conflicts', 'No opposing qualified directions are visible under this filter.', 'Checking opposing engine directions…');
   window.dispatchEvent(new CustomEvent('betynz:content-rendered'));
 }
 
-async function load() {
-  const from = $('#picksDate').value || today;
-  for (const id of ['eliteGrid','consensusGrid','qualifiedList','saferList','conflictList']) $(`#${id}`).innerHTML = '<div class="picks-empty">Analysing upcoming fixtures…</div>';
+async function fetchJson(url, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(`/api/consensus-picks?from=${encodeURIComponent(from)}&days=7`, { cache: 'no-store' });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || data.error || `HTTP ${response.status}`);
+    return data;
+  } finally { clearTimeout(timer); }
+}
+
+function schedulePoll(from, days, version) {
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(() => {
+    if (version === requestVersion && ($('#picksDate').value || today) === from) load({ silent: true, days });
+  }, 4500);
+}
+
+async function load({ silent = false, days = 1 } = {}) {
+  const from = $('#picksDate').value || today;
+  const version = ++requestVersion;
+  requestedDays = days;
+  clearTimeout(pollTimer);
+  if (!silent) {
+    for (const id of ['eliteGrid','consensusGrid','qualifiedList','saferList','conflictList']) $(`#${id}`).innerHTML = '<div class="picks-empty">Starting engine analysis…</div>';
+  }
+  try {
+    const data = await fetchJson(`/api/consensus-picks?from=${encodeURIComponent(from)}&days=${days}`);
+    if (version !== requestVersion) return;
     payload = data;
     $('#eliteCount').textContent = data.summary?.elite || 0;
     $('#consensusCount').textContent = data.summary?.consensus || 0;
@@ -120,16 +153,26 @@ async function load() {
     $('#conflictCount').textContent = data.summary?.conflicts || 0;
     populateFilters();
     render();
+    if (!data.complete && !data.failed) {
+      schedulePoll(from, days, version);
+    } else if (data.complete && !data.failed && days === 1) {
+      // The selected day is useful first. Expand to the remaining six dates only
+      // after it has completed so the initial page is never blocked by a week scan.
+      pollTimer = setTimeout(() => {
+        if (version === requestVersion && ($('#picksDate').value || today) === from) load({ silent: true, days: 7 });
+      }, 300);
+    }
   } catch (error) {
-    payload = null;
-    $('#eliteGrid').innerHTML = empty('Consensus analysis is temporarily unavailable', error.message || 'Refresh to try again.');
-    for (const id of ['consensusGrid','qualifiedList','saferList','conflictList']) $(`#${id}`).innerHTML = '<div class="picks-empty">No data loaded.</div>';
+    if (version !== requestVersion) return;
+    payload = { complete: true, failed: true, error: error?.name === 'AbortError' ? 'The analysis request timed out.' : (error.message || 'Refresh to try again.'), consensus: { all: [] }, summary: {} };
+    populateFilters();
+    render();
   }
 }
 
 $('#picksDate').value = today;
-$('#picksRefresh').addEventListener('click', load);
-$('#picksDate').addEventListener('change', load);
+$('#picksRefresh').addEventListener('click', () => load({ days: 1 }));
+$('#picksDate').addEventListener('change', () => load({ days: 1 }));
 for (const id of ['engineFilter','tierFilter','dateFilter','leagueFilter']) $(`#${id}`).addEventListener('change', render);
 $('#picksSearch').addEventListener('input', render);
-load();
+load({ days: 1 });

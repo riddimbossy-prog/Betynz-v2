@@ -22,7 +22,8 @@ const allowedTests = new Set([
   'responsive-cinematic.test.mjs',
   'api-football.test.mjs',
   'api-football-source.test.mjs',
-  'platform-smoke.test.mjs'
+  'platform-smoke.test.mjs',
+  'progressive-engine-analysis.test.mjs'
 ]);
 
 try {

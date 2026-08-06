@@ -1,4 +1,4 @@
-# Betynz v5.0.1 — API-Football Only
+# Betynz v5.0.2 — API-Football Only
 
 Betynz is a single-service Node.js prediction platform. `API_FOOTBALL_KEY` is the sole football-data credential and API-Football supplies every football input used by the website and engines.
 
@@ -33,3 +33,7 @@ The repository contains one root `render.yaml` and one Render web service. Add `
 No application-level fixture cap is applied. The board displays every fixture returned by the subscription for the selected date. Odds pagination continues until API-Football reports the final page.
 
 See `START_HERE.md` for exact installation steps.
+
+## Shared non-blocking analysis
+
+Market Route returns when fixtures and odds are ready. PPG Route and Convergence then share one background venue-history scan. Consensus reads those same snapshots instead of launching a separate full-day analysis. Public routes expose progress and terminal error states so pages cannot remain indefinitely on a loading message.

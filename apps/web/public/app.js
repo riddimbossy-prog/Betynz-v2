@@ -25,7 +25,10 @@ const state = {
   convergenceByFixture: new Map(),
   consensusByFixture: new Map(),
   visualByFixture: new Map(),
-  requestToken: 0
+  requestToken: 0,
+  consensusPollTimer: null,
+  routePollTimer: null,
+  weekCountToken: 0
 };
 
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
@@ -88,15 +91,20 @@ function updateWeekCount(date, count) {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
-  let payload = null;
-  try { payload = await response.json(); } catch {}
-  if (!response.ok) {
-    const error = new Error(payload?.message || `HTTP ${response.status}`);
-    error.code = payload?.error || `HTTP_${response.status}`;
-    throw error;
-  }
-  return payload;
+  const controller = new AbortController();
+  const timeoutMs = Math.max(3000, Number(options.timeoutMs || 20000));
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    let payload = null;
+    try { payload = await response.json(); } catch {}
+    if (!response.ok) {
+      const error = new Error(payload?.message || `HTTP ${response.status}`);
+      error.code = payload?.error || `HTTP_${response.status}`;
+      throw error;
+    }
+    return payload;
+  } finally { clearTimeout(timer); }
 }
 
 function setHomeSpotlightMessage(message, detail = '') {
@@ -140,6 +148,7 @@ async function loadDate(date, force = false) {
       $('#dayLoadState').textContent = `${state.fixtures.length} fixtures loaded. Deep statistics load only when you open a match.`;
       hydrateVisuals(date).catch(() => {});
       loadRouteSummary(date).catch(() => {});
+      loadRemainingWeekCounts(date).catch(() => {});
     } else {
       $('#dayLoadState').textContent = payload.warning || 'No real matches are listed for this date yet.';
       setHomeSpotlightMessage('No qualified picks for this date yet.', 'The board updates when complete market and statistics routes become available.');
@@ -169,7 +178,9 @@ function populateLeagues() {
   const previous = select.value;
   const leagues = [...new Set(state.fixtures.map(fixture => `${fixture.league?.country || 'International'} · ${fixture.league?.name || 'League'}`))].sort();
   select.innerHTML = '<option value="ALL">All leagues</option>' + leagues.map(value => `<option value="${esc(value)}">${esc(value)}</option>`).join('');
-  if (leagues.includes(previous)) select.value = previous;
+  // Every date opens on the complete board. A previous league filter must not
+  // silently reduce a new day to one competition.
+  select.value = 'ALL';
 }
 
 function applyFilters() {
@@ -260,6 +271,10 @@ function renderHomeBankers(payload) {
   const consensusGrid = $('#homeConsensusGrid');
   const earlyGrid = $('#homeEarlyGrid');
   if (!eliteGrid || !consensusGrid || !earlyGrid) return;
+  if (payload?.failed) {
+    setHomeSpotlightMessage('Engine analysis could not be completed.', payload.error || 'Refresh to try again.');
+    return;
+  }
   const all = payload?.consensus?.all || [];
   state.consensusByFixture = new Map(all.map(item => [String(item.fixtureId), item]));
   const todayRows = all.filter(item => item.date === state.selectedDate);
@@ -269,22 +284,47 @@ function renderHomeBankers(payload) {
   selected.setUTCDate(selected.getUTCDate() + 1);
   const nextDate = selected.toISOString().slice(0, 10);
   const early = all.filter(item => item.date === nextDate && ['ELITE_BANKER','CONSENSUS_BANKER','QUALIFIED_PICK','SAFER_PICK'].includes(item.classification)).slice(0, 4);
-  eliteGrid.innerHTML = elite.length ? elite.map(row => homeConsensusCard(row, 'elite')).join('') : '<div class="spotlight-empty"><b>No 3/3 agreement yet.</b><span>Elite Bankers appear only when all three engines support one safe direction.</span></div>';
-  consensusGrid.innerHTML = consensus.length ? consensus.map(row => homeConsensusCard(row, 'consensus')).join('') : '<div class="spotlight-empty"><b>No 2/3 agreement yet.</b><span>Consensus Bankers need two independent engines to agree.</span></div>';
-  earlyGrid.innerHTML = early.length ? early.map(row => homeConsensusCard(row, 'early')).join('') : '<div class="spotlight-empty"><b>No early pick published yet.</b><span>Future selections appear as soon as their required markets and statistics qualify.</span></div>';
+  const processing = !payload?.complete;
+  const progress = payload?.progress || {};
+  const progressText = `${Number(progress.processed || 0)} of ${Number(progress.total || 0)} processed`;
+  eliteGrid.innerHTML = elite.length ? elite.map(row => homeConsensusCard(row, 'elite')).join('') : processing
+    ? `<div class="spotlight-empty"><b>Checking 3/3 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>`
+    : '<div class="spotlight-empty"><b>No 3/3 agreement yet.</b><span>Elite Bankers appear only when all three engines support one safe direction.</span></div>';
+  consensusGrid.innerHTML = consensus.length ? consensus.map(row => homeConsensusCard(row, 'consensus')).join('') : processing
+    ? `<div class="spotlight-empty"><b>Checking 2/3 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>`
+    : '<div class="spotlight-empty"><b>No 2/3 agreement yet.</b><span>Consensus Bankers need two independent engines to agree.</span></div>';
+  earlyGrid.innerHTML = early.length ? early.map(row => homeConsensusCard(row, 'early')).join('') : processing
+    ? '<div class="spotlight-empty"><b>Preparing early picks…</b><span>The selected date finishes before future dates are scanned.</span></div>'
+    : '<div class="spotlight-empty"><b>No early pick published yet.</b><span>Future selections appear as soon as their required markets and statistics qualify.</span></div>';
   renderList();
   window.dispatchEvent(new CustomEvent('betynz:content-rendered'));
 }
 
-async function loadRouteSummary(date) {
-  const payload = await fetchJson(`/api/market-route-board?date=${encodeURIComponent(date)}`, { cache: 'default' });
+async function loadHomeConsensus(date, attempt = 0) {
+  clearTimeout(state.consensusPollTimer);
+  try {
+    const qualified = await fetchJson(`/api/consensus-picks?from=${encodeURIComponent(date)}&days=2`, { cache: 'no-store', timeoutMs: 20000 });
+    if (state.selectedDate !== date) return;
+    renderHomeBankers(qualified);
+    if (!qualified.complete && !qualified.failed && attempt < 90) {
+      state.consensusPollTimer = setTimeout(() => loadHomeConsensus(date, attempt + 1), 4500);
+    }
+  } catch (error) {
+    if (state.selectedDate === date) setHomeSpotlightMessage('Engine analysis could not be completed.', error?.name === 'AbortError' ? 'The request timed out. Tap Refresh to retry.' : 'Tap Refresh to retry.');
+  }
+}
+
+async function loadRouteSummary(date, attempt = 0) {
+  clearTimeout(state.routePollTimer);
+  const payload = await fetchJson(`/api/market-route-board?date=${encodeURIComponent(date)}`, { cache: 'no-store', timeoutMs: 20000 });
   if (state.selectedDate !== date) return;
   state.routeByFixture = new Map((payload.all || []).map(item => [String(item.fixture?.id), item.engine]));
   $('#routeTipCount').textContent = Number(payload.summary?.fire || 0) + Number(payload.summary?.safer || 0);
   renderList();
-  fetchJson(`/api/consensus-picks?from=${encodeURIComponent(date)}&days=2`, { cache: 'default' })
-    .then(qualified => { if (state.selectedDate === date) renderHomeBankers(qualified); })
-    .catch(() => {});
+  if (attempt === 0) loadHomeConsensus(date).catch(() => {});
+  if (!payload.complete && !payload.failed && attempt < 90) {
+    state.routePollTimer = setTimeout(() => loadRouteSummary(date, attempt + 1).catch(() => {}), 4500);
+  }
 }
 
 async function hydrateVisuals(date) {
@@ -299,6 +339,23 @@ async function hydrateVisuals(date) {
     fixture.league = { ...fixture.league, ...(visual.league || {}) };
   }
   renderList();
+}
+
+async function loadRemainingWeekCounts(selectedDate) {
+  const token = ++state.weekCountToken;
+  for (let offset = 1; offset < 7; offset += 1) {
+    const date = dateOffset(offset);
+    if (date === selectedDate) continue;
+    try {
+      const payload = await fetchJson(`/api/fixtures?date=${encodeURIComponent(date)}`, { cache: 'default', timeoutMs: 20000 });
+      if (token !== state.weekCountToken) return;
+      updateWeekCount(date, Array.isArray(payload.fixtures) ? payload.fixtures.length : null);
+    } catch {
+      if (token !== state.weekCountToken) return;
+      updateWeekCount(date, null);
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
 }
 
 function setCrest(imageSelector, fallbackSelector, team) {

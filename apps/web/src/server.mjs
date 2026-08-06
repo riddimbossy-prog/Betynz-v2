@@ -44,7 +44,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.1';
+const APP_VERSION = '5.0.2';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const CONVERGENCE_ROUTE_CODE = 'CONVERGENCE_ROUTE';
@@ -342,8 +342,8 @@ async function storePredictions(date, items, engineCode = MARKET_ROUTE_CODE) {
   if (frozen.status === 'rejected') console.error('Prediction freeze failed:', frozen.reason?.message || frozen.reason);
 }
 
-async function enrichPrimaryStatsAndVisuals(date, fixtures = []) {
-  return enrichApiFootballStatsBoard(date, fixtures, extractVenueStats);
+async function enrichPrimaryStatsAndVisuals(date, fixtures = [], options = {}) {
+  return enrichApiFootballStatsBoard(date, fixtures, extractVenueStats, options);
 }
 
 const marketBoardInflight = new Map();
@@ -354,37 +354,43 @@ async function getMarketRouteBoard(date) {
   if (cached) return { ...cached, cache: 'HIT' };
   if (marketBoardInflight.has(key)) return marketBoardInflight.get(key);
   const task = (async () => {
-      const board = await getFastFixtureBoard(date);
-      const statisticsEnrichment = await enrichPrimaryStatsAndVisuals(date, board.fixtures);
-      const fixtures = statisticsEnrichment.fixtures || board.fixtures;
-      const items = fixtures.map(fixture => {
-        const stats = fixture?.stats?.homeSplit || fixture?.stats?.awaySplit
-          ? { homeSplit: fixture.stats?.homeSplit || null, awaySplit: fixture.stats?.awaySplit || null, source: fixture.stats?.source || 'API_FOOTBALL' }
-          : null;
-        return { fixture: publicFixture(fixture), engine: analyzeMarketRoute(fixture, stats), venueForm: publicVenueForm(stats) };
-      }).filter(item => item.fixture);
-      await storePredictions(date, items, MARKET_ROUTE_CODE);
-      const response = {
-        date,
-        engine: 'Market Route Engine',
-        source: 'API_FOOTBALL',
-        statisticsSource: 'API_FOOTBALL',
-        enrichmentSource: statisticsEnrichment.enrichmentSource || null,
-        warning: statisticsEnrichment.warning || board.warning || null,
-        qualified: items.filter(item => item.engine.selection),
-        all: items,
-        summary: {
-          fixtures: items.length,
-          fire: items.filter(item => item.engine.decision === 'FIRE').length,
-          safer: items.filter(item => item.engine.decision === 'SAFER').length,
-          conflict: items.filter(item => item.engine.decision === 'CONFLICT').length,
-          noSignal: items.filter(item => !item.engine.selection).length
-        },
-        generatedAt: new Date().toISOString(),
-        cache: 'MISS'
-      };
-      cacheSet(key, response, 120);
-      return response;
+    const board = await getFastFixtureBoard(date);
+    // Market Route is an odds-structure engine. It must return as soon as the
+    // daily fixtures and bookmaker markets are ready; venue enrichment is not
+    // allowed to hold this page open. Statistical contradiction checks are
+    // added later from the shared stats job and in match intelligence.
+    const items = (board.fixtures || []).map(fixture => ({
+      fixture: publicFixture(fixture),
+      engine: analyzeMarketRoute(fixture, null),
+      venueForm: null
+    })).filter(item => item.fixture);
+    storePredictions(date, items, MARKET_ROUTE_CODE).catch(error => console.error('Market prediction storage failed:', error.message));
+    const response = {
+      date,
+      engine: 'Market Route Engine',
+      source: 'API_FOOTBALL',
+      statisticsSource: 'PENDING_SHARED_ENRICHMENT',
+      enrichmentSource: null,
+      warning: board.warning || null,
+      qualified: items.filter(item => item.engine.selection),
+      all: items,
+      summary: {
+        fixtures: items.length,
+        fire: items.filter(item => item.engine.decision === 'FIRE').length,
+        safer: items.filter(item => item.engine.decision === 'SAFER').length,
+        conflict: items.filter(item => item.engine.decision === 'CONFLICT').length,
+        noSignal: items.filter(item => !item.engine.selection).length
+      },
+      progress: { stage: 'ODDS_READY_STATS_RUNNING', processed: 0, total: items.length, percent: 0 },
+      complete: false,
+      failed: false,
+      generatedAt: new Date().toISOString(),
+      cache: 'MISS'
+    };
+    cacheSet(key, response, 120);
+    // Start the shared venue-history job without holding this HTTP response open.
+    queueMicrotask(() => ensureStatsRouteView(date).catch(error => console.error('Shared engine analysis failed:', error.message)));
+    return response;
   })();
   marketBoardInflight.set(key, task);
   try { return await task; }
@@ -400,8 +406,24 @@ async function getStatsRouteBoards(date) {
   if (statsBoardInflight.has(key)) return statsBoardInflight.get(key);
   const task = (async () => {
     const board = await getFastFixtureBoard(date);
-    const enrichment = await enrichPrimaryStatsAndVisuals(date, board.fixtures);
+    let processed = 0;
+    const total = (board.fixtures || []).length;
+    const enrichment = await enrichPrimaryStatsAndVisuals(date, board.fixtures, {
+      onFixture: () => {
+        processed += 1;
+        const snapshot = statsRouteViewSnapshots.get(date);
+        if (!snapshot) return;
+        const progress = { stage: 'VENUE_HISTORY', processed, total, percent: total ? Math.round(processed / total * 100) : 100 };
+        statsRouteViewSnapshots.set(date, {
+          ppg: { ...snapshot.ppg, progress, complete: false },
+          convergence: { ...snapshot.convergence, progress, complete: false }
+        });
+        const marketSnapshot = cacheGet(`market-route-board:${date}`);
+        if (marketSnapshot && !marketSnapshot.complete) cacheSet(`market-route-board:${date}`, { ...marketSnapshot, progress, complete: false }, 120);
+      }
+    });
     const enrichedFixtures = enrichment.fixtures || [];
+    const marketItems = [];
     const ppgItems = [];
     const convergenceItems = [];
     for (const fixture of enrichedFixtures) {
@@ -411,10 +433,12 @@ async function getStatsRouteBoards(date) {
         : null;
       const safeFixture = publicFixture(fixture);
       if (!safeFixture) continue;
+      marketItems.push({ fixture: safeFixture, engine: analyzeMarketRoute(fixture, stats), venueForm: publicVenueForm(stats) });
       ppgItems.push({ fixture: safeFixture, engine: analyzePpgRoute(fixture, stats), venueForm: publicVenueForm(stats) });
       convergenceItems.push({ fixture: safeFixture, engine: analyzeConvergence(fixture, stats), venueForm: publicVenueForm(stats) });
     }
     await Promise.all([
+      storePredictions(date, marketItems, MARKET_ROUTE_CODE),
       storePredictions(date, ppgItems, PPG_ROUTE_CODE),
       storePredictions(date, convergenceItems, CONVERGENCE_ROUTE_CODE)
     ]);
@@ -438,10 +462,36 @@ async function getStatsRouteBoards(date) {
       generatedAt: new Date().toISOString(),
       cache: 'MISS'
     });
+    const marketResponse = {
+      date,
+      engine: 'Market Route Engine',
+      source: 'API_FOOTBALL',
+      statisticsSource: 'API_FOOTBALL',
+      enrichmentSource: enrichment.enrichmentSource || 'API_FOOTBALL_VENUE_HISTORY',
+      warning: enrichment.warning || board.warning || null,
+      qualified: marketItems.filter(item => item.engine.selection),
+      all: marketItems,
+      summary: {
+        fixtures: marketItems.length,
+        fire: marketItems.filter(item => item.engine.decision === 'FIRE').length,
+        safer: marketItems.filter(item => item.engine.decision === 'SAFER').length,
+        conflict: marketItems.filter(item => ['CONFLICT','STAT_CONFLICT'].includes(item.engine.decision)).length,
+        noSignal: marketItems.filter(item => !item.engine.selection).length
+      },
+      progress: { stage: 'COMPLETE', processed: marketItems.length, total: marketItems.length, percent: 100 },
+      complete: true,
+      failed: false,
+      generatedAt: new Date().toISOString(),
+      cache: 'MISS'
+    };
     const result = {
+      market: marketResponse,
       ppg: makeResponse('PPG Route Engine', ppgItems),
       convergence: makeResponse('Convergence Engine', convergenceItems)
     };
+    result.ppg = { ...result.ppg, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: ppgItems.length, total: ppgItems.length, percent: 100 } };
+    result.convergence = { ...result.convergence, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: convergenceItems.length, total: convergenceItems.length, percent: 100 } };
+    cacheSet(`market-route-board:${date}`, marketResponse, 120);
     cacheSet(key, result, Number(process.env.STATS_ROUTE_CACHE_TTL_SECONDS || process.env.PPG_ROUTE_CACHE_TTL_SECONDS || 1800));
     return result;
   })();
@@ -458,6 +508,82 @@ async function getPpgRouteBoard(date) {
 async function getConvergenceRouteBoard(date) {
   const bundle = await getStatsRouteBoards(date);
   return bundle.convergence;
+}
+
+const statsRouteViewSnapshots = new Map();
+const statsRouteViewJobs = new Map();
+
+function waitingStatsResponse(date, engine, fixtures = [], analyser) {
+  const items = (fixtures || []).map(fixture => ({
+    fixture: publicFixture(fixture),
+    engine: analyser(fixture, null),
+    venueForm: null
+  })).filter(item => item.fixture);
+  return {
+    date,
+    engine,
+    source: 'API_FOOTBALL',
+    enrichmentSource: 'API_FOOTBALL_VENUE_HISTORY',
+    warning: null,
+    qualified: items.filter(item => item.engine.selection),
+    all: items,
+    summary: {
+      fixtures: items.length,
+      analysed: items.filter(item => item.engine.decision !== 'WAITING').length,
+      fire: items.filter(item => item.engine.decision === 'FIRE').length,
+      safer: items.filter(item => item.engine.decision === 'SAFER').length,
+      waiting: items.filter(item => item.engine.decision === 'WAITING').length,
+      conflict: items.filter(item => item.engine.decision === 'CONFLICT').length,
+      noSignal: items.filter(item => item.engine.decision === 'NO_SIGNAL').length
+    },
+    progress: { stage: 'VENUE_HISTORY', processed: 0, total: items.length, percent: 0 },
+    complete: false,
+    failed: false,
+    generatedAt: new Date().toISOString(),
+    cache: 'MISS'
+  };
+}
+
+async function ensureStatsRouteView(date) {
+  const existing = statsRouteViewSnapshots.get(date);
+  if (existing?.ppg?.complete && existing?.convergence?.complete) return existing;
+  if (!existing) {
+    const board = await getFastFixtureBoard(date);
+    statsRouteViewSnapshots.set(date, {
+      ppg: waitingStatsResponse(date, 'PPG Route Engine', board.fixtures || [], analyzePpgRoute),
+      convergence: waitingStatsResponse(date, 'Convergence Engine', board.fixtures || [], analyzeConvergence)
+    });
+  }
+  if (!statsRouteViewJobs.has(date)) {
+    const task = getStatsRouteBoards(date).then(bundle => {
+      const complete = {
+        ppg: { ...bundle.ppg, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.ppg.summary?.fixtures || 0, total: bundle.ppg.summary?.fixtures || 0, percent: 100 } },
+        convergence: { ...bundle.convergence, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: bundle.convergence.summary?.fixtures || 0, total: bundle.convergence.summary?.fixtures || 0, percent: 100 } }
+      };
+      statsRouteViewSnapshots.set(date, complete);
+      return complete;
+    }).catch(error => {
+      const current = statsRouteViewSnapshots.get(date) || {};
+      const failed = {
+        ppg: { ...(current.ppg || {}), complete: true, failed: true, error: error.message || 'PPG analysis failed', progress: { stage: 'FAILED', processed: 0, total: current.ppg?.summary?.fixtures || 0, percent: 0 } },
+        convergence: { ...(current.convergence || {}), complete: true, failed: true, error: error.message || 'Convergence analysis failed', progress: { stage: 'FAILED', processed: 0, total: current.convergence?.summary?.fixtures || 0, percent: 0 } }
+      };
+      statsRouteViewSnapshots.set(date, failed);
+      return failed;
+    }).finally(() => statsRouteViewJobs.delete(date));
+    statsRouteViewJobs.set(date, task);
+  }
+  return statsRouteViewSnapshots.get(date);
+}
+
+async function getPpgRouteView(date) {
+  const snapshot = await ensureStatsRouteView(date);
+  return snapshot.ppg;
+}
+
+async function getConvergenceRouteView(date) {
+  const snapshot = await ensureStatsRouteView(date);
+  return snapshot.convergence;
 }
 
 function publicQualifiedPick(item, date, engineCode = MARKET_ROUTE_CODE) {
@@ -594,8 +720,10 @@ async function getQualifiedPicksWindow(from, days = 7) {
     }
   }
   await Promise.all([statsWorker(), statsWorker()]);
+  const finalMarketBoards = await Promise.all(dates.map(date => getMarketRouteBoard(date).catch(() => null)));
+  const finalMarketPicks = finalMarketBoards.flatMap((board, index) => (board?.qualified || marketBoards[index]?.qualified || []).map(item => publicQualifiedPick(item, dates[index], MARKET_ROUTE_CODE)).filter(Boolean));
   const unique = new Map();
-  for (const pick of [...marketPicks, ...statsPicks]) unique.set(`${pick.fixtureId}:${pick.engine}:${pick.market}`, pick);
+  for (const pick of [...finalMarketPicks, ...statsPicks]) unique.set(`${pick.fixtureId}:${pick.engine}:${pick.market}`, pick);
   const enginePicksInternal = [...unique.values()];
   enginePicksInternal.sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff) || (a.decision === 'FIRE' ? -1 : 1));
 
@@ -651,6 +779,94 @@ async function getQualifiedPicksWindow(from, days = 7) {
   return response;
 }
 
+const consensusViewSnapshots = new Map();
+const consensusViewJobs = new Map();
+
+function partialConsensusResponse(from, days, marketBoard, statsSnapshot) {
+  const safeDays = Math.max(1, Math.min(7, Number(days) || 7));
+  const dates = Array.from({ length: safeDays }, (_, index) => addDays(from, index));
+  const enginePicksInternal = [
+    ...(marketBoard?.qualified || []).map(item => publicQualifiedPick(item, from, MARKET_ROUTE_CODE)).filter(Boolean),
+    ...(statsSnapshot?.ppg?.qualified || []).map(item => publicQualifiedPick(item, from, PPG_ROUTE_CODE)).filter(Boolean),
+    ...(statsSnapshot?.convergence?.qualified || []).map(item => publicQualifiedPick(item, from, CONVERGENCE_ROUTE_CODE)).filter(Boolean)
+  ];
+  const unique = new Map();
+  for (const pick of enginePicksInternal) unique.set(`${pick.fixtureId}:${pick.engine}:${pick.market}`, pick);
+  const internal = [...unique.values()].sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+  const consensusRows = buildConsensusWindow(internal).map(consensusLifecycle);
+  const enginePicks = internal.map(({ _odds, ...pick }) => pick);
+  const elite = consensusRows.filter(item => item.classification === 'ELITE_BANKER');
+  const consensusBankers = consensusRows.filter(item => item.classification === 'CONSENSUS_BANKER');
+  const singleQualified = consensusRows.filter(item => item.classification === 'QUALIFIED_PICK');
+  const saferConsensus = consensusRows.filter(item => item.classification === 'SAFER_PICK');
+  const conflicts = consensusRows.filter(item => item.classification === 'CONFLICT');
+  const holds = consensusRows.filter(item => item.classification === 'HOLD_MISSING_SHARED_PRICE');
+  const publishable = [...elite, ...consensusBankers, ...singleQualified, ...saferConsensus];
+  const bankers = [...elite, ...consensusBankers];
+  const statsComplete = Boolean(statsSnapshot?.ppg?.complete && statsSnapshot?.convergence?.complete);
+  const fixtureTotal = Number(statsSnapshot?.ppg?.summary?.fixtures || marketBoard?.summary?.fixtures || 0);
+  const fixtureProcessed = statsComplete ? fixtureTotal : Number(statsSnapshot?.ppg?.progress?.processed || statsSnapshot?.ppg?.summary?.analysed || 0);
+  const total = safeDays === 1 ? fixtureTotal : safeDays;
+  const processed = safeDays === 1 ? fixtureProcessed : (statsComplete ? 1 : 0);
+  return {
+    from,
+    to: dates.at(-1),
+    days: safeDays,
+    bankers,
+    qualified: enginePicks,
+    enginePicks,
+    consensusPicks: publishable,
+    elite,
+    consensusBankers,
+    singleQualified,
+    safer: saferConsensus,
+    conflicts,
+    holds,
+    byDate: dates.map(date => ({
+      date,
+      elite: elite.filter(item => item.date === date),
+      consensus: consensusBankers.filter(item => item.date === date),
+      qualified: singleQualified.filter(item => item.date === date),
+      safer: saferConsensus.filter(item => item.date === date),
+      conflicts: conflicts.filter(item => item.date === date),
+      enginePicks: enginePicks.filter(item => item.date === date)
+    })),
+    consensus: { elite, bankers: consensusBankers, qualified: singleQualified, safer: saferConsensus, conflicts, holds, all: consensusRows },
+    summary: { ...consensusSummary(consensusRows), bankers: bankers.length, engineQualified: enginePicks.length, publishable: publishable.length },
+    progress: { stage: statsComplete ? 'SELECTED_DATE_COMPLETE' : 'SELECTED_DATE_ANALYSIS', processed, total, percent: total ? Math.round(processed / total * 100) : 0 },
+    complete: false,
+    failed: false,
+    generatedAt: new Date().toISOString(),
+    cache: 'MISS'
+  };
+}
+
+async function getQualifiedPicksWindowView(from, days = 7) {
+  const safeDays = Math.max(1, Math.min(7, Number(days) || 7));
+  const key = `${from}:${safeDays}`;
+  const finalCached = cacheGet(`qualified-picks-v35:${from}:${safeDays}`);
+  if (finalCached) return { ...finalCached, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: safeDays, total: safeDays, percent: 100 }, cache: 'HIT' };
+
+  const marketBoard = await getMarketRouteBoard(from);
+  const statsSnapshot = await ensureStatsRouteView(from);
+  const partial = partialConsensusResponse(from, safeDays, marketBoard, statsSnapshot);
+  consensusViewSnapshots.set(key, partial);
+
+  if (!consensusViewJobs.has(key)) {
+    const task = getQualifiedPicksWindow(from, safeDays).then(final => {
+      const complete = { ...final, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: safeDays, total: safeDays, percent: 100 } };
+      consensusViewSnapshots.set(key, complete);
+      return complete;
+    }).catch(error => {
+      const current = consensusViewSnapshots.get(key) || partial;
+      const failed = { ...current, complete: true, failed: true, error: error.message || 'Consensus analysis failed', progress: { stage: 'FAILED', processed: 0, total: safeDays, percent: 0 } };
+      consensusViewSnapshots.set(key, failed);
+      return failed;
+    }).finally(() => consensusViewJobs.delete(key));
+    consensusViewJobs.set(key, task);
+  }
+  return consensusViewSnapshots.get(key) || partial;
+}
 
 function compactEngineAudit(item, code) {
   const engine = item?.engine || {};
@@ -945,20 +1161,20 @@ async function apiRoute(req, res, url) {
   if (url.pathname === '/api/ppg-route-board') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
-    return jsonCached(res, 200, await getPpgRouteBoard(date), 120);
+    return jsonCached(res, 200, await getPpgRouteView(date), 5);
   }
 
   if (url.pathname === '/api/convergence-route-board') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
-    return jsonCached(res, 200, await getConvergenceRouteBoard(date), 120);
+    return jsonCached(res, 200, await getConvergenceRouteView(date), 5);
   }
 
   if (url.pathname === '/api/qualified-picks' || url.pathname === '/api/consensus-picks') {
     const from = url.searchParams.get('from') || utcDateOffset(0);
     const days = Number(url.searchParams.get('days') || 7);
     if (!safeDate(from)) return json(res, 400, { error: 'from must be YYYY-MM-DD' });
-    return jsonCached(res, 200, await getQualifiedPicksWindow(from, days), 60);
+    return jsonCached(res, 200, await getQualifiedPicksWindowView(from, days), 5);
   }
 
   if (url.pathname === '/api/match-intelligence') {

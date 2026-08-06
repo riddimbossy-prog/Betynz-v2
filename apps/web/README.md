@@ -1,4 +1,4 @@
-# Betynz Web v5.0.1
+# Betynz Web v5.0.2
 
 The web service uses `src/lib/apiFootball.mjs` as its only football provider adapter.
 

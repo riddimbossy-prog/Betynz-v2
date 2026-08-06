@@ -122,7 +122,7 @@ function requestHeaders(current) {
   const headers = {
     [current.headerName]: current.key,
     accept: 'application/json',
-    'user-agent': 'Betynz-API-Football-Only/5.0.1'
+    'user-agent': 'Betynz-API-Football-Only/5.0.2'
   };
   if (current.rapidApiHost) headers['x-rapidapi-host'] = current.rapidApiHost;
   return headers;
@@ -681,6 +681,21 @@ export async function getApiFootballIntelligence(context = {}, sourceFixture = n
     league: leagueVisual(row?.league)
   };
 
+  // Daily engine scans only need the exact five-match home/away venue histories.
+  // Standings, H2H, injuries, predictions, lineups and player data remain on-demand
+  // for the match intelligence panel. This keeps a full daily board from creating
+  // hundreds of unnecessary API calls before an engine page can respond.
+  if (mode === 'engine') {
+    return {
+      ...base,
+      standings: null,
+      teamStatistics: { home: null, away: null },
+      h2h: [],
+      predictions: null,
+      injuries: []
+    };
+  }
+
   const coreRequests = [
     leagueId && season ? apiFootballRequest('/standings', { league: leagueId, season }, 1800) : Promise.resolve(null),
     leagueId && season && homeId ? apiFootballRequest('/teams/statistics', { league: leagueId, season, team: homeId }, 1800) : Promise.resolve(null),
@@ -716,10 +731,11 @@ export async function getApiFootballIntelligence(context = {}, sourceFixture = n
   };
 }
 
-export async function enrichApiFootballStatsBoard(date, fixtures = [], extractVenueStats) {
+export async function enrichApiFootballStatsBoard(date, fixtures = [], extractVenueStats, options = {}) {
   const current = config();
   if (!current.configured) return { configured: false, source: null, warning: 'API_FOOTBALL_KEY is not configured.', fixtures };
-  const enriched = await mapWithConcurrency(fixtures, current.enrichConcurrency, async fixture => {
+  const total = fixtures.length;
+  const enriched = await mapWithConcurrency(fixtures, current.enrichConcurrency, async (fixture, index) => {
     const context = {
       date,
       beforeDate: date,
@@ -730,10 +746,11 @@ export async function enrichApiFootballStatsBoard(date, fixtures = [], extractVe
       league: fixture.league?.name,
       country: fixture.league?.country
     };
+    let result;
     try {
       const intelligence = await getApiFootballIntelligence(context, fixture, { mode: 'engine' });
       const stats = typeof extractVenueStats === 'function' ? extractVenueStats(intelligence, context) : null;
-      return {
+      result = {
         ...fixture,
         stats: stats ? {
           ...stats,
@@ -748,9 +765,11 @@ export async function enrichApiFootballStatsBoard(date, fixtures = [], extractVe
         apiFootballFixtureId: Number(fixture.id) || intelligence?.fixture?.id || null,
         enrichment: { matched: Boolean(intelligence?.mapped), confidence: intelligence?.mappingConfidence || 1, statsAvailable: Boolean(stats?.homeSplit || stats?.awaySplit), source: 'API_FOOTBALL' }
       };
-    } catch {
-      return { ...fixture, stats: null };
+    } catch (error) {
+      result = { ...fixture, stats: null, enrichment: { matched: false, confidence: 0, statsAvailable: false, source: 'API_FOOTBALL', error: error?.message || 'Enrichment failed' } };
     }
+    try { options.onFixture?.(result, index, total); } catch {}
+    return result;
   });
   return {
     configured: true,

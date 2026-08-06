@@ -3,10 +3,12 @@ const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&am
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
 const today = new Date().toISOString().slice(0, 10);
 let payload = null;
+let pollTimer = null;
+let requestVersion = 0;
 
 $('#convergenceDate').value = today;
-$('#convergenceRefresh').addEventListener('click', load);
-$('#convergenceDate').addEventListener('change', load);
+$('#convergenceRefresh').addEventListener('click', () => load());
+$('#convergenceDate').addEventListener('change', () => load());
 $('#convergenceDecisionFilter').addEventListener('change', render);
 
 function kickoff(value) {
@@ -14,21 +16,44 @@ function kickoff(value) {
   return Number.isNaN(date.getTime()) ? 'Kickoff TBA' : date.toLocaleString([], { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 }
 
-async function load() {
-  const date = $('#convergenceDate').value || today;
-  $('#convergenceGrid').innerHTML = '<div class="route-empty"><h3>Analysing all real fixtures…</h3><p>Every non-SRL match is checked. Attack, defence, venue and market evidence are cached after analysis.</p></div>';
+async function fetchJson(url, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(`/api/convergence-route-board?date=${encodeURIComponent(date)}`, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    payload = await response.json();
+    const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || `HTTP ${response.status}`);
+    return data;
+  } finally { clearTimeout(timer); }
+}
+
+function schedulePoll(date, version) {
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(() => {
+    if (version === requestVersion && ($('#convergenceDate').value || today) === date) load({ silent: true });
+  }, 4000);
+}
+
+async function load({ silent = false } = {}) {
+  const date = $('#convergenceDate').value || today;
+  const version = ++requestVersion;
+  clearTimeout(pollTimer);
+  if (!silent) $('#convergenceGrid').innerHTML = '<div class="route-empty"><h3>Starting four-block analysis…</h3><p>The page will update automatically while venue histories are processed.</p></div>';
+  try {
+    const data = await fetchJson(`/api/convergence-route-board?date=${encodeURIComponent(date)}`);
+    if (version !== requestVersion) return;
+    payload = data;
     $('#convFixtures').textContent = payload.summary?.fixtures || 0;
     $('#convAnalysed').textContent = payload.summary?.analysed || 0;
     $('#convFire').textContent = payload.summary?.fire || 0;
     $('#convSafer').textContent = payload.summary?.safer || 0;
     render();
-  } catch {
+    if (!payload.complete && !payload.failed) schedulePoll(date, version);
+  } catch (error) {
+    if (version !== requestVersion) return;
     payload = null;
-    $('#convergenceGrid').innerHTML = '<div class="route-empty"><h3>Convergence analysis is temporarily unavailable</h3><p>Check the match-data connection and retry.</p></div>';
+    const message = error?.name === 'AbortError' ? 'The server did not respond in time.' : (error.message || 'Check the match-data connection and retry.');
+    $('#convergenceGrid').innerHTML = `<div class="route-empty"><h3>Convergence analysis could not be completed</h3><p>${esc(message)}</p></div>`;
   }
 }
 
@@ -37,10 +62,20 @@ function render() {
   const filter = $('#convergenceDecisionFilter').value;
   const rows = (payload.qualified || []).filter(item => filter === 'ALL' || item.engine?.decision === filter);
   if (!rows.length) {
+    if (payload.failed) {
+      $('#convergenceGrid').innerHTML = `<div class="route-empty"><h3>Convergence analysis failed</h3><p>${esc(payload.error || 'Refresh to try again.')}</p></div>`;
+      return;
+    }
+    if (!payload.complete) {
+      const progress = payload.progress || {};
+      $('#convergenceGrid').innerHTML = `<div class="route-empty"><h3>Building convergence evidence…</h3><p>${Number(progress.processed || payload.summary?.analysed || 0)} of ${Number(progress.total || payload.summary?.fixtures || 0)} fixtures processed. This page updates automatically.</p></div>`;
+      return;
+    }
     $('#convergenceGrid').innerHTML = `<div class="route-empty"><h3>No qualifying convergence picks</h3><p>${esc(payload.warning || 'No market received enough agreement across attack, defence, venue and market evidence.')}</p></div>`;
     return;
   }
-  $('#convergenceGrid').innerHTML = rows.map(item => {
+  const progressBanner = !payload.complete ? `<div class="route-progress">Four-block analysis continues · ${Number(payload.progress?.processed || payload.summary?.analysed || 0)}/${Number(payload.progress?.total || payload.summary?.fixtures || 0)}</div>` : '';
+  $('#convergenceGrid').innerHTML = progressBanner + rows.map(item => {
     const fixture = item.fixture || {};
     const engine = item.engine || {};
     const selection = engine.selection || {};

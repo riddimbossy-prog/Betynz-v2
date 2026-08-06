@@ -3,27 +3,52 @@ const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&am
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
 const today = new Date().toISOString().slice(0, 10);
 let payload = null;
+let pollTimer = null;
+let requestVersion = 0;
 
 $('#routeDate').value = today;
-$('#routeRefresh').addEventListener('click', load);
-$('#routeDate').addEventListener('change', load);
+$('#routeRefresh').addEventListener('click', () => load());
+$('#routeDate').addEventListener('change', () => load());
 $('#routeDecisionFilter').addEventListener('change', render);
 
-async function load() {
-  const date = $('#routeDate').value || today;
-  $('#routeGrid').innerHTML = '<div class="route-empty">Loading market routes…</div>';
+async function fetchJson(url, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(`/api/market-route-board?date=${encodeURIComponent(date)}`, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    payload = await response.json();
+    const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || `HTTP ${response.status}`);
+    return data;
+  } finally { clearTimeout(timer); }
+}
+
+function schedulePoll(date, version) {
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(() => {
+    if (version === requestVersion && ($('#routeDate').value || today) === date) load({ silent: true });
+  }, 4000);
+}
+
+async function load({ silent = false } = {}) {
+  const date = $('#routeDate').value || today;
+  const version = ++requestVersion;
+  clearTimeout(pollTimer);
+  if (!silent) $('#routeGrid').innerHTML = '<div class="route-empty">Loading market routes…</div>';
+  try {
+    const data = await fetchJson(`/api/market-route-board?date=${encodeURIComponent(date)}`);
+    if (version !== requestVersion) return;
+    payload = data;
     $('#routeFixtures').textContent = payload.summary?.fixtures || 0;
     $('#routeFire').textContent = payload.summary?.fire || 0;
     $('#routeSafer').textContent = payload.summary?.safer || 0;
     $('#routeNoSignal').textContent = payload.summary?.noSignal || 0;
     render();
-  } catch {
+    if (!payload.complete && !payload.failed) schedulePoll(date, version);
+  } catch (error) {
+    if (version !== requestVersion) return;
     payload = null;
-    $('#routeGrid').innerHTML = '<div class="route-empty">Market routes are temporarily unavailable.</div>';
+    const message = error?.name === 'AbortError' ? 'The market-route request timed out.' : (error.message || 'Refresh to retry.');
+    $('#routeGrid').innerHTML = `<div class="route-empty"><h3>Market routes are temporarily unavailable</h3><p>${esc(message)}</p></div>`;
   }
 }
 
@@ -32,10 +57,20 @@ function render() {
   const filter = $('#routeDecisionFilter').value;
   const rows = (payload.qualified || []).filter(item => filter === 'ALL' || item.engine?.decision === filter);
   if (!rows.length) {
+    if (payload.failed) {
+      $('#routeGrid').innerHTML = `<div class="route-empty"><h3>Market Route analysis failed</h3><p>${esc(payload.error || 'Refresh to try again.')}</p></div>`;
+      return;
+    }
+    if (!payload.complete) {
+      const progress = payload.progress || {};
+      $('#routeGrid').innerHTML = `<div class="route-empty"><h3>Odds routes are ready; statistics are being checked…</h3><p>${Number(progress.processed || 0)} of ${Number(progress.total || payload.summary?.fixtures || 0)} fixtures statistically verified. This page updates automatically.</p></div>`;
+      return;
+    }
     $('#routeGrid').innerHTML = '<div class="route-empty">No qualifying route for this filter.</div>';
     return;
   }
-  $('#routeGrid').innerHTML = rows.map(item => {
+  const progressBanner = !payload.complete ? `<div class="route-progress">Early odds routes shown · statistical contradiction checks continue ${Number(payload.progress?.processed || 0)}/${Number(payload.progress?.total || payload.summary?.fixtures || 0)}</div>` : '';
+  $('#routeGrid').innerHTML = progressBanner + rows.map(item => {
     const fixture = item.fixture || {};
     const engine = item.engine || {};
     const selection = engine.selection || {};
