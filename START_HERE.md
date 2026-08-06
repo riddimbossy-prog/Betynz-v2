@@ -1,66 +1,68 @@
-# Start here — Betynz v4.0.3
+# Start here — Betynz v5.0.0
 
-This is one deployable repository with one root `render.yaml` and one Render web service.
+## 1. Create one GitHub repository
 
-## Source responsibilities
+Extract the ZIP. Upload the contents of the extracted folder to the root of one blank GitHub repository. The repository root must contain:
 
-### SportyBet custom API — primary
+```text
+package.json
+render.yaml
+apps/
+scripts/
+test/
+```
 
-- Complete daily fixture list
-- SportyBet markets and odds
-- Live scores, minutes and incidents
-- Final results and settlement
-- Team result histories
-- Exact home and away venue samples
-- PPG, form, goals, clean sheets, failed-to-score, BTTS and goal thresholds
-- Streaks and competition scoring trends
+Do not upload a `.env` file or any secret key.
 
-### API-Football — enrichment only
+## 2. Create the Render Blueprint
 
-- Team crests
-- League logos and country flags
-- Standings
-- H2H
-- Injuries
-- Lineups and formations
-- Additional fixture/player statistics
-- Missing statistical fields when SportyBet has no value
+In Render choose **New → Blueprint**, select the repository and allow Render to read the single root `render.yaml`.
 
-API-Football never overwrites a populated SportyBet statistic.
-
-## Deploy
-
-1. Extract the ZIP.
-2. Create one blank GitHub repository.
-3. Upload the contents of the extracted project folder to the repository root.
-4. In Render choose **New → Blueprint** and connect the repository.
-5. Add the private values requested by the Blueprint:
+Add this private secret when Render asks:
 
 ```env
 API_FOOTBALL_KEY=YOUR_DIRECT_API_SPORTS_KEY
-SUPABASE_URL=YOUR_SUPABASE_URL
-SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
 ```
 
-6. Deploy and open `/api/health`.
-
-Expected source roles:
-
-```json
-{
-  "primaryStatistics": "SPORTYBET_CUSTOM_API",
-  "enrichmentStatistics": "API_FOOTBALL",
-  "visuals": "API_FOOTBALL"
-}
-```
-
-## Important settings
+For a key purchased directly from API-Sports, keep:
 
 ```env
-SPORTYBET_MAX_PAGES=0
-API_FOOTBALL_HISTORY_LAST=40
-API_FOOTBALL_MAPPING_THRESHOLD=0.55
+API_FOOTBALL_BASE_URL=https://v3.football.api-sports.io
+API_FOOTBALL_KEY_HEADER=x-apisports-key
 ```
 
-There is no daily application fixture cap. The request queues pace upstream calls without reducing the number of fixtures.
+Do not add RapidAPI headers unless the subscription was purchased through RapidAPI.
+
+## 3. Optional Supabase setup
+
+For permanent proof, performance, settlement and learning records, create a Supabase project and run:
+
+```text
+apps/web/sql/001_market_route_fresh.sql
+apps/web/sql/009_ppg_route_engine.sql
+apps/web/sql/010_convergence_engine.sql
+apps/web/sql/011_consensus_calibration.sql
+```
+
+Then add `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` to Render.
+
+## 4. Verify the temporary Render URL
+
+Open:
+
+```text
+/api/health
+/api/config
+/api/fixtures?date=YYYY-MM-DD
+/api/live
+```
+
+Expected version: `5.0.0`. Health should show `apiFootball: true`, and every football source role should be `API_FOOTBALL`.
+
+## 5. Connect the domain
+
+Only after the temporary Render URL works, add `betynz.com` and `www.betynz.com` to the Render service and replace obsolete DNS records.
+
+## Coverage note
+
+Betynz applies no daily fixture cap. It displays every fixture returned by API-Football for the selected date. Actual competition, odds and statistics availability still depends on the user's API-Football plan and provider coverage.

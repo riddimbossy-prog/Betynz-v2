@@ -1,39 +1,35 @@
-# Betynz v4.0.3 — SportyBet Primary + API-Football Enrichment
+# Betynz v5.0.0 — API-Football Only
 
-One GitHub repository, one Node process launcher, one Render web service and one root `render.yaml`.
+Betynz is a single-service Node.js prediction platform. `API_FOOTBALL_KEY` is the sole football-data credential and API-Football supplies every football input used by the website and engines.
 
-## Data roles
+## Data responsibilities
 
-| Role | Source |
+| Capability | Source |
 |---|---|
-| Fixtures and kickoff | Private SportyBet custom API |
-| Offered markets and odds | Private SportyBet custom API |
-| Live scores, minutes and incidents | Private SportyBet custom API |
-| Final results and settlement | Private SportyBet custom API |
-| Engine venue history and PPG | API-Football |
-| Standings, season profiles, H2H, predictions and injuries | API-Football |
-| Team crests and league visuals | API-Football |
-| Lineups, events, fixture/player statistics | API-Football, loaded on match open |
-| Admin, proof, settlement and learning storage | Supabase |
+| Daily fixtures and kickoff | API-Football `/fixtures` |
+| Prematch odds and markets | API-Football `/odds` |
+| Live scores and minutes | API-Football `/fixtures?live=all` |
+| Results and settlement | API-Football `/fixtures?date=...` |
+| Team crests, league logos and flags | API-Football fixture/team data |
+| Venue histories and PPG | API-Football team fixture history |
+| Standings and season team statistics | API-Football |
+| H2H, predictions and injuries | API-Football |
+| Lineups, events, fixture and player statistics | API-Football |
+| Prediction history and learning storage | Supabase, when configured |
 
-API-Football enrichment never overwrites SportyBet fixture identity, market availability or prices.
+There is no second football provider or private collector service.
 
 ## Engines
 
-- Market Route: SportyBet odds structure plus an API-Football support/contradiction gate.
-- PPG Route: last five home versus last five away API-Football venue PPG.
-- Convergence: API-Football attack, defence, venue and goal-profile evidence plus SportyBet market confirmation.
-- Consensus: combines only independently qualified engine selections.
+- **Market Route** analyses API-Football bookmaker prices and rejects statistically contradicted routes.
+- **PPG Route** compares the home side's last five home matches with the away side's last five away matches.
+- **Convergence** combines attack, defence, goals, clean sheets, failed-to-score, BTTS and venue evidence.
+- **Consensus** publishes only compatible selections from the three engines.
 
-## Deploy
+## Deployment
 
-1. Upload the contents of this repository to one GitHub repository.
-2. In Render choose **New → Blueprint** and select the repository.
-3. Add `API_FOOTBALL_KEY` and the three Supabase values when prompted.
-4. Deploy and check `/api/health`.
+The repository contains one root `render.yaml` and one Render web service. Add `API_FOOTBALL_KEY` as a private Render environment variable, optionally add Supabase credentials, and deploy the Blueprint.
 
-See `START_HERE.md` and `DEPLOY_SINGLE_RENDER.md`.
+No application-level fixture cap is applied. The board displays every fixture returned by the subscription for the selected date. Odds pagination continues until API-Football reports the final page.
 
-## Full-day fixture coverage
-
-There is no application-level daily fixture cap. SportyBet pagination continues until empty or repeated, every returned fixture is displayed, and API-Football enrichment is applied across the complete day.
+See `START_HERE.md` for exact installation steps.

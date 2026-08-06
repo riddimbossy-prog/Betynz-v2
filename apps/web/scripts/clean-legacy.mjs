@@ -20,9 +20,8 @@ const allowedTests = new Set([
   'three-engine-reset.test.mjs',
   'qualified-picks.test.mjs',
   'responsive-cinematic.test.mjs',
-  'custom-data-api.test.mjs',
   'api-football.test.mjs',
-  'source-priority.test.mjs',
+  'api-football-source.test.mjs',
   'platform-smoke.test.mjs'
 ]);
 
@@ -58,4 +57,4 @@ const retiredPaths = [
 ];
 
 for (const path of retiredPaths) await remove(path);
-console.log(`SportyBet + API-Football cleanup complete. ${removed.length} retired path(s) removed or confirmed absent.`);
+console.log(`API-Football-only cleanup complete. ${removed.length} retired path(s) removed or confirmed absent.`);

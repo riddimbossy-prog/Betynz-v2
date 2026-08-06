@@ -1,15 +1,19 @@
-# Betynz v3.8 architecture
+# Betynz v5.0.0 architecture
 
 ```text
-SportyBet public football feeds
-          ↓
-Betynz SportyBet Core API
-          ↓ private X-API-Key
-Betynz Web and engines
-          ↓
-Supabase proof/settlement storage
+API-Football
+  ↓ server-side authenticated requests
+Betynz Node service
+  ├─ fixture and odds normalization
+  ├─ live/results/event normalization
+  ├─ venue history and team intelligence
+  ├─ Market Route
+  ├─ PPG Route
+  ├─ Convergence
+  ├─ Consensus and settlement
+  └─ responsive PWA
 ```
 
-The SportyBet core is authoritative for fixtures, offered odds, live state and results. Supabase is persistence only. There is no football-data fallback.
+API-Football is authoritative for fixture identity, kickoff, markets, odds, live state, results, official visuals and statistics. Supabase is optional persistence for proof, settlement, performance and learning; it is not a football-data provider.
 
-Market Route can work from offered prices immediately. PPG Route and Convergence use team history calculated from SportyBet finished results when enough venue-correct samples are available. When evidence is incomplete, the engine waits rather than inventing statistics.
+The daily board has no application fixture cap. Odds requests paginate to the provider's reported final page. Request pacing, caching, in-flight deduplication and retry backoff protect API quotas.

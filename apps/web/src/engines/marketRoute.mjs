@@ -188,14 +188,12 @@ function averageAvailable(...values) {
 }
 
 function statisticsSource(stats, fixture) {
-  const source = stats?.source || fixture?.stats?.source || 'SPORTYBET_CUSTOM_API';
+  const source = stats?.source || fixture?.stats?.source || 'API_FOOTBALL';
   return String(source).toUpperCase();
 }
 
 function statisticsLabel(source) {
-  return source === 'SPORTYBET_CUSTOM_API' ? 'SportyBet primary statistics'
-    : source === 'API_FOOTBALL_FALLBACK' ? 'API-Football fallback statistics'
-      : 'Enriched statistics';
+  return source === 'API_FOOTBALL' ? 'API-Football statistics' : 'Football statistics';
 }
 
 function statisticalValidation(selection, fixture, stats, structure) {
@@ -437,7 +435,7 @@ export function analyzeMarketRoute(fixture = {}, stats = null) {
       candidates,
       structure,
       statisticalValidation: validation,
-      explanation: `${best.name} passed the SportyBet odds route, but ${statisticsLabel(validation.source)} strongly contradict ${best.selection.label}. The engine rejected the pick.`
+      explanation: `${best.name} passed the API-Football odds route, but ${statisticsLabel(validation.source)} strongly contradict ${best.selection.label}. The engine rejected the pick.`
     };
   }
   const selected = best?.selection
@@ -446,7 +444,7 @@ export function analyzeMarketRoute(fixture = {}, stats = null) {
         statisticalValidation: validation,
         reasons: [
           ...(best.selection.reasons || []),
-          ...(validation.status === 'SUPPORTED' ? [`${statisticsLabel(validation.source)} support the route (${validation.score ?? 0}% evidence agreement).`] : validation.status === 'NEUTRAL' ? [`${statisticsLabel(validation.source)} are neutral and do not oppose the SportyBet route.`] : [])
+          ...(validation.status === 'SUPPORTED' ? [`${statisticsLabel(validation.source)} support the route (${validation.score ?? 0}% evidence agreement).`] : validation.status === 'NEUTRAL' ? [`${statisticsLabel(validation.source)} are neutral and do not oppose the API-Football route.`] : [])
         ]
       }
     : null;

@@ -1,42 +1,31 @@
-# Deploy Betynz v4.0.3 on one Render service
+# Deploy Betynz v5.0.0 on one Render service
 
-The root `render.yaml` declares exactly one Render web service. The launcher starts:
+The root `render.yaml` creates exactly one Node web service:
 
-- a private SportyBet core API on `127.0.0.1:10001`;
-- the public Betynz web/API server on Render's public port.
-
-API-Football is called directly from the public Betynz server process with the private Render secret.
-
-## Required secret
-
-```env
-API_FOOTBALL_KEY=YOUR_DIRECT_API_SPORTS_KEY
+```text
+Build command: npm run build
+Start command: npm start
+Health path: /api/health
 ```
 
-The Blueprint already supplies:
+The web process calls API-Football server-side. Browsers call only Betynz same-origin `/api/*` routes, so `API_FOOTBALL_KEY` never appears in public JavaScript.
+
+Required private value:
 
 ```env
-API_FOOTBALL_BASE_URL=https://v3.football.api-sports.io
-API_FOOTBALL_KEY_HEADER=x-apisports-key
+API_FOOTBALL_KEY=YOUR_KEY
+```
+
+Recommended no-cap settings already included:
+
+```env
+API_FOOTBALL_MAX_ODDS_PAGES=0
 API_FOOTBALL_HISTORY_LAST=40
-API_FOOTBALL_MAPPING_THRESHOLD=0.55
-API_FOOTBALL_DEEP_STATS=true
+API_FOOTBALL_ENRICH_CONCURRENCY=2
+API_FOOTBALL_REQUEST_CONCURRENCY=3
+API_FOOTBALL_REQUEST_MIN_INTERVAL_MS=200
 ```
 
-The default 30-fixture daily automatic-enrichment cap protects API quota. Matches beyond the cap remain visible and can still receive API-Football intelligence when opened.
+`API_FOOTBALL_MAX_ODDS_PAGES=0` means continue until the provider's final odds page. There is no `API_FOOTBALL_MAX_FIXTURES` setting.
 
-## Deployment sequence
-
-1. Push the repository to GitHub.
-2. Create a Render Blueprint from it.
-3. Enter the API-Football and Supabase secrets.
-4. Deploy.
-5. Check `/api/health` and confirm both `sportybet` and `apiFootball` are `true`.
-6. Open a mapped fixture and confirm team crests, five-home/five-away venue history, standings and season statistics appear.
-7. Hard-refresh with `Ctrl + Shift + R` so the `betynz-v4-0-2` service-worker cache activates.
-
-No second Render service and no second `render.yaml` are required.
-
-## Full daily coverage
-
-`SPORTYBET_MAX_PAGES=0` means continue through every SportyBet page until the feed is exhausted. API-Football enrichment and crest mapping run across every fixture returned for the selected day.
+After a repository replacement, use **Manual Deploy → Clear build cache & deploy** and hard-refresh the browser with `Ctrl + Shift + R`.

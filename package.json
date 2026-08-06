@@ -1,19 +1,17 @@
 {
-  "name": "betynz-unified-sportybet-primary-api-football-enrichment",
-  "version": "4.0.3",
+  "name": "betynz-api-football-only",
+  "version": "5.0.0",
   "private": true,
   "type": "module",
-  "description": "Single-Render Betynz platform: SportyBet custom API is primary for fixtures, odds, live, results and engine statistics; API-Football supplies crests and secondary enrichment only.",
+  "description": "Single-Render Betynz platform using API-Football as the sole football data provider for fixtures, odds, live scores, results, statistics and visuals.",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "start": "node scripts/start-combined.mjs",
-    "build": "npm run build:api && npm run build:web && npm run verify:single-render",
-    "build:api": "npm --prefix apps/sportybet-api run build",
-    "build:web": "npm --prefix apps/web run build",
+    "start": "node apps/web/src/server.mjs",
+    "build": "npm --prefix apps/web run build && npm run verify:single-render",
     "test": "npm run build",
-    "test:integration": "node test/combined-smoke.mjs",
+    "test:integration": "node test/api-football-single-service-smoke.mjs",
     "verify:single-render": "node scripts/verify-single-render.mjs"
   }
 }

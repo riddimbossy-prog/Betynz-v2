@@ -1,12 +1,12 @@
 import { cacheGet, cacheSet } from './cache.mjs';
 import { normalizeName, similarity } from './utils.mjs';
-import { getDataApiResults } from './dataApi.mjs';
+import { getApiFootballResults } from './apiFootball.mjs';
 
 const finished = status => /^(FT|AET|PEN|FINISHED|ENDED|COMPLETED)$/i.test(String(status || ''));
 
-function dataApiResults(fixtures) {
+function normalizedResults(fixtures) {
   return (fixtures || []).map(item => ({
-    source: 'SPORTYBET_CUSTOM_API',
+    source: 'API_FOOTBALL',
     sourceId: String(item.sourceId || item.id || ''),
     kickoff: item.kickoff,
     status: item.status,
@@ -21,12 +21,12 @@ function dataApiResults(fixtures) {
 }
 
 export async function fetchResultsForDate(date) {
-  const key = `results:${date}:custom-data-api-v1`;
+  const key = `results:${date}:api-football-v1`;
   const hit = cacheGet(key);
   if (hit) return hit;
   let rows = [];
-  try { rows = dataApiResults((await getDataApiResults(date)).fixtures); } catch { rows = []; }
-  const response = { date, rows, source: rows.length ? 'SPORTYBET_CUSTOM_API' : 'UNAVAILABLE', generatedAt: new Date().toISOString() };
+  try { rows = normalizedResults((await getApiFootballResults(date)).fixtures); } catch { rows = []; }
+  const response = { date, rows, source: rows.length ? 'API_FOOTBALL' : 'UNAVAILABLE', generatedAt: new Date().toISOString() };
   cacheSet(key, response, Number(process.env.RESULTS_CACHE_TTL_SECONDS || 300));
   return response;
 }

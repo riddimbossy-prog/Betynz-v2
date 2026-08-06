@@ -4,12 +4,61 @@ import { normalizeName, round, similarity } from './utils.mjs';
 
 const DEFAULT_BASE_URL = 'https://v3.football.api-sports.io';
 const FINISHED = new Set(['FT', 'AET', 'PEN']);
+const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT']);
 
 const apiInFlight = new Map();
 const apiQueue = [];
 let apiActive = 0;
 let apiNextAt = 0;
 let apiTimer = null;
+
+function number(value, fallback = null) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function text(value) {
+  return String(value ?? '').trim();
+}
+
+function safeDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(text(value));
+}
+
+function truthy(value, fallback = true) {
+  const raw = text(value).toLowerCase();
+  if (!raw) return fallback;
+  return !['0', 'false', 'no', 'off'].includes(raw);
+}
+
+function config(env = process.env) {
+  const key = text(env.API_FOOTBALL_KEY);
+  return {
+    configured: configuredValue(key),
+    key,
+    baseUrl: text(env.API_FOOTBALL_BASE_URL) || DEFAULT_BASE_URL,
+    headerName: text(env.API_FOOTBALL_KEY_HEADER) || 'x-apisports-key',
+    rapidApiHost: text(env.API_FOOTBALL_RAPIDAPI_HOST),
+    timeoutMs: Math.max(3000, number(env.API_FOOTBALL_TIMEOUT_MS, 20000)),
+    retries: Math.max(0, Math.min(4, number(env.API_FOOTBALL_RETRIES, 2))),
+    cacheTtlSeconds: Math.max(60, number(env.API_FOOTBALL_CACHE_TTL_SECONDS, 1800)),
+    fixtureTtlSeconds: Math.max(20, number(env.API_FOOTBALL_FIXTURE_CACHE_TTL_SECONDS, 120)),
+    oddsTtlSeconds: Math.max(60, number(env.API_FOOTBALL_ODDS_CACHE_TTL_SECONDS, 300)),
+    visualTtlSeconds: Math.max(300, number(env.API_FOOTBALL_VISUAL_CACHE_TTL_SECONDS, 604800)),
+    enrichConcurrency: Math.max(1, Math.min(8, number(env.API_FOOTBALL_ENRICH_CONCURRENCY, 2))),
+    requestConcurrency: Math.max(1, Math.min(6, number(env.API_FOOTBALL_REQUEST_CONCURRENCY, 3))),
+    requestMinIntervalMs: Math.max(0, Math.min(5000, number(env.API_FOOTBALL_REQUEST_MIN_INTERVAL_MS, 200))),
+    retryBaseMs: Math.max(250, Math.min(10000, number(env.API_FOOTBALL_RETRY_BASE_MS, 1000))),
+    retryMaxMs: Math.max(1000, Math.min(120000, number(env.API_FOOTBALL_RETRY_MAX_MS, 30000))),
+    historyLast: Math.max(10, Math.min(100, number(env.API_FOOTBALL_HISTORY_LAST, 40))),
+    mappingThreshold: Math.max(0.45, Math.min(0.95, number(env.API_FOOTBALL_MAPPING_THRESHOLD, 0.55))),
+    deepStats: truthy(env.API_FOOTBALL_DEEP_STATS, true),
+    bookmakerId: text(env.API_FOOTBALL_BOOKMAKER_ID),
+    bookmakerName: text(env.API_FOOTBALL_BOOKMAKER_NAME),
+    timezone: text(env.API_FOOTBALL_TIMEZONE) || 'UTC',
+    maxOddsPages: Math.max(0, number(env.API_FOOTBALL_MAX_ODDS_PAGES, 0))
+  };
+}
 
 function pumpApiQueue() {
   const current = config();
@@ -37,41 +86,6 @@ function scheduleApiRequest(task) {
   });
 }
 
-function number(value, fallback = null) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function text(value) {
-  return String(value ?? '').trim();
-}
-
-function safeDate(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(text(value));
-}
-
-function config(env = process.env) {
-  const key = text(env.API_FOOTBALL_KEY);
-  return {
-    configured: configuredValue(key),
-    key,
-    baseUrl: text(env.API_FOOTBALL_BASE_URL) || DEFAULT_BASE_URL,
-    headerName: text(env.API_FOOTBALL_KEY_HEADER) || 'x-apisports-key',
-    timeoutMs: Math.max(3000, number(env.API_FOOTBALL_TIMEOUT_MS, 20000)),
-    retries: Math.max(0, Math.min(3, number(env.API_FOOTBALL_RETRIES, 2))),
-    cacheTtlSeconds: Math.max(60, number(env.API_FOOTBALL_CACHE_TTL_SECONDS, 1800)),
-    visualTtlSeconds: Math.max(300, number(env.API_FOOTBALL_VISUAL_CACHE_TTL_SECONDS, 604800)),
-    enrichConcurrency: Math.max(1, Math.min(8, number(env.API_FOOTBALL_ENRICH_CONCURRENCY, 2))),
-    requestConcurrency: Math.max(1, Math.min(6, number(env.API_FOOTBALL_REQUEST_CONCURRENCY, 3))),
-    requestMinIntervalMs: Math.max(0, Math.min(5000, number(env.API_FOOTBALL_REQUEST_MIN_INTERVAL_MS, 200))),
-    retryBaseMs: Math.max(250, Math.min(10000, number(env.API_FOOTBALL_RETRY_BASE_MS, 1000))),
-    retryMaxMs: Math.max(1000, Math.min(120000, number(env.API_FOOTBALL_RETRY_MAX_MS, 30000))),
-    historyLast: Math.max(10, Math.min(100, number(env.API_FOOTBALL_HISTORY_LAST, 40))),
-    mappingThreshold: Math.max(0.45, Math.min(0.95, number(env.API_FOOTBALL_MAPPING_THRESHOLD, 0.55))),
-    deepStats: !['0', 'false', 'no', 'off'].includes(text(env.API_FOOTBALL_DEEP_STATS).toLowerCase())
-  };
-}
-
 export function apiFootballConfigured(env = process.env) {
   return config(env).configured;
 }
@@ -82,9 +96,13 @@ export function apiFootballPublicConfig(env = process.env) {
     configured: value.configured,
     baseUrl: value.baseUrl,
     headerName: value.headerName,
-    fixtureScope: 'ALL_DAILY_FIXTURES',
-    role: 'CRESTS_AND_SECONDARY_ENRICHMENT_ONLY',
-    mappingThreshold: value.mappingThreshold,
+    source: 'API_FOOTBALL',
+    role: 'SOLE_FOOTBALL_DATA_PROVIDER',
+    fixtureScope: 'ALL_DAILY_FIXTURES_RETURNED_BY_PROVIDER',
+    applicationFixtureCap: null,
+    historyLast: value.historyLast,
+    bookmakerId: value.bookmakerId || null,
+    bookmakerName: value.bookmakerName || null,
     deepStats: value.deepStats
   };
 }
@@ -100,7 +118,17 @@ function apiErrors(body) {
   return [String(body.errors)];
 }
 
-async function apiRequest(path, params = {}, ttlSeconds = null) {
+function requestHeaders(current) {
+  const headers = {
+    [current.headerName]: current.key,
+    accept: 'application/json',
+    'user-agent': 'Betynz-API-Football-Only/5.0.0'
+  };
+  if (current.rapidApiHost) headers['x-rapidapi-host'] = current.rapidApiHost;
+  return headers;
+}
+
+export async function apiFootballRequest(path, params = {}, ttlSeconds = null) {
   const current = config();
   if (!current.configured) return { configured: false, response: [], errors: ['API_FOOTBALL_KEY is not configured'] };
   const url = new URL(path.replace(/^\//, ''), current.baseUrl.endsWith('/') ? current.baseUrl : `${current.baseUrl}/`);
@@ -120,14 +148,7 @@ async function apiRequest(path, params = {}, ttlSeconds = null) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), current.timeoutMs);
       try {
-        const response = await fetch(url, {
-          headers: {
-            [current.headerName]: current.key,
-            accept: 'application/json',
-            'user-agent': 'Betynz-API-Football-Enrichment/4.0.3'
-          },
-          signal: controller.signal
-        });
+        const response = await fetch(url, { headers: requestHeaders(current), signal: controller.signal });
         const body = await response.json().catch(() => ({}));
         const errors = apiErrors(body);
         if (!response.ok || errors.length) {
@@ -170,6 +191,19 @@ async function apiRequest(path, params = {}, ttlSeconds = null) {
   finally { apiInFlight.delete(cacheKey); }
 }
 
+async function apiFootballPagedRequest(path, params = {}, ttlSeconds = null, maxPages = 0) {
+  const rows = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const body = await apiFootballRequest(path, { ...params, page }, ttlSeconds);
+    rows.push(...responseArray(body));
+    totalPages = Math.max(1, number(body?.paging?.total, 1));
+    page += 1;
+  } while (page <= totalPages && (maxPages <= 0 || page <= maxPages));
+  return { configured: true, response: rows, paging: { current: Math.max(1, page - 1), total: totalPages }, fetchedAt: new Date().toISOString() };
+}
+
 function kickoffMs(fixture) {
   const raw = fixture?.fixture?.date ?? fixture?.kickoff ?? fixture?.date;
   const value = new Date(raw).getTime();
@@ -177,10 +211,7 @@ function kickoffMs(fixture) {
 }
 
 function apiFixtureNames(item) {
-  return {
-    home: text(item?.teams?.home?.name),
-    away: text(item?.teams?.away?.name)
-  };
+  return { home: text(item?.teams?.home?.name), away: text(item?.teams?.away?.name) };
 }
 
 function sourceFixtureNames(item) {
@@ -199,6 +230,9 @@ function countryName(item) {
 }
 
 export function fixtureMatchScore(source, candidate) {
+  const sourceId = String(source?.sourceId || source?.id || '');
+  const candidateId = String(candidate?.fixture?.id || '');
+  if (sourceId && candidateId && sourceId === candidateId) return 1;
   const wanted = sourceFixtureNames(source);
   const actual = apiFixtureNames(candidate);
   if (!wanted.home || !wanted.away || !actual.home || !actual.away) return 0;
@@ -239,14 +273,244 @@ function teamVisual(team) {
 }
 
 function leagueVisual(league) {
-  if (!league) return { id: null, logo: null, flag: null, season: null };
-  return { id: league.id || null, logo: league.logo || null, flag: league.flag || null, season: league.season || null };
+  if (!league) return { id: null, logo: null, flag: null, season: null, round: null };
+  return {
+    id: league.id || null,
+    name: league.name || null,
+    country: league.country || null,
+    logo: league.logo || null,
+    flag: league.flag || null,
+    season: league.season || null,
+    round: league.round || null
+  };
+}
+
+function validOdd(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 1 && parsed < 1000 ? parsed : null;
+}
+
+function norm(value) {
+  return text(value).toLowerCase().replace(/[^a-z0-9.]+/g, ' ').trim();
+}
+
+function setOdd(target, key, value) {
+  const odd = validOdd(value);
+  if (odd && !target[key]) target[key] = odd;
+}
+
+function lineFrom(value) {
+  const found = text(value).replace(',', '.').match(/(?:^|\s)(\d+(?:\.\d+)?)(?:\s|$)/);
+  return found ? found[1] : null;
+}
+
+function oddsKeyForTotal(prefix, side, line) {
+  const map = { '0.5': '05', '1.5': '15', '2.5': '25', '3.5': '35' };
+  const suffix = map[line];
+  if (!suffix) return null;
+  if (side === 'home') return `${prefix === 'over' ? 'homeOver' : 'homeUnder'}${suffix}`;
+  if (side === 'away') return `${prefix === 'over' ? 'awayOver' : 'awayUnder'}${suffix}`;
+  if (side === 'firstHalf') return `${prefix === 'over' ? 'firstHalfOver' : 'firstHalfUnder'}${suffix}`;
+  return `${prefix}${suffix}`;
+}
+
+function normalizeOddsBookmaker(bookmaker, fixture = null) {
+  const odds = {};
+  const marketRows = [];
+  const homeName = norm(fixture?.teams?.home?.name);
+  const awayName = norm(fixture?.teams?.away?.name);
+  for (const bet of bookmaker?.bets || []) {
+    const market = norm(bet?.name);
+    for (const selection of bet?.values || []) {
+      const choice = norm(selection?.value);
+      const odd = validOdd(selection?.odd);
+      if (!odd) continue;
+      marketRows.push({ market: bet?.name || 'Market', selection: selection?.value || 'Selection', odds: odd, bookmaker: bookmaker?.name || null });
+
+      if (/match winner|winner|1x2|three way|3 way/.test(market) && !/half|period|corner|card/.test(market)) {
+        if (choice === 'home' || choice === '1' || (homeName && choice === homeName)) setOdd(odds, 'homeWin', odd);
+        else if (choice === 'draw' || choice === 'x') setOdd(odds, 'draw', odd);
+        else if (choice === 'away' || choice === '2' || (awayName && choice === awayName)) setOdd(odds, 'awayWin', odd);
+        continue;
+      }
+
+      if (/double chance/.test(market)) {
+        const compact = choice.replace(/\s+/g, '');
+        if (['home/draw', 'homeordraw', '1x'].includes(compact)) setOdd(odds, 'doubleChance1X', odd);
+        else if (['draw/away', 'draworaway', 'x2'].includes(compact)) setOdd(odds, 'doubleChanceX2', odd);
+        else if (['home/away', 'homeoraway', '12'].includes(compact)) setOdd(odds, 'doubleChance12', odd);
+        continue;
+      }
+
+      if (/both teams.*score|btts/.test(market)) {
+        if (/^yes$|both/.test(choice)) setOdd(odds, 'bttsYes', odd);
+        else if (/^no$|not both/.test(choice)) setOdd(odds, 'bttsNo', odd);
+        continue;
+      }
+
+      const isFirstHalf = /first half|1st half|half time/.test(market);
+      const isHomeTotal = /home.*total|total.*home|home team goals/.test(market);
+      const isAwayTotal = /away.*total|total.*away|away team goals/.test(market);
+      const isGoalsTotal = /goals.*over.*under|over.*under|total goals|goals total/.test(market);
+      if (isGoalsTotal || isFirstHalf || isHomeTotal || isAwayTotal) {
+        const direction = /^over\b/.test(choice) ? 'over' : /^under\b/.test(choice) ? 'under' : null;
+        const line = lineFrom(choice) || lineFrom(bet?.name);
+        if (direction && line) {
+          const side = isHomeTotal ? 'home' : isAwayTotal ? 'away' : isFirstHalf ? 'firstHalf' : 'match';
+          const key = oddsKeyForTotal(direction, side, line);
+          if (key) setOdd(odds, key, odd);
+        }
+      }
+    }
+  }
+  return { odds, marketRows, count: Object.values(odds).filter(Boolean).length };
+}
+
+function selectBookmaker(row, fixture = null) {
+  const current = config();
+  const bookmakers = Array.isArray(row?.bookmakers) ? row.bookmakers : [];
+  const preferred = bookmakers.find(item => current.bookmakerId && String(item?.id) === current.bookmakerId)
+    || bookmakers.find(item => current.bookmakerName && norm(item?.name) === norm(current.bookmakerName));
+  if (preferred) return { bookmaker: preferred, normalized: normalizeOddsBookmaker(preferred, fixture) };
+  let best = null;
+  for (const bookmaker of bookmakers) {
+    const normalized = normalizeOddsBookmaker(bookmaker, fixture);
+    if (!best || normalized.count > best.normalized.count) best = { bookmaker, normalized };
+  }
+  return best;
+}
+
+function normalizeScore(row) {
+  const home = number(row?.goals?.home);
+  const away = number(row?.goals?.away);
+  if (home === null || away === null) return null;
+  return {
+    home,
+    away,
+    htHome: number(row?.score?.halftime?.home),
+    htAway: number(row?.score?.halftime?.away),
+    fulltimeHome: number(row?.score?.fulltime?.home),
+    fulltimeAway: number(row?.score?.fulltime?.away),
+    extraTimeHome: number(row?.score?.extratime?.home),
+    extraTimeAway: number(row?.score?.extratime?.away),
+    penaltyHome: number(row?.score?.penalty?.home),
+    penaltyAway: number(row?.score?.penalty?.away)
+  };
+}
+
+export function normalizeApiFootballFixture(row, oddsRow = null) {
+  const fixtureId = row?.fixture?.id;
+  if (!fixtureId || !row?.teams?.home?.name || !row?.teams?.away?.name) return null;
+  const selected = oddsRow ? selectBookmaker(oddsRow, row) : null;
+  const odds = selected?.normalized?.odds || {};
+  return {
+    id: String(fixtureId),
+    sourceId: String(fixtureId),
+    kickoff: row?.fixture?.date || null,
+    status: text(row?.fixture?.status?.short || 'NS').toUpperCase(),
+    minute: number(row?.fixture?.status?.elapsed),
+    score: normalizeScore(row),
+    events: [],
+    league: {
+      id: row?.league?.id || null,
+      name: row?.league?.name || 'Unknown League',
+      country: row?.league?.country || 'International',
+      logo: row?.league?.logo || null,
+      flag: row?.league?.flag || null,
+      season: row?.league?.season || null,
+      round: row?.league?.round || null
+    },
+    home: teamVisual(row?.teams?.home) || { id: null, name: row?.teams?.home?.name, logo: null },
+    away: teamVisual(row?.teams?.away) || { id: null, name: row?.teams?.away?.name, logo: null },
+    odds,
+    oddsMeta: {
+      source: 'API_FOOTBALL',
+      bookmakerId: selected?.bookmaker?.id || null,
+      bookmakerName: selected?.bookmaker?.name || null,
+      updatedAt: oddsRow?.update || null
+    },
+    marketRows: selected?.normalized?.marketRows || [],
+    availableMarketCount: Object.values(odds).filter(Boolean).length,
+    rawSource: 'API_FOOTBALL',
+    apiFootballFixtureId: fixtureId,
+    venue: row?.fixture?.venue || null,
+    referee: row?.fixture?.referee || null,
+    timezone: row?.fixture?.timezone || null,
+    enrichment: { matched: true, confidence: 1, statsAvailable: false, source: 'API_FOOTBALL' }
+  };
+}
+
+function oddsByFixture(rows = []) {
+  const map = new Map();
+  for (const row of rows) {
+    const id = row?.fixture?.id;
+    if (id != null && !map.has(String(id))) map.set(String(id), row);
+  }
+  return map;
 }
 
 export async function getApiFootballDailyFixtures(date) {
   if (!safeDate(date)) throw new Error('date must be YYYY-MM-DD');
-  const body = await apiRequest('/fixtures', { date }, 300);
+  const current = config();
+  const body = await apiFootballRequest('/fixtures', { date, timezone: current.timezone }, current.fixtureTtlSeconds);
   return { configured: body.configured, fixtures: responseArray(body), fetchedAt: body.fetchedAt || null };
+}
+
+export async function getApiFootballOddsForDate(date) {
+  if (!safeDate(date)) throw new Error('date must be YYYY-MM-DD');
+  const current = config();
+  const params = { date, timezone: current.timezone };
+  if (current.bookmakerId) params.bookmaker = current.bookmakerId;
+  const body = await apiFootballPagedRequest('/odds', params, current.oddsTtlSeconds, current.maxOddsPages);
+  return { configured: body.configured, odds: responseArray(body), fetchedAt: body.fetchedAt || null, pages: body.paging?.total || 1 };
+}
+
+export async function getApiFootballFixtureBoard(date) {
+  const [daily, oddsResult] = await Promise.all([
+    getApiFootballDailyFixtures(date),
+    getApiFootballOddsForDate(date).catch(error => ({ configured: apiFootballConfigured(), odds: [], warning: error.message }))
+  ]);
+  const oddsMap = oddsByFixture(oddsResult.odds || []);
+  const fixtures = daily.fixtures.map(row => normalizeApiFootballFixture(row, oddsMap.get(String(row?.fixture?.id)) || null)).filter(Boolean)
+    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+  return {
+    configured: daily.configured,
+    source: 'API_FOOTBALL',
+    fixtures,
+    warning: oddsResult.warning || null,
+    oddsPages: oddsResult.pages || 0,
+    fetchedAt: daily.fetchedAt || null
+  };
+}
+
+export async function getApiFootballLiveBoard() {
+  const current = config();
+  const body = await apiFootballRequest('/fixtures', { live: 'all', timezone: current.timezone }, Math.max(10, number(process.env.LIVE_CACHE_TTL_SECONDS, 20)));
+  const fixtures = responseArray(body).map(row => normalizeApiFootballFixture(row)).filter(item => item && LIVE.has(item.status));
+  return { configured: body.configured, source: 'API_FOOTBALL', fixtures, fetchedAt: body.fetchedAt || null };
+}
+
+export async function getApiFootballResults(date) {
+  const daily = await getApiFootballDailyFixtures(date);
+  const fixtures = daily.fixtures.map(row => normalizeApiFootballFixture(row)).filter(item => item && FINISHED.has(item.status));
+  return { configured: daily.configured, source: 'API_FOOTBALL', fixtures, fetchedAt: daily.fetchedAt || null };
+}
+
+export async function getApiFootballFixtureEvents(fixtureId) {
+  const id = Number(fixtureId);
+  if (!Number.isFinite(id) || id <= 0) return [];
+  const body = await apiFootballRequest('/fixtures/events', { fixture: id }, Math.max(20, number(process.env.LIVE_CACHE_TTL_SECONDS, 20)));
+  return responseArray(body).map(row => ({
+    time: row.time || null,
+    minute: number(row?.time?.elapsed),
+    extra: number(row?.time?.extra),
+    team: row.team || null,
+    player: row.player || null,
+    assist: row.assist || null,
+    type: row.type || null,
+    detail: row.detail || null,
+    comments: row.comments || null
+  }));
 }
 
 export async function resolveApiFootballTeam(name, country = '') {
@@ -255,7 +519,7 @@ export async function resolveApiFootballTeam(name, country = '') {
   const cacheKey = `api-football-team:${normalizeName(name)}:${normalizeName(country)}`;
   const cached = cacheGet(cacheKey);
   if (cached !== undefined) return cached;
-  const body = await apiRequest('/teams', { search: name }, current.visualTtlSeconds);
+  const body = await apiFootballRequest('/teams', { search: name }, current.visualTtlSeconds);
   let best = null;
   for (const row of responseArray(body)) {
     const team = row?.team || row;
@@ -279,7 +543,7 @@ async function mapWithConcurrency(items, limit, worker) {
       output[index] = await worker(items[index], index);
     }
   }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, run));
+  await Promise.all(Array.from({ length: Math.min(limit, items.length || 1) }, run));
   return output;
 }
 
@@ -300,18 +564,7 @@ export async function enrichApiFootballVisuals(date, fixtures = []) {
         league: leagueVisual(row?.league)
       };
     }
-    const [home, away] = await Promise.all([
-      resolveApiFootballTeam(source?.home?.name, source?.league?.country).catch(() => null),
-      resolveApiFootballTeam(source?.away?.name, source?.league?.country).catch(() => null)
-    ]);
-    return {
-      fixtureId: source.id,
-      apiFixtureId: null,
-      mappingConfidence: 0,
-      home: home ? { id: home.id, name: home.name, logo: home.logo } : null,
-      away: away ? { id: away.id, name: away.name, logo: away.logo } : null,
-      league: null
-    };
+    return { fixtureId: source.id, apiFixtureId: null, mappingConfidence: 0, home: null, away: null, league: null };
   });
   return { configured: true, source: 'API_FOOTBALL', visuals, fetchedAt: daily.fetchedAt };
 }
@@ -332,29 +585,21 @@ function historyRow(row) {
     home_team: { id: row?.teams?.home?.id || null, name: row?.teams?.home?.name || '' },
     away_team: { id: row?.teams?.away?.id || null, name: row?.teams?.away?.name || '' },
     full_time_score: { home: number(row?.goals?.home, 0), away: number(row?.goals?.away, 0) },
-    half_time_score: {
-      home: number(row?.score?.halftime?.home),
-      away: number(row?.score?.halftime?.away)
-    },
+    half_time_score: { home: number(row?.score?.halftime?.home), away: number(row?.score?.halftime?.away) },
     league: { id: row?.league?.id || null, name: row?.league?.name || '', country: row?.league?.country || '' }
   };
 }
 
 function selectVenueHistory(rows, teamId, venue, beforeMs, limit = 5) {
-  return (rows || [])
-    .filter(isCompletedFixture)
-    .filter(row => {
-      const kickoff = kickoffMs(row);
-      if (beforeMs && kickoff && kickoff >= beforeMs) return false;
-      return venue === 'home' ? Number(row?.teams?.home?.id) === Number(teamId) : Number(row?.teams?.away?.id) === Number(teamId);
-    })
-    .sort((a, b) => (kickoffMs(b) || 0) - (kickoffMs(a) || 0))
-    .slice(0, limit)
-    .map(historyRow);
+  return (rows || []).filter(isCompletedFixture).filter(row => {
+    const kickoff = kickoffMs(row);
+    if (beforeMs && kickoff && kickoff >= beforeMs) return false;
+    return venue === 'home' ? Number(row?.teams?.home?.id) === Number(teamId) : Number(row?.teams?.away?.id) === Number(teamId);
+  }).sort((a, b) => (kickoffMs(b) || 0) - (kickoffMs(a) || 0)).slice(0, limit).map(historyRow);
 }
 
 function teamStatsSummary(body) {
-  const row = responseArray(body)[0] || body?.response || null;
+  const row = responseArray(body)[0] || body?.rawResponse || null;
   if (!row || Array.isArray(row)) return null;
   return {
     form: row.form || null,
@@ -390,12 +635,7 @@ function compactStandings(body) {
 }
 
 function compactInjuries(body) {
-  return responseArray(body).map(row => ({
-    player: row.player || null,
-    team: row.team || null,
-    fixture: row.fixture || null,
-    league: row.league || null
-  }));
+  return responseArray(body).map(row => ({ player: row.player || null, team: row.team || null, fixture: row.fixture || null, league: row.league || null }));
 }
 
 export async function getApiFootballIntelligence(context = {}, sourceFixture = null, options = {}) {
@@ -425,8 +665,8 @@ export async function getApiFootballIntelligence(context = {}, sourceFixture = n
   const historyTtl = Math.max(current.cacheTtlSeconds, 1800);
 
   const [homeFixturesBody, awayFixturesBody] = await Promise.all([
-    apiRequest('/fixtures', { team: homeId, last: current.historyLast, status: 'FT' }, historyTtl),
-    apiRequest('/fixtures', { team: awayId, last: current.historyLast, status: 'FT' }, historyTtl)
+    apiFootballRequest('/fixtures', { team: homeId, last: current.historyLast, status: 'FT' }, historyTtl),
+    apiFootballRequest('/fixtures', { team: awayId, last: current.historyLast, status: 'FT' }, historyTtl)
   ]);
   const homeHistory = selectVenueHistory(responseArray(homeFixturesBody), homeId, 'home', beforeMs, 5);
   const awayHistory = selectVenueHistory(responseArray(awayFixturesBody), awayId, 'away', beforeMs, 5);
@@ -442,22 +682,22 @@ export async function getApiFootballIntelligence(context = {}, sourceFixture = n
   };
 
   const coreRequests = [
-    leagueId && season ? apiRequest('/standings', { league: leagueId, season }, 1800) : Promise.resolve(null),
-    leagueId && season && homeId ? apiRequest('/teams/statistics', { league: leagueId, season, team: homeId }, 1800) : Promise.resolve(null),
-    leagueId && season && awayId ? apiRequest('/teams/statistics', { league: leagueId, season, team: awayId }, 1800) : Promise.resolve(null),
-    homeId && awayId ? apiRequest('/fixtures/headtohead', { h2h: `${homeId}-${awayId}`, last: 10 }, 3600) : Promise.resolve(null),
-    fixtureId ? apiRequest('/predictions', { fixture: fixtureId }, 1800) : Promise.resolve(null),
-    fixtureId ? apiRequest('/injuries', { fixture: fixtureId }, 900) : Promise.resolve(null)
+    leagueId && season ? apiFootballRequest('/standings', { league: leagueId, season }, 1800) : Promise.resolve(null),
+    leagueId && season && homeId ? apiFootballRequest('/teams/statistics', { league: leagueId, season, team: homeId }, 1800) : Promise.resolve(null),
+    leagueId && season && awayId ? apiFootballRequest('/teams/statistics', { league: leagueId, season, team: awayId }, 1800) : Promise.resolve(null),
+    homeId && awayId ? apiFootballRequest('/fixtures/headtohead', { h2h: `${homeId}-${awayId}`, last: 10 }, 3600) : Promise.resolve(null),
+    fixtureId ? apiFootballRequest('/predictions', { fixture: fixtureId }, 1800) : Promise.resolve(null),
+    fixtureId ? apiFootballRequest('/injuries', { fixture: fixtureId }, 900) : Promise.resolve(null)
   ];
   const [standings, homeStats, awayStats, h2h, predictions, injuries] = await Promise.all(coreRequests.map(promise => promise.catch(() => null)));
 
   const deep = {};
   if (mode !== 'engine' && current.deepStats && fixtureId) {
     const [fixtureStatistics, lineups, events, players] = await Promise.all([
-      apiRequest('/fixtures/statistics', { fixture: fixtureId }, 300).catch(() => null),
-      apiRequest('/fixtures/lineups', { fixture: fixtureId }, 300).catch(() => null),
-      apiRequest('/fixtures/events', { fixture: fixtureId }, 60).catch(() => null),
-      apiRequest('/fixtures/players', { fixture: fixtureId }, 300).catch(() => null)
+      apiFootballRequest('/fixtures/statistics', { fixture: fixtureId }, 300).catch(() => null),
+      apiFootballRequest('/fixtures/lineups', { fixture: fixtureId }, 300).catch(() => null),
+      apiFootballRequest('/fixtures/events', { fixture: fixtureId }, 60).catch(() => null),
+      apiFootballRequest('/fixtures/players', { fixture: fixtureId }, 300).catch(() => null)
     ]);
     deep.fixtureStatistics = responseArray(fixtureStatistics);
     deep.lineups = responseArray(lineups);
@@ -493,23 +733,20 @@ export async function enrichApiFootballStatsBoard(date, fixtures = [], extractVe
     try {
       const intelligence = await getApiFootballIntelligence(context, fixture, { mode: 'engine' });
       const stats = typeof extractVenueStats === 'function' ? extractVenueStats(intelligence, context) : null;
-      const apiFixture = intelligence?.fixture;
       return {
         ...fixture,
-        home: { ...fixture.home, id: apiFixture?.home?.id || fixture.home?.id || null, logo: apiFixture?.home?.logo || fixture.home?.logo || null },
-        away: { ...fixture.away, id: apiFixture?.away?.id || fixture.away?.id || null, logo: apiFixture?.away?.logo || fixture.away?.logo || null },
-        league: { ...fixture.league, id: apiFixture?.league?.id || fixture.league?.id || null, logo: apiFixture?.league?.logo || fixture.league?.logo || null, flag: apiFixture?.league?.flag || fixture.league?.flag || null, season: apiFixture?.league?.season || fixture.league?.season || null },
         stats: stats ? {
           ...stats,
           source: 'API_FOOTBALL',
-          mappingConfidence: intelligence?.mappingConfidence || null,
+          mappingConfidence: intelligence?.mappingConfidence || 1,
           standings: intelligence?.standings || null,
           teamStatistics: intelligence?.teamStatistics || null,
           h2h: intelligence?.h2h || [],
           predictions: intelligence?.predictions || null,
           injuries: intelligence?.injuries || []
         } : null,
-        apiFootballFixtureId: apiFixture?.id || null
+        apiFootballFixtureId: Number(fixture.id) || intelligence?.fixture?.id || null,
+        enrichment: { matched: Boolean(intelligence?.mapped), confidence: intelligence?.mappingConfidence || 1, statsAvailable: Boolean(stats?.homeSplit || stats?.awaySplit), source: 'API_FOOTBALL' }
       };
     } catch {
       return { ...fixture, stats: null };
@@ -518,8 +755,27 @@ export async function enrichApiFootballStatsBoard(date, fixtures = [], extractVe
   return {
     configured: true,
     source: 'API_FOOTBALL',
-    warning: null,
+    warning: enriched.some(item => item?.stats?.homeSplit || item?.stats?.awaySplit) ? null : 'API-Football fixtures loaded, but venue histories were unavailable for this date.',
     fixtures: enriched,
-    fixtureScope: 'ALL_DAILY_FIXTURES'
+    fixtureScope: 'ALL_DAILY_FIXTURES_RETURNED_BY_PROVIDER'
   };
+}
+
+export async function diagnoseApiFootball(date) {
+  const current = config();
+  if (!current.configured) return { configured: false, status: 'NOT_CONFIGURED' };
+  try {
+    const board = await getApiFootballFixtureBoard(date);
+    return {
+      configured: true,
+      status: 'READY',
+      date,
+      fixtures: board.fixtures.length,
+      fixturesWithOdds: board.fixtures.filter(item => item.availableMarketCount > 0).length,
+      oddsPages: board.oddsPages || 0,
+      source: 'API_FOOTBALL'
+    };
+  } catch (error) {
+    return { configured: true, status: 'REQUEST_FAILED', message: error.message || 'Request failed', source: 'API_FOOTBALL' };
+  }
 }

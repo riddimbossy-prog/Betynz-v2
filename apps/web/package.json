@@ -1,21 +1,19 @@
 {
-  "name": "betynz-sportybet-primary-api-football-enrichment",
-  "version": "4.0.3",
+  "name": "betynz-api-football-only-web",
+  "version": "5.0.0",
   "private": true,
   "type": "module",
-  "description": "Betynz three-engine platform using SportyBet as the primary statistics and odds authority, with API-Football only for crests and secondary enrichment.",
-  "engines": {
-    "node": ">=20"
-  },
+  "description": "Betynz three-engine platform using API-Football as the sole provider for fixtures, odds, live scores, results, statistics and visuals.",
+  "engines": { "node": ">=20" },
   "scripts": {
     "start": "node src/server.mjs",
     "dev": "NODE_ENV=development node --watch src/server.mjs",
     "clean:legacy": "node scripts/clean-legacy.mjs",
-    "check:syntax": "node --check src/server.mjs && node --check src/engines/marketRoute.mjs && node --check src/engines/ppgRoute.mjs && node --check src/engines/convergence.mjs && node --check src/engines/consensus.mjs && node --check src/engines/settlement.mjs && node --check src/lib/calibration.mjs && node --check src/lib/dataApi.mjs && node --check src/lib/apiFootball.mjs && node --check src/lib/sourcePriority.mjs && node --check src/lib/results.mjs && node --check src/lib/venueStats.mjs && node --check src/lib/learning.mjs && node --check src/lib/supabase.mjs && node --check public/app.js && node --check public/picks.js && node --check public/motion.js && node --check public/market-route.js && node --check public/ppg-route.js && node --check public/convergence.js && node --check public/sw.js && node --check public/live.js && node --check public/odds-movement.js && node --check public/leagues.js && node --check public/proof.js && node --check public/performance.js && node --check public/admin-learning.js && node --check public/admin-engine-audit.js && node --check public/admin-calibration.js && node --check public/admin-login.js",
+    "check:syntax": "node --check src/server.mjs && node --check src/engines/marketRoute.mjs && node --check src/engines/ppgRoute.mjs && node --check src/engines/convergence.mjs && node --check src/engines/consensus.mjs && node --check src/engines/settlement.mjs && node --check src/lib/calibration.mjs && node --check src/lib/apiFootball.mjs && node --check src/lib/results.mjs && node --check src/lib/venueStats.mjs && node --check src/lib/learning.mjs && node --check src/lib/supabase.mjs && node --check public/app.js && node --check public/picks.js && node --check public/motion.js && node --check public/market-route.js && node --check public/ppg-route.js && node --check public/convergence.js && node --check public/sw.js && node --check public/live.js && node --check public/odds-movement.js && node --check public/leagues.js && node --check public/proof.js && node --check public/performance.js && node --check public/admin-learning.js && node --check public/admin-engine-audit.js && node --check public/admin-calibration.js && node --check public/admin-login.js",
     "check": "npm run clean:legacy && npm run check:syntax",
     "test": "npm run clean:legacy && npm run test:engines",
     "build": "npm run clean:legacy && npm run check:syntax && npm run test:engines && npm run verify:release",
     "verify:release": "node scripts/verify-release.mjs",
-    "test:engines": "node --test test/market-route.test.mjs test/ppg-route.test.mjs test/convergence.test.mjs test/consensus.test.mjs test/calibration.test.mjs test/settlement.test.mjs test/three-engine-reset.test.mjs test/qualified-picks.test.mjs test/responsive-cinematic.test.mjs test/custom-data-api.test.mjs test/api-football.test.mjs test/source-priority.test.mjs test/platform-smoke.test.mjs"
+    "test:engines": "node --test test/market-route.test.mjs test/ppg-route.test.mjs test/convergence.test.mjs test/consensus.test.mjs test/calibration.test.mjs test/settlement.test.mjs test/three-engine-reset.test.mjs test/qualified-picks.test.mjs test/responsive-cinematic.test.mjs test/api-football.test.mjs test/api-football-source.test.mjs test/platform-smoke.test.mjs"
   }
 }

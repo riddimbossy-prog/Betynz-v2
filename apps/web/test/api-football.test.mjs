@@ -7,7 +7,12 @@ import {
   matchApiFootballFixture,
   enrichApiFootballVisuals,
   enrichApiFootballStatsBoard,
-  getApiFootballIntelligence
+  getApiFootballIntelligence,
+  getApiFootballFixtureBoard,
+  getApiFootballLiveBoard,
+  getApiFootballResults,
+  getApiFootballFixtureEvents,
+  normalizeApiFootballFixture
 } from '../src/lib/apiFootball.mjs';
 import { extractVenueStats } from '../src/lib/venueStats.mjs';
 
@@ -40,8 +45,8 @@ function apiFixture({ id = 9001, date = '2035-06-15T18:00:00Z', homeId = 101, aw
 }
 
 const sourceFixture = {
-  id: 'sr:match:alpha-beta',
-  sourceId: 'sr:match:alpha-beta',
+  id: '9001',
+  sourceId: '9001',
   kickoff: '2035-06-15T18:00:00Z',
   league: { name: 'Premier Test', country: 'Ghana' },
   home: { name: 'Alpha FC' },
@@ -51,7 +56,7 @@ const sourceFixture = {
 
 test('API-Football matcher respects team direction and kickoff', () => {
   const correct = apiFixture();
-  const reversed = apiFixture({ homeId: 202, awayId: 101, home: 'Beta United', away: 'Alpha FC' });
+  const reversed = apiFixture({ id: 9002, homeId: 202, awayId: 101, home: 'Beta United', away: 'Alpha FC' });
   assert.ok(fixtureMatchScore(sourceFixture, correct) > 0.9);
   assert.equal(fixtureMatchScore(sourceFixture, reversed), 0);
   assert.equal(matchApiFootballFixture(sourceFixture, [reversed, correct])?.fixture?.fixture?.id, 9001);
@@ -178,13 +183,91 @@ test('API-Football engine enrichment has no 30-fixture daily cap', async t => {
 
   const fixtures = Array.from({ length: 45 }, (_, index) => ({
     ...sourceFixture,
-    id: `sr:match:no-cap-${index + 1}`,
-    sourceId: `sr:match:no-cap-${index + 1}`,
+    id: `day-${index + 1}`,
+    sourceId: `day-${index + 1}`, 
     kickoff: '2036-01-10T15:00:00Z'
   }));
   const enriched = await enrichApiFootballStatsBoard('2036-01-10', fixtures);
-  assert.equal(enriched.fixtureScope, 'ALL_DAILY_FIXTURES');
+  assert.equal(enriched.fixtureScope, 'ALL_DAILY_FIXTURES_RETURNED_BY_PROVIDER');
   assert.equal(enriched.fixtures.length, 45);
-  assert.equal(enriched.warning, null);
+  assert.match(enriched.warning || '', /venue histories were unavailable/i);
   assert.ok(enriched.fixtures.every(row => row.apiFootballFixtureId === 9901));
+});
+
+test('API-Football alone supplies daily fixtures, paginated odds, live scores, results and events', async t => {
+  const date = '2037-02-14';
+  const scheduled = apiFixture({ id: 12001, date: `${date}T14:00:00Z`, status: 'NS' });
+  const second = apiFixture({ id: 12002, date: `${date}T16:00:00Z`, homeId: 303, awayId: 404, home: 'Gamma FC', away: 'Delta FC', status: 'NS' });
+  const liveRow = apiFixture({ id: 12003, date: `${date}T18:00:00Z`, homeGoals: 2, awayGoals: 1, status: '2H' });
+  liveRow.fixture.status.elapsed = 67;
+  const resultRow = apiFixture({ id: 12004, date: `${date}T12:00:00Z`, homeGoals: 3, awayGoals: 1, status: 'FT' });
+  const bookmaker = (fixtureId, homeOdd) => ({
+    fixture: { id: fixtureId },
+    update: `${date}T10:00:00Z`,
+    bookmakers: [{
+      id: 8,
+      name: 'Test Book',
+      bets: [
+        { name: 'Match Winner', values: [{ value: 'Home', odd: String(homeOdd) }, { value: 'Draw', odd: '3.60' }, { value: 'Away', odd: '4.80' }] },
+        { name: 'Goals Over/Under', values: [{ value: 'Over 2.5', odd: '1.72' }, { value: 'Under 2.5', odd: '2.05' }] },
+        { name: 'Both Teams To Score', values: [{ value: 'Yes', odd: '1.75' }, { value: 'No', odd: '1.95' }] }
+      ]
+    }]
+  });
+
+  const { server, base } = await listen((req, res) => {
+    assert.equal(req.headers['x-apisports-key'], 'sole-source-key');
+    const url = new URL(req.url, base);
+    res.setHeader('content-type', 'application/json');
+    const send = (response, paging = { current: 1, total: 1 }) => res.end(JSON.stringify({ response, errors: [], paging }));
+    if (url.pathname === '/fixtures' && url.searchParams.get('date') === date) return send([scheduled, second, resultRow]);
+    if (url.pathname === '/fixtures' && url.searchParams.get('live') === 'all') return send([liveRow]);
+    if (url.pathname === '/odds') {
+      const page = Number(url.searchParams.get('page') || 1);
+      return page === 1 ? send([bookmaker(12001, 1.70)], { current: 1, total: 2 }) : send([bookmaker(12002, 1.88)], { current: 2, total: 2 });
+    }
+    if (url.pathname === '/fixtures/events') return send([{ time: { elapsed: 67, extra: null }, team: { id: 101, name: 'Alpha FC' }, player: { id: 9, name: 'Scorer' }, type: 'Goal', detail: 'Normal Goal' }]);
+    return send([]);
+  });
+  t.after(() => server.close());
+
+  const keys = ['API_FOOTBALL_KEY','API_FOOTBALL_BASE_URL','API_FOOTBALL_KEY_HEADER','API_FOOTBALL_RETRIES','API_FOOTBALL_MAX_ODDS_PAGES'];
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  Object.assign(process.env, {
+    API_FOOTBALL_KEY: 'sole-source-key',
+    API_FOOTBALL_BASE_URL: base,
+    API_FOOTBALL_KEY_HEADER: 'x-apisports-key',
+    API_FOOTBALL_RETRIES: '0',
+    API_FOOTBALL_MAX_ODDS_PAGES: '0'
+  });
+  t.after(() => restoreEnv(previous));
+
+  const board = await getApiFootballFixtureBoard(date);
+  assert.equal(board.source, 'API_FOOTBALL');
+  assert.equal(board.fixtures.length, 3);
+  assert.equal(board.oddsPages, 2);
+  assert.equal(board.fixtures.find(row => row.id === '12001').odds.homeWin, 1.70);
+  assert.equal(board.fixtures.find(row => row.id === '12001').odds.over25, 1.72);
+  assert.equal(board.fixtures.find(row => row.id === '12002').odds.homeWin, 1.88);
+  assert.equal(board.fixtures[0].home.logo.startsWith('https://img.test/'), true);
+
+  const live = await getApiFootballLiveBoard();
+  assert.equal(live.source, 'API_FOOTBALL');
+  assert.equal(live.fixtures[0].minute, 67);
+  assert.equal(live.fixtures[0].score.home, 2);
+
+  const results = await getApiFootballResults(date);
+  assert.equal(results.source, 'API_FOOTBALL');
+  assert.equal(results.fixtures.length, 1);
+  assert.equal(results.fixtures[0].status, 'FT');
+  assert.equal(results.fixtures[0].score.home, 3);
+
+  const events = await getApiFootballFixtureEvents(12003);
+  assert.equal(events[0].minute, 67);
+  assert.equal(events[0].type, 'Goal');
+
+  const normalized = normalizeApiFootballFixture(scheduled, bookmaker(12001, 1.70));
+  assert.equal(normalized.rawSource, 'API_FOOTBALL');
+  assert.equal(normalized.league.logo, 'https://img.test/league.png');
+  assert.equal(normalized.availableMarketCount >= 7, true);
 });

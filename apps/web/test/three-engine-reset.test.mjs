@@ -3,14 +3,16 @@ import assert from 'node:assert/strict';
 import { readFile, access } from 'node:fs/promises';
 
 const read = path => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
-const readCombined = path => readFile(new URL(`../../../${path}`, import.meta.url), 'utf8');
+const readRoot = path => readFile(new URL(`../../../${path}`, import.meta.url), 'utf8');
 
-test('production server exposes the three engines, SportyBet authority and API-Football enrichment', async () => {
+test('production server exposes the three engines with API-Football as the sole provider', async () => {
   const server = await read('src/server.mjs');
   assert.match(server, /MARKET_ROUTE/);
   assert.match(server, /PPG_ROUTE/);
   assert.match(server, /CONVERGENCE_ROUTE/);
-  assert.match(server, /fetchDataApiFixtures/);
+  assert.match(server, /getApiFootballFixtureBoard/);
+  assert.match(server, /getApiFootballLiveBoard/);
+  assert.match(server, /getApiFootballResults/);
   assert.match(server, /getApiFootballIntelligence/);
   assert.match(server, /enrichApiFootballStatsBoard/);
   assert.match(server, /buildConsensusWindow|buildConsensusForFixture/);
@@ -26,29 +28,24 @@ test('public dashboard contains the three current engines and no retired engines
   assert.doesNotMatch(html, /Atlas 80\/20|Odds Threshold|Counter Odds|Supervisor|Best Picks/);
 });
 
-test('combined Render service keeps SportyBet authoritative and adds private API-Football enrichment', async () => {
+test('one Render service contains only API-Football football configuration', async () => {
   const env = await read('.env.example');
-  const render = await readCombined('render.yaml');
-  const launcher = await readCombined('scripts/start-combined.mjs');
-  assert.match(env, /BETYNZ_DATA_API_BASE_URL/);
-  assert.match(render, /SPORTYBET_PUBLIC_UPCOMING_URL/);
-  assert.match(render, /SPORTYBET_PUBLIC_LIVE_URL/);
-  assert.match(render, /SPORTYBET_PUBLIC_RESULTS_URL/);
-  assert.match(launcher, /BETYNZ_DATA_API_BASE_URL/);
-  assert.match(launcher, /127\.0\.0\.1/);
+  const render = await readRoot('render.yaml');
+  const rootPackage = JSON.parse(await readRoot('package.json'));
+  assert.match(env, /API_FOOTBALL_KEY=/);
   assert.match(render, /API_FOOTBALL_KEY/);
   assert.match(render, /API_FOOTBALL_BASE_URL/);
-  assert.match(env, /API_FOOTBALL_KEY=/);
-  assert.doesNotMatch(`${env}\n${render}\n${launcher}`, /ODDS_FEED_/);
+  assert.match(render, /API_FOOTBALL_MAX_ODDS_PAGES/);
+  assert.equal((render.match(/type:\s*web/g) || []).length, 1);
+  assert.equal(rootPackage.scripts.start, 'node apps/web/src/server.mjs');
 });
 
-test('retired engine and old data-adapter modules are absent', async () => {
-  for (const path of [
-    'src/engines/atlas8020.mjs','src/engines/oddsThreshold.mjs','src/engines/counterOdds.mjs','src/engines/supervisor.mjs',
-    'src/lib/oddsFeed.mjs'
-  ]) await assert.rejects(access(new URL(`../${path}`, import.meta.url)));
-  await access(new URL('../src/lib/dataApi.mjs', import.meta.url));
-  await access(new URL('../src/lib/apiFootball.mjs', import.meta.url));
+test('only the current three engine modules and provider module remain', async () => {
+  for (const path of ['src/engines/marketRoute.mjs','src/engines/ppgRoute.mjs','src/engines/convergence.mjs','src/engines/consensus.mjs','src/lib/apiFootball.mjs']) {
+    await access(new URL(`../${path}`, import.meta.url));
+  }
+  const apps = (await import('node:fs/promises')).readdir(new URL('../../../apps/', import.meta.url), { withFileTypes: true });
+  assert.deepEqual((await apps).filter(entry => entry.isDirectory()).map(entry => entry.name), ['web']);
 });
 
 test('fresh database schema accepts all three current engine codes', async () => {
@@ -60,14 +57,12 @@ test('fresh database schema accepts all three current engine codes', async () =>
   assert.match(sql, /consensus_snapshots/);
 });
 
-
-test('SportyBet statistics are primary and API-Football only enriches missing fields and visuals', async () => {
-  const server = await read('src/server.mjs');
-  assert.match(server, /enrichDataApiFixtures/);
-  assert.match(server, /combinePrimaryAndSecondaryStats/);
-  const priority = await read('src/lib/sourcePriority.mjs');
-  assert.match(priority, /sourcePriority:\s*\['SPORTYBET_CUSTOM_API', 'API_FOOTBALL'\]/);
-  assert.match(server, /primaryStatistics:\s*'SPORTYBET_CUSTOM_API'/);
-  assert.match(server, /enrichmentStatistics:\s*'API_FOOTBALL'/);
-  assert.match(priority, /mergeMissingPrimaryFirst/);
+test('API-Football contract owns fixtures odds live results statistics and visuals', async () => {
+  const module = await read('src/lib/apiFootball.mjs');
+  for (const token of [
+    'getApiFootballFixtureBoard','getApiFootballOddsForDate','getApiFootballLiveBoard','getApiFootballResults',
+    'getApiFootballFixtureEvents','getApiFootballIntelligence','enrichApiFootballStatsBoard','resolveApiFootballTeam'
+  ]) assert.match(module, new RegExp(token));
+  assert.match(module, /SOLE_FOOTBALL_DATA_PROVIDER/);
+  assert.match(module, /ALL_DAILY_FIXTURES_RETURNED_BY_PROVIDER/);
 });

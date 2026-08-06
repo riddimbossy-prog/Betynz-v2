@@ -15,74 +15,6 @@ services:
         value: production
       - key: PORT
         value: 10000
-      - key: SPORTYBET_INTERNAL_PORT
-        value: 10001
-      - key: SPORTYBET_COUNTRY
-        value: gh
-      - key: SPORTYBET_PUBLIC_UPCOMING_URL
-        value: "https://www.sportybet.com/api/{country}/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=1&pageNum={page}&pageSize={page_size}"
-      - key: SPORTYBET_PUBLIC_LIVE_URL
-        value: "https://www.sportybet.com/api/{country}/factsCenter/pcLiveEvents?sportId=sr%3Asport%3A1&marketId=1&pageNum={page}&pageSize={page_size}"
-      - key: SPORTYBET_PUBLIC_RESULTS_URL
-        value: "https://www.sportybet.com/api/{country}/factsCenter/pcResults?sportId=sr%3Asport%3A1&date={date}&pageNum={page}&pageSize={page_size}"
-      - key: SPORTYBET_PUBLIC_EVENT_DETAIL_URL
-        value: "https://www.sportybet.com/api/{country}/factsCenter/pcEvent?eventId={event_id}"
-      - key: SPORTYBET_PAGE_SIZE
-        value: "100"
-      - key: SPORTYBET_MAX_PAGES
-        value: "0"
-      - key: SPORTYBET_TIMEOUT_MS
-        value: "20000"
-      - key: SPORTYBET_CACHE_TTL_SECONDS
-        value: "60"
-      - key: SPORTYBET_RESULTS_CACHE_TTL_SECONDS
-        value: "300"
-      - key: SPORTYBET_HISTORY_LOOKBACK_DAYS
-        value: "120"
-      - key: SPORTYBET_HISTORY_MAX_REQUEST_DAYS
-        value: "120"
-      - key: API_RATE_LIMIT_PER_MINUTE
-        value: "180"
-      - key: ALLOW_INTERNAL_RATE_LIMIT_BYPASS
-        value: "true"
-      - key: SPORTYBET_UPSTREAM_CONCURRENCY
-        value: "2"
-      - key: SPORTYBET_UPSTREAM_MIN_INTERVAL_MS
-        value: "250"
-      - key: SPORTYBET_UPSTREAM_RETRIES
-        value: "4"
-      - key: SPORTYBET_UPSTREAM_BACKOFF_BASE_MS
-        value: "1000"
-      - key: SPORTYBET_UPSTREAM_BACKOFF_MAX_MS
-        value: "30000"
-      - key: BETYNZ_DATA_API_ENRICH_CONCURRENCY
-        value: "2"
-      - key: BETYNZ_DATA_API_ACTION_CONCURRENCY
-        value: "2"
-      - key: BETYNZ_DATA_API_ACTION_MIN_INTERVAL_MS
-        value: "250"
-      - key: BETYNZ_DATA_API_RETRY_BASE_MS
-        value: "1000"
-      - key: BETYNZ_DATA_API_RETRY_MAX_MS
-        value: "30000"
-      - key: CACHE_TTL_SECONDS
-        value: "120"
-      - key: FIXTURE_BOARD_CACHE_TTL_SECONDS
-        value: "60"
-      - key: MATCH_INTELLIGENCE_CACHE_TTL_SECONDS
-        value: "600"
-      - key: ODDS_SNAPSHOT_INTERVAL_SECONDS
-        value: "300"
-      - key: LIVE_CACHE_TTL_SECONDS
-        value: "20"
-      - key: RESULTS_CACHE_TTL_SECONDS
-        value: "300"
-      - key: PPG_ROUTE_CACHE_TTL_SECONDS
-        value: "1800"
-      - key: CONVERGENCE_ROUTE_CACHE_TTL_SECONDS
-        value: "1800"
-      - key: STATS_ROUTE_CACHE_TTL_SECONDS
-        value: "1800"
       - key: API_FOOTBALL_KEY
         sync: false
       - key: API_FOOTBALL_BASE_URL
@@ -95,6 +27,10 @@ services:
         value: "2"
       - key: API_FOOTBALL_CACHE_TTL_SECONDS
         value: "1800"
+      - key: API_FOOTBALL_FIXTURE_CACHE_TTL_SECONDS
+        value: "120"
+      - key: API_FOOTBALL_ODDS_CACHE_TTL_SECONDS
+        value: "300"
       - key: API_FOOTBALL_VISUAL_CACHE_TTL_SECONDS
         value: "604800"
       - key: API_FOOTBALL_ENRICH_CONCURRENCY
@@ -113,6 +49,28 @@ services:
         value: "0.55"
       - key: API_FOOTBALL_DEEP_STATS
         value: "true"
+      - key: API_FOOTBALL_TIMEZONE
+        value: "UTC"
+      - key: API_FOOTBALL_MAX_ODDS_PAGES
+        value: "0"
+      - key: CACHE_TTL_SECONDS
+        value: "120"
+      - key: FIXTURE_BOARD_CACHE_TTL_SECONDS
+        value: "60"
+      - key: MATCH_INTELLIGENCE_CACHE_TTL_SECONDS
+        value: "600"
+      - key: ODDS_SNAPSHOT_INTERVAL_SECONDS
+        value: "300"
+      - key: LIVE_CACHE_TTL_SECONDS
+        value: "20"
+      - key: RESULTS_CACHE_TTL_SECONDS
+        value: "300"
+      - key: PPG_ROUTE_CACHE_TTL_SECONDS
+        value: "1800"
+      - key: CONVERGENCE_ROUTE_CACHE_TTL_SECONDS
+        value: "1800"
+      - key: STATS_ROUTE_CACHE_TTL_SECONDS
+        value: "1800"
       - key: CONSENSUS_FREEZE_MINUTES
         value: "30"
       - key: CONSENSUS_CACHE_TTL_SECONDS

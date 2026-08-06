@@ -1,11 +1,19 @@
-# Betynz Web v4.0.3
+# Betynz Web v5.0.0
 
-This web application is the public layer of the unified single-Render Betynz repository.
+The web service uses `src/lib/apiFootball.mjs` as its only football provider adapter.
 
-- SportyBet custom API: fixtures, prices, live state and results.
-- API-Football: engine statistics, official team crests and league visuals.
-- Supabase: admin, frozen predictions, proof, settlement and learning.
+It exposes same-origin routes for fixtures, engine boards, match intelligence, live scores, incidents, proof, performance, odds movement, league intelligence and protected administration. The browser never receives `API_FOOTBALL_KEY`.
 
-The browser only calls same-origin `/api/*` routes. All provider keys remain server-side.
+Run locally:
 
-Detailed API-Football behavior is documented in `docs/API_FOOTBALL_ENRICHMENT.md`.
+```bash
+cp .env.example .env
+# add API_FOOTBALL_KEY to .env
+npm start
+```
+
+Build and test:
+
+```bash
+npm run build
+```

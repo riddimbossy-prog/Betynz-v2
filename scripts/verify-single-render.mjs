@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 
@@ -13,17 +13,15 @@ async function walk(directory) {
   }
 }
 await walk(root);
-if (found.length !== 1 || found[0] !== 'render.yaml') {
-  throw new Error(`Expected exactly one root render.yaml; found: ${found.join(', ') || 'none'}`);
-}
+if (found.length !== 1 || found[0] !== 'render.yaml') throw new Error(`Expected exactly one root render.yaml; found: ${found.join(', ') || 'none'}`);
+await access(join(root, 'apps', 'web', 'src', 'server.mjs'));
 const render = await readFile(join(root, 'render.yaml'), 'utf8');
+const packageText = await readFile(join(root, 'package.json'), 'utf8');
 const serviceCount = (render.match(/^\s*-\s+type:\s+web\s*$/gm) || []).length;
 if (serviceCount !== 1) throw new Error(`Expected one Render web service, found ${serviceCount}.`);
-const starter = await readFile(join(root, 'scripts', 'start-combined.mjs'), 'utf8');
-for (const required of ['apps/sportybet-api', 'apps/web', 'BETYNZ_DATA_API_BASE_URL', 'SPORTYBET_API_KEY']) {
-  if (!starter.includes(required.split('/').pop()) && !starter.includes(required)) throw new Error(`Combined launcher is missing ${required}.`);
-}
 for (const required of ['API_FOOTBALL_KEY', 'API_FOOTBALL_BASE_URL', 'API_FOOTBALL_KEY_HEADER']) {
   if (!render.includes(required)) throw new Error(`Root Render configuration is missing ${required}.`);
 }
-console.log('Single-Render verification passed: one service, one render.yaml, SportyBet primary statistics + API-Football enrichment + Betynz engines.');
+const apps = (await readdir(join(root, 'apps'), { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
+if (JSON.stringify(apps) !== JSON.stringify(['web'])) throw new Error(`Expected only apps/web; found: ${apps.join(', ')}`);
+console.log('Single-Render verification passed: one service, one render.yaml and one API-Football data layer.');

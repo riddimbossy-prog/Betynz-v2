@@ -1,53 +1,51 @@
-# Betynz v4.0.3 build validation
+# Betynz v5.0.0 build validation
 
 Validation date: 2026-08-06 UTC
 
-## Required source hierarchy
+## Architecture
 
-- SportyBet custom API is primary for fixtures, markets, odds, live scores, results, team histories, venue splits, streaks and competition statistics.
-- API-Football is secondary for team crests, league logos/flags, standings, injuries, H2H, lineups and missing statistical fields.
-- The primary-first merge never overwrites a populated SportyBet value.
-- API-Football is labelled `API_FOOTBALL_FALLBACK` only when the required SportyBet statistic is absent.
+- API-Football is the sole football-data provider.
+- Fixtures, prematch odds, live scores, results, incidents, statistics and official visuals use `API_FOOTBALL_KEY` server-side.
+- One GitHub repository, one root `render.yaml` and one Render web service.
+- No application-level daily fixture cap.
+- Odds pagination continues until the provider reports the final page.
+- The browser never receives the private API key.
 
-## Automated validation
+## Automated results
 
 ```text
-SportyBet core tests:                       6 passed, 0 failed
-Betynz engine/platform tests:              72 passed, 0 failed
-Primary-source conflict test:              passed
-Missing-field enrichment test:             passed
-SportyBet pagination beyond ten pages:     passed
-API-Football full-day enrichment:          passed
-Internal rate-limit bypass:                passed
-Duplicate request coalescing:              passed
-Release verification:                      passed
-Single-render verification:                passed
-Combined process integration:              passed
+Syntax checks:                         passed
+Engine/platform tests:                66 passed, 0 failed
+API-Football sole-source checks:       passed
+Fixture and odds normalization:        passed
+Odds pagination test:                  passed
+No 30-fixture enrichment cap:          45/45 processed
+Live score and minute normalization:   passed
+Result normalization and API route:    passed
+Incident/event normalization:          passed
+Crests, league logos and flags:        passed
+Venue history and PPG extraction:      passed
+Deep intelligence contract:            passed
+Release verification:                  passed
+Single-render verification:            passed
+One-service integration test:          passed
 ```
 
-## Source-priority conflict fixture
-
-The regression fixture deliberately supplied conflicting values:
-
-- SportyBet home PPG: 2.20; API-Football home PPG: 0.40
-- SportyBet home sample: 5; API-Football home sample: 10
-- SportyBet home Over 2.5: 80%; API-Football home Over 2.5: 10%
-
-The final engine object retained the SportyBet values. API-Football filled only missing fields such as home scoring average, BTTS rate and standings.
-
-## Combined service smoke test
+## Integration smoke result
 
 ```json
 {
-  "ok": true,
   "deployment": "ONE_RENDER_SERVICE",
-  "renderYamlCount": 1,
-  "source": "SPORTYBET_CUSTOM_API",
+  "provider": "API_FOOTBALL",
+  "version": "5.0.0",
   "engines": ["MARKET_ROUTE", "PPG_ROUTE", "CONVERGENCE_ROUTE"],
-  "webVersion": "4.0.3"
+  "fixtures": 2,
+  "live": 1,
+  "results": 1,
+  "events": 1
 }
 ```
 
 ## Production limitation
 
-The build environment did not call the user's private API-Football subscription or the live SportyBet production endpoints. Production endpoint availability, plan quotas and exact upstream responses must be confirmed after deployment. The code and tests use compatible local response contracts.
+The live API-Football service was not called because the private production key is unavailable in this build environment. Tests use a local mock matching the expected response contract. Competition, bookmaker, odds, injury and deep-stat coverage depends on the user's API-Football subscription and the provider's coverage for each league. Missing data is reported as unavailable evidence; engines do not invent it.
