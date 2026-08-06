@@ -17,7 +17,10 @@ const sourceStatus = {
 
 const cleanCountry = () => text(env('SPORTYBET_COUNTRY', 'gh')).toLowerCase().replace(/[^a-z]/g, '').slice(0, 3) || 'gh';
 const pageSize = () => Math.max(20, Math.min(100, integer(env('SPORTYBET_PAGE_SIZE', '100'), 100)));
-const maxPages = () => Math.max(1, Math.min(50, integer(env('SPORTYBET_MAX_PAGES', '10'), 10)));
+const maxPages = () => {
+  const value = integer(env('SPORTYBET_MAX_PAGES', '0'), 0);
+  return value > 0 ? value : 0;
+};
 const timeoutMs = () => Math.max(3000, Math.min(60000, integer(env('SPORTYBET_TIMEOUT_MS', '20000'), 20000)));
 const ttl = kind => kind === 'results' ? integer(env('SPORTYBET_RESULTS_CACHE_TTL_SECONDS', '300'), 300) : integer(env('SPORTYBET_CACHE_TTL_SECONDS', '60'), 60);
 
@@ -155,13 +158,20 @@ async function fetchPaged(kind, vars = {}, { force = false } = {}) {
   const rows = [];
   const audits = [];
   try {
-    for (let page = 1; page <= maxPages(); page += 1) {
+    const configuredPageLimit = maxPages();
+    const pageSignatures = new Set();
+    for (let page = 1; ; page += 1) {
+      if (configuredPageLimit > 0 && page > configuredPageLimit) break;
       const url = renderTemplate(templateFor(kind), { country: cleanCountry(), page, page_size: pageSize(), ...vars });
       const payload = await fetchPayload(url);
       const batch = eventsFromPayload(payload);
-      audits.push({ page, count: batch.length });
+      const signature = batch.map(item => item.id || `${item.home_team}|${item.away_team}|${item.kickoff || item.start_time || ''}`).join('||');
+      const repeated = Boolean(signature) && pageSignatures.has(signature);
+      audits.push({ page, count: batch.length, repeated });
+      if (!batch.length || repeated) break;
+      pageSignatures.add(signature);
       rows.push(...batch);
-      if (!batch.length || batch.length < pageSize()) break;
+      if (batch.length < pageSize()) break;
       await sleep(120);
     }
     const events = mergeRows(rows);

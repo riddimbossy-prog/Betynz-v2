@@ -11,7 +11,7 @@ This release keeps the unified SportyBet API and all prediction engines unchange
 
 ## Functional safety
 - Existing HTML IDs and JavaScript hooks were preserved.
-- SportyBet fixtures, markets, live scores and results remain the sole football-data source.
+- SportyBet remains authoritative for fixtures, markets, live scores and results; API-Football supplies engine statistics and official visuals.
 - Market Route, PPG Route, Convergence and Consensus logic are unchanged.
 - One root render.yaml and one Render service remain enforced.
 

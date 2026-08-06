@@ -21,6 +21,7 @@ const allowedTests = new Set([
   'qualified-picks.test.mjs',
   'responsive-cinematic.test.mjs',
   'custom-data-api.test.mjs',
+  'api-football.test.mjs',
   'platform-smoke.test.mjs'
 ]);
 
@@ -41,7 +42,6 @@ const retiredPaths = [
   'src/engines/counterOdds.mjs',
   'src/engines/supervisor.mjs',
   'src/lib/oddsFeed.mjs',
-  'src/lib/apiFootball.mjs',
   'public/atlas.html',
   'public/atlas.js',
   'public/odds-threshold.html',
@@ -57,4 +57,4 @@ const retiredPaths = [
 ];
 
 for (const path of retiredPaths) await remove(path);
-console.log(`custom-data-API cleanup complete. ${removed.length} retired path(s) removed or confirmed absent.`);
+console.log(`SportyBet + API-Football cleanup complete. ${removed.length} retired path(s) removed or confirmed absent.`);

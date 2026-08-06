@@ -166,6 +166,120 @@ function conflictResult(candidates) {
   return { conflict: false, reason: null };
 }
 
+
+function statNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function splitRate(split, key) {
+  if (!split || typeof split !== 'object') return null;
+  const direct = statNumber(split?.rates?.[key]);
+  if (direct !== null) return direct;
+  const played = statNumber(split.played);
+  const count = statNumber(split[key]);
+  return played && count !== null ? round((count / played) * 100, 1) : null;
+}
+
+function averageAvailable(...values) {
+  const valid = values.map(statNumber).filter(value => value !== null);
+  return valid.length ? round(valid.reduce((sum, value) => sum + value, 0) / valid.length, 1) : null;
+}
+
+function statisticalValidation(selection, fixture, stats, structure) {
+  const home = stats?.homeSplit || stats?.home || fixture?.stats?.homeSplit || null;
+  const away = stats?.awaySplit || stats?.away || fixture?.stats?.awaySplit || null;
+  const homePlayed = statNumber(home?.played) || 0;
+  const awayPlayed = statNumber(away?.played) || 0;
+  const samples = { home: homePlayed, away: awayPlayed, required: 3 };
+  if (!selection || homePlayed < 3 || awayPlayed < 3) {
+    return {
+      source: 'API_FOOTBALL',
+      status: 'UNAVAILABLE',
+      samples,
+      score: null,
+      reasons: [`API-Football venue samples are incomplete (${homePlayed}/3 home, ${awayPlayed}/3 away).`]
+    };
+  }
+
+  const market = String(selection.market || '').toUpperCase();
+  const homeOver15 = splitRate(home, 'over15');
+  const awayOver15 = splitRate(away, 'over15');
+  const homeOver25 = splitRate(home, 'over25');
+  const awayOver25 = splitRate(away, 'over25');
+  const homeUnder25 = splitRate(home, 'under25');
+  const awayUnder25 = splitRate(away, 'under25');
+  const homeUnder35 = splitRate(home, 'under35');
+  const awayUnder35 = splitRate(away, 'under35');
+  const homeBtts = splitRate(home, 'btts');
+  const awayBtts = splitRate(away, 'btts');
+  const goalPace = averageAvailable(home?.goalsPerMatch, away?.goalsPerMatch);
+  const checks = [];
+  let contradicted = false;
+  let supported = false;
+
+  const evidence = (label, value, supportRule, contradictionRule) => {
+    if (value === null) return;
+    const support = supportRule(value);
+    const contradiction = contradictionRule(value);
+    checks.push({ label, value, support, contradiction });
+    supported ||= support;
+    contradicted ||= contradiction;
+  };
+
+  if (market === 'OVER_2_5') {
+    evidence('Combined Over 2.5 venue rate', averageAvailable(homeOver25, awayOver25), value => value >= 60, value => value <= 25);
+    evidence('Combined venue goal pace', goalPace, value => value >= 2.8, value => value <= 2.1);
+  } else if (market === 'OVER_1_5') {
+    evidence('Combined Over 1.5 venue rate', averageAvailable(homeOver15, awayOver15), value => value >= 70, value => value <= 40);
+    evidence('Combined venue goal pace', goalPace, value => value >= 2.4, value => value <= 1.7);
+  } else if (market === 'UNDER_2_5') {
+    evidence('Combined Under 2.5 venue rate', averageAvailable(homeUnder25, awayUnder25), value => value >= 60, value => value <= 25);
+    evidence('Combined venue goal pace', goalPace, value => value <= 2.4, value => value >= 3.2);
+  } else if (market === 'UNDER_3_5') {
+    evidence('Combined Under 3.5 venue rate', averageAvailable(homeUnder35, awayUnder35), value => value >= 70, value => value <= 45);
+    evidence('Combined venue goal pace', goalPace, value => value <= 3.0, value => value >= 3.8);
+  } else if (market === 'BTTS_YES') {
+    evidence('Combined BTTS venue rate', averageAvailable(homeBtts, awayBtts), value => value >= 60, value => value <= 25);
+    evidence('Both teams scoring frequency', averageAvailable(splitRate(home, 'scoredIn'), splitRate(away, 'scoredIn')), value => value >= 80, value => value <= 45);
+  } else if (market === 'BTTS_NO') {
+    evidence('Combined BTTS venue rate', averageAvailable(homeBtts, awayBtts), value => value <= 35, value => value >= 75);
+    evidence('Combined failed-to-score rate', averageAvailable(splitRate(home, 'failedToScore'), splitRate(away, 'failedToScore')), value => value >= 30, value => value <= 10);
+  } else if (market.includes('OVER_1_5') && (market.startsWith('HOME_') || market.startsWith('AWAY_'))) {
+    const selected = market.startsWith('HOME_') ? home : away;
+    evidence('Selected team two-goal frequency', splitRate(selected, 'scored2Plus'), value => value >= 60, value => value <= 20);
+    evidence('Selected team venue scoring average', statNumber(selected?.goalsForAvg), value => value >= 1.7, value => value < 0.9);
+  } else if (market.includes('OVER_0_5') && (market.startsWith('HOME_') || market.startsWith('AWAY_'))) {
+    const selected = market.startsWith('HOME_') ? home : away;
+    evidence('Selected team scoring frequency', splitRate(selected, 'scoredIn'), value => value >= 80, value => value <= 40);
+    evidence('Selected team venue scoring average', statNumber(selected?.goalsForAvg), value => value >= 1.2, value => value < 0.6);
+  } else if (['HOME_WIN', 'AWAY_WIN', 'DOUBLE_CHANCE_1X', 'DOUBLE_CHANCE_X2'].includes(market)) {
+    const selectedSide = market.startsWith('HOME') || market.endsWith('1X') ? 'home' : 'away';
+    const selected = selectedSide === 'home' ? home : away;
+    const opponent = selectedSide === 'home' ? away : home;
+    const selectedPpg = statNumber(selected?.ppg);
+    const opponentPpg = statNumber(opponent?.ppg);
+    const ppgGap = selectedPpg !== null && opponentPpg !== null ? round(selectedPpg - opponentPpg, 2) : null;
+    evidence('Selected-side venue PPG gap', ppgGap, value => value >= 0.6, value => value <= -0.7);
+    evidence('Selected-side win rate', splitRate(selected, 'wins'), value => value >= 60, value => value <= 20 && splitRate(opponent, 'losses') !== null && splitRate(opponent, 'losses') <= 20);
+    if (structure?.favouriteSide && structure.favouriteSide !== selectedSide && market.includes('WIN')) {
+      contradicted = true;
+      checks.push({ label: 'Odds/stat direction', value: structure.favouriteSide, support: false, contradiction: true });
+    }
+  }
+
+  const contradictionCount = checks.filter(item => item.contradiction).length;
+  const supportCount = checks.filter(item => item.support).length;
+  const status = contradicted && contradictionCount >= 1 ? 'CONTRADICTED' : supported ? 'SUPPORTED' : 'NEUTRAL';
+  const score = checks.length ? round((supportCount / checks.length) * 100, 1) : null;
+  const reasons = checks.map(item => {
+    const printable = typeof item.value === 'number' ? item.value.toFixed(1) : String(item.value);
+    return `${item.label}: ${printable}${typeof item.value === 'number' && item.label.includes('rate') ? '%' : ''}${item.contradiction ? ' (strong contradiction)' : item.support ? ' (supports)' : ' (neutral)'}.`;
+  });
+  return { source: 'API_FOOTBALL', status, samples, score, checks, reasons };
+}
+
 function pickBest(candidates) {
   const priority = {
     FAV_TEAM_OVER_1_5: 100,
@@ -185,7 +299,7 @@ function pickBest(candidates) {
     })[0] || null;
 }
 
-export function analyzeMarketRoute(fixture = {}) {
+export function analyzeMarketRoute(fixture = {}, stats = null) {
   const odds = fixture.odds || {};
   const structure = implied1x2(odds);
   const favouriteWin = sideMarket(structure, odds, 'WIN');
@@ -301,14 +415,37 @@ export function analyzeMarketRoute(fixture = {}) {
   }
 
   const best = pickBest(candidates);
+  const validation = statisticalValidation(best?.selection || null, fixture, stats, structure);
+  if (best?.selection && validation.status === 'CONTRADICTED') {
+    return {
+      engine: 'MARKET_ROUTE',
+      decision: 'STAT_CONFLICT',
+      selection: null,
+      candidates,
+      structure,
+      statisticalValidation: validation,
+      explanation: `${best.name} passed the SportyBet odds route, but API-Football venue statistics strongly contradict ${best.selection.label}. The engine rejected the pick.`
+    };
+  }
+  const selected = best?.selection
+    ? {
+        ...best.selection,
+        statisticalValidation: validation,
+        reasons: [
+          ...(best.selection.reasons || []),
+          ...(validation.status === 'SUPPORTED' ? [`API-Football statistics support the route (${validation.score ?? 0}% evidence agreement).`] : validation.status === 'NEUTRAL' ? ['API-Football statistics are neutral and do not oppose the SportyBet route.'] : [])
+        ]
+      }
+    : null;
   return {
     engine: 'MARKET_ROUTE',
     decision: best?.decision || 'NO_SIGNAL',
-    selection: best?.selection || null,
+    selection: selected,
     candidates,
     structure,
-    explanation: best?.selection
-      ? `${best.name} selected ${best.selection.label}${best.decision === 'SAFER' ? ` as the safer market after ${best.selection.missed} missed condition${best.selection.missed === 1 ? '' : 's'}` : ''}.`
+    statisticalValidation: validation,
+    explanation: selected
+      ? `${best.name} selected ${selected.label}${best.decision === 'SAFER' ? ` as the safer market after ${selected.missed} missed condition${selected.missed === 1 ? '' : 's'}` : ''}. ${validation.status === 'SUPPORTED' ? 'API-Football statistics support the direction.' : validation.status === 'NEUTRAL' ? 'API-Football statistics do not strongly oppose the direction.' : 'The statistical gate is waiting for enough venue history.'}`
       : 'No route passed. Three or more conditions were missing from every market direction, or the safer market was unavailable.'
   };
 }
@@ -318,6 +455,7 @@ export function marketRouteSummary(result = {}) {
     decision: result.decision || 'NO_SIGNAL',
     selection: result.selection || null,
     structure: result.structure || null,
+    statisticalValidation: result.statisticalValidation || null,
     closest: [...(result.candidates || [])].sort((a, b) => a.failures.length - b.failures.length || b.score - a.score)[0] || null,
     explanation: result.explanation || null
   };

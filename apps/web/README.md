@@ -1,25 +1,11 @@
-# Betynz v3.8.0 — SportyBet-only core
+# Betynz Web v4.0.1
 
-Betynz now uses the private **Betynz SportyBet Core API** as its only football-data source.
+This web application is the public layer of the unified single-Render Betynz repository.
 
-The API supplies:
+- SportyBet custom API: fixtures, prices, live state and results.
+- API-Football: engine statistics, official team crests and league visuals.
+- Supabase: admin, frozen predictions, proof, settlement and learning.
 
-- fixtures and kickoff times;
-- every offered SportyBet market and price;
-- live scores, minutes, status and incidents;
-- half-time and full-time scores;
-- finished results for automatic settlement;
-- result-derived team history, streaks and competition profiles.
+The browser only calls same-origin `/api/*` routes. All provider keys remain server-side.
 
-No Parse.bot, BetExplorer, API-Football, The Odds API or demo feed exists in this release. Supabase is storage only for admin access, frozen predictions, proof, settlement, performance and learning.
-
-## Repositories
-
-Deploy as two clean repositories:
-
-```text
-betynz-sportybet-api
-betynz-web
-```
-
-Deploy the API first, then set its Render URL and shared private key on the web service.
+Detailed API-Football behavior is documented in `docs/API_FOOTBALL_ENRICHMENT.md`.

@@ -1,9 +1,9 @@
 {
-  "name": "betynz-unified-sportybet",
-  "version": "3.8.0",
+  "name": "betynz-unified-sportybet-api-football",
+  "version": "4.0.1",
   "private": true,
   "type": "module",
-  "description": "Single-service Betynz deployment containing the SportyBet core API and all Betynz prediction engines.",
+  "description": "Single-Render Betynz platform: SportyBet custom API for fixtures, odds, live scores and results; API-Football for engine statistics and official visuals.",
   "engines": {
     "node": ">=20"
   },

@@ -1,42 +1,42 @@
-# Betynz single-Render deployment
+# Deploy Betynz v4.0.1 on one Render service
 
-## GitHub
+The root `render.yaml` declares exactly one Render web service. The launcher starts:
 
-Use one repository. The repository root must contain:
+- a private SportyBet core API on `127.0.0.1:10001`;
+- the public Betynz web/API server on Render's public port.
 
-```text
-apps/
-package.json
-render.yaml
-scripts/
-test/
-```
+API-Football is called directly from the public Betynz server process with the private Render secret.
 
-There must be no second `render.yaml` inside either app folder.
-
-## Render
-
-Create a Blueprint from the repository. The included `render.yaml` creates exactly one web service.
-
-Required private values:
+## Required secret
 
 ```env
-SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
+API_FOOTBALL_KEY=YOUR_DIRECT_API_SPORTS_KEY
 ```
 
-`SPORTYBET_API_KEY` is optional in this combined build. When omitted, the launcher generates a strong private key and passes it only between the two internal workers.
+The Blueprint already supplies:
 
-## Verification
-
-Open:
-
-```text
-https://YOUR-SERVICE.onrender.com/api/health
-https://YOUR-SERVICE.onrender.com/api/config
-https://YOUR-SERVICE.onrender.com/api/fixtures?date=YYYY-MM-DD
-https://YOUR-SERVICE.onrender.com/api/live?date=YYYY-MM-DD
+```env
+API_FOOTBALL_BASE_URL=https://v3.football.api-sports.io
+API_FOOTBALL_KEY_HEADER=x-apisports-key
+API_FOOTBALL_HISTORY_LAST=40
+API_FOOTBALL_MAPPING_THRESHOLD=0.55
+API_FOOTBALL_DEEP_STATS=true
 ```
 
-`/api/health` should report Betynz `3.8.0`. `/api/config` should identify the SportyBet custom API for fixtures, odds, statistics, live data and results.
+The default 30-fixture daily automatic-enrichment cap protects API quota. Matches beyond the cap remain visible and can still receive API-Football intelligence when opened.
+
+## Deployment sequence
+
+1. Push the repository to GitHub.
+2. Create a Render Blueprint from it.
+3. Enter the API-Football and Supabase secrets.
+4. Deploy.
+5. Check `/api/health` and confirm both `sportybet` and `apiFootball` are `true`.
+6. Open a mapped fixture and confirm team crests, five-home/five-away venue history, standings and season statistics appear.
+7. Hard-refresh with `Ctrl + Shift + R` so the `betynz-v4-0-1` service-worker cache activates.
+
+No second Render service and no second `render.yaml` are required.
+
+## Full daily coverage
+
+`SPORTYBET_MAX_PAGES=0` means continue through every SportyBet page until the feed is exhausted. API-Football enrichment and crest mapping run across every fixture returned for the selected day.

@@ -23,4 +23,7 @@ const starter = await readFile(join(root, 'scripts', 'start-combined.mjs'), 'utf
 for (const required of ['apps/sportybet-api', 'apps/web', 'BETYNZ_DATA_API_BASE_URL', 'SPORTYBET_API_KEY']) {
   if (!starter.includes(required.split('/').pop()) && !starter.includes(required)) throw new Error(`Combined launcher is missing ${required}.`);
 }
-console.log('Single-Render verification passed: one service, one render.yaml, SportyBet core + Betynz engines.');
+for (const required of ['API_FOOTBALL_KEY', 'API_FOOTBALL_BASE_URL', 'API_FOOTBALL_KEY_HEADER']) {
+  if (!render.includes(required)) throw new Error(`Root Render configuration is missing ${required}.`);
+}
+console.log('Single-Render verification passed: one service, one render.yaml, SportyBet core + API-Football intelligence + Betynz engines.');

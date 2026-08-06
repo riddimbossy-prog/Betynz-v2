@@ -957,15 +957,15 @@ async function requestFeedStrategy({ base, key, headerName, timeoutMs, retries, 
   let firstBody = null;
 
   const configuredPageLimit = Number(maxPages);
-  const hardSafetyPages = 1000;
-  for (let page = 1; page <= hardSafetyPages && (!(configuredPageLimit > 0) || page <= configuredPageLimit); page += 1) {
+  for (let page = 1; ; page += 1) {
+    if (configuredPageLimit > 0 && page > configuredPageLimit) break;
     const pagedPath = setPathQuery(path, { page, page_size: pageSize });
     const url = endpointUrl(base, pagedPath, date);
     let body;
     try {
       body = await fetchFeedJsonWithRetry(
         url,
-        { headers: { [headerName]: key, accept: 'application/json', 'user-agent': 'Betynz-Data-API-Worker/3.8.0' } },
+        { headers: { [headerName]: key, accept: 'application/json', 'user-agent': 'Betynz-Data-API-Worker/4.0.1' } },
         timeoutMs,
         retries
       );
@@ -1159,7 +1159,7 @@ function actionPath(name, fallback = '') {
 function actionHeaders() {
   const config = resolveDataApiConfig();
   return config.configured
-    ? { [config.headerName]: config.key, accept: 'application/json', 'user-agent': 'Betynz-Data-API-Worker/3.8.0' }
+    ? { [config.headerName]: config.key, accept: 'application/json', 'user-agent': 'Betynz-Data-API-Worker/4.0.1' }
     : { accept: 'application/json' };
 }
 

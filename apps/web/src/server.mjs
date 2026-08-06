@@ -7,9 +7,7 @@ import {
   fetchDataApiFixtures,
   isSrlFixture,
   resolveDataApiConfig,
-  enrichDataApiFixtures,
   enrichDataApiMarketOdds,
-  getDataApiIntelligence,
   getDataApiLiveFixtures,
   getDataApiFixtureEvents,
   diagnoseDataApi
@@ -39,10 +37,18 @@ import { buildLearningRecommendations, buildPerformance, proofData, settleDate }
 import { summarizeOddsSnapshots, closingLineValue } from './lib/oddsMovement.mjs';
 import { buildLeagueIntelligence } from './lib/leagueIntelligence.mjs';
 import { buildAgreementPerformance, buildCalibrationReport } from './lib/calibration.mjs';
+import {
+  apiFootballConfigured,
+  apiFootballPublicConfig,
+  enrichApiFootballStatsBoard,
+  enrichApiFootballVisuals,
+  getApiFootballIntelligence,
+  resolveApiFootballTeam
+} from './lib/apiFootball.mjs';
 
 await loadLocalEnv();
 
-const APP_VERSION = '3.8.0';
+const APP_VERSION = '4.0.1';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const CONVERGENCE_ROUTE_CODE = 'CONVERGENCE_ROUTE';
@@ -332,14 +338,22 @@ async function getMarketRouteBoard(date) {
   if (cached) return { ...cached, cache: 'HIT' };
   const board = await getFastFixtureBoard(date);
   const marketEnrichment = await enrichDataApiMarketOdds(date, board.fixtures);
-  const fixtures = marketEnrichment.fixtures || board.fixtures;
-  const items = fixtures.map(fixture => ({ fixture, engine: analyzeMarketRoute(fixture) }));
+  const pricedFixtures = marketEnrichment.fixtures || board.fixtures;
+  const statisticsEnrichment = await enrichApiFootballStatsBoard(date, pricedFixtures, extractVenueStats);
+  const fixtures = statisticsEnrichment.fixtures || pricedFixtures;
+  const items = fixtures.map(fixture => {
+    const stats = fixture?.stats?.homeSplit || fixture?.stats?.awaySplit
+      ? { homeSplit: fixture.stats?.homeSplit || null, awaySplit: fixture.stats?.awaySplit || null }
+      : null;
+    return { fixture: publicFixture(fixture), engine: analyzeMarketRoute(fixture, stats), venueForm: publicVenueForm(stats) };
+  }).filter(item => item.fixture);
   await storePredictions(date, items, MARKET_ROUTE_CODE);
   const response = {
     date,
     engine: 'Market Route Engine',
     source: 'SPORTYBET_CUSTOM_API',
-    warning: board.warning,
+    statisticsSource: statisticsEnrichment.configured ? 'API_FOOTBALL' : null,
+    warning: statisticsEnrichment.warning || board.warning || null,
     qualified: items.filter(item => item.engine.selection),
     all: items,
     summary: {
@@ -365,7 +379,7 @@ async function getStatsRouteBoards(date) {
   if (statsBoardInflight.has(key)) return statsBoardInflight.get(key);
   const task = (async () => {
     const board = await getFastFixtureBoard(date);
-    const enrichment = await enrichDataApiFixtures(date, board.fixtures, extractVenueStats);
+    const enrichment = await enrichApiFootballStatsBoard(date, board.fixtures, extractVenueStats);
     const enrichedFixtures = enrichment.fixtures || [];
     const ppgItems = [];
     const convergenceItems = [];
@@ -386,7 +400,7 @@ async function getStatsRouteBoards(date) {
     const makeResponse = (engine, items) => ({
       date,
       engine,
-      source: enrichment.source || 'SPORTYBET_CUSTOM_API',
+      source: enrichment.source || 'API_FOOTBALL',
       warning: enrichment.warning || board.warning || null,
       qualified: items.filter(item => item.engine.selection),
       all: items,
@@ -713,32 +727,23 @@ async function getEngineAudit(date) {
   return response;
 }
 
-async function findDataApiTeamVisual(name, country = '', startDate = utcDateOffset(0)) {
-  const wanted = normalizeName(name);
-  if (!wanted) return null;
-  for (let offset = 0; offset < 7; offset += 1) {
-    const date = addDays(startDate, offset);
-    const board = await getFastFixtureBoard(date).catch(() => ({ fixtures: [] }));
-    for (const fixture of board.fixtures || []) {
-      for (const side of [fixture.home, fixture.away]) {
-        const sideName = normalizeName(side?.name || '');
-        if (!sideName || (sideName !== wanted && !sideName.includes(wanted) && !wanted.includes(sideName))) continue;
-        if (!side?.logo) continue;
-        return {
-          id: side.id || side.name,
-          name: side.name,
-          country: fixture.league?.country || country || null,
-          confidence: sideName === wanted ? 1 : 0.85,
-          logo: side.logo
-        };
-      }
-    }
-  }
-  return null;
+async function findDataApiTeamVisual(name, country = '') {
+  return resolveApiFootballTeam(name, country).catch(() => null);
 }
 
-async function serveTeamCrest(res) {
-  res.writeHead(404, securityHeaders());
+async function serveTeamCrest(res, url) {
+  const name = String(url?.searchParams?.get('name') || '').trim();
+  const country = String(url?.searchParams?.get('country') || '').trim();
+  if (name.length < 2) {
+    res.writeHead(404, securityHeaders());
+    return res.end();
+  }
+  const visual = await findDataApiTeamVisual(name, country);
+  if (!visual?.logo) {
+    res.writeHead(404, securityHeaders());
+    return res.end();
+  }
+  res.writeHead(302, { ...securityHeaders(), location: visual.logo, 'cache-control': 'public, max-age=604800' });
   res.end();
 }
 
@@ -771,7 +776,7 @@ async function requireAdmin(req, res) {
 }
 
 async function apiRoute(req, res, url) {
-  if (url.pathname === '/api/health') return json(res, 200, { ok: true, app: 'Betynz', version: APP_VERSION, engines: ENGINE_CODES, systems: ['CONSENSUS_BANKERS', 'AUTOMATIC_CALIBRATION'], time: new Date().toISOString() });
+  if (url.pathname === '/api/health') return json(res, 200, { ok: true, app: 'Betynz', version: APP_VERSION, engines: ENGINE_CODES, systems: ['CONSENSUS_BANKERS', 'AUTOMATIC_CALIBRATION'], configured: { sportybet: resolveDataApiConfig().configured, apiFootball: apiFootballConfigured(), supabase: supabaseConfigured() }, sourceRoles: { fixtures: 'SPORTYBET_CUSTOM_API', odds: 'SPORTYBET_CUSTOM_API', live: 'SPORTYBET_CUSTOM_API', results: 'SPORTYBET_CUSTOM_API', statistics: 'API_FOOTBALL', visuals: 'API_FOOTBALL' }, fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null }, time: new Date().toISOString() });
 
   if (url.pathname === '/api/config') return json(res, 200, {
     appName: process.env.APP_NAME || 'Betynz',
@@ -779,7 +784,8 @@ async function apiRoute(req, res, url) {
     engines: ['Market Route Engine', 'PPG Route Engine', 'Convergence Engine'],
     systems: ['Consensus Bankers', 'Settlement Calibration'],
     consensusFreezeMinutes: Math.max(5, Number(process.env.CONSENSUS_FREEZE_MINUTES || 30)),
-    dataSources: { fixtures: 'SportyBet custom API', odds: 'SportyBet custom API', statistics: 'SportyBet custom API', live: 'SportyBet custom API', results: 'SportyBet custom API' },
+    dataSources: { fixtures: 'SportyBet custom API', odds: 'SportyBet custom API', statistics: 'API-Football', visuals: 'API-Football', live: 'SportyBet custom API', results: 'SportyBet custom API' },
+    fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null },
     responsiblePlay: 'Predictions are informational, not guarantees. Adults only.'
   });
 
@@ -797,7 +803,7 @@ async function apiRoute(req, res, url) {
   }
 
   if (url.pathname === '/api/team-visuals') {
-    const names = String(url.searchParams.get('names') || '').split('|').map(value => value.trim()).filter(value => value.length >= 3).slice(0, 30);
+    const names = String(url.searchParams.get('names') || '').split('|').map(value => value.trim()).filter(value => value.length >= 3);
     const country = String(url.searchParams.get('country') || '').trim();
     const teams = await Promise.all(names.map(async name => {
       const visual = await findDataApiTeamVisual(name, country).catch(() => null);
@@ -810,13 +816,13 @@ async function apiRoute(req, res, url) {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
     const board = await getFastFixtureBoard(date);
-    const visuals = (board.fixtures || []).map(item => ({
-      fixtureId: item.id,
-      home: { logo: item.home?.logo || null, id: item.home?.id || null },
-      away: { logo: item.away?.logo || null, id: item.away?.id || null },
-      league: { logo: item.league?.logo || null, flag: item.league?.flag || null }
-    }));
-    return jsonCached(res, 200, { date, source: 'SPORTYBET_CUSTOM_API', visuals }, 1800);
+    const enrichment = await enrichApiFootballVisuals(date, board.fixtures || []).catch(() => ({ configured: apiFootballConfigured(), source: null, visuals: [] }));
+    return jsonCached(res, 200, {
+      date,
+      configured: enrichment.configured,
+      source: enrichment.source || 'API_FOOTBALL',
+      visuals: enrichment.visuals || []
+    }, 1800);
   }
 
   if (url.pathname === '/api/auth/login') {
@@ -856,6 +862,8 @@ async function apiRoute(req, res, url) {
         dataApi: resolveDataApiConfig().configured,
         dataApiCandidates: resolveDataApiConfig().candidateCount || 0,
         dataApiIntelligence: resolveDataApiConfig().configured,
+        apiFootball: apiFootballConfigured(),
+        apiFootballConfig: apiFootballPublicConfig(),
         supabase: supabaseConfigured()
       }
     });
@@ -952,17 +960,17 @@ async function apiRoute(req, res, url) {
     const cached = cacheGet(key);
     if (cached) return jsonCached(res, 200, { ...cached, cache: 'HIT' }, 120);
     try {
-      const [board, apiStats] = await Promise.all([
-        getFastFixtureBoard(date),
-        getDataApiIntelligence(context).catch(() => null)
-      ]);
+      const board = await getFastFixtureBoard(date);
       const fixture = matchFixture(board.fixtures, context);
       if (!fixture) return json(res, 200, { available: false, error: 'FIXTURE_NOT_FOUND', loadMs: Date.now() - started });
-      const embedded = fixture?.stats?.homeSplit && fixture?.stats?.awaySplit
-        ? { homeSplit: fixture.stats.homeSplit, awaySplit: fixture.stats.awaySplit }
-        : null;
-      const stats = embedded || extractVenueStats(apiStats, context);
-      const engine = analyzeMarketRoute(fixture);
+      const apiStats = await getApiFootballIntelligence({ ...context, date }, fixture, { mode: 'deep' }).catch(() => null);
+      const stats = extractVenueStats(apiStats, context);
+      if (apiStats?.fixture) {
+        fixture.home = { ...fixture.home, id: apiStats.fixture.home?.id || fixture.home?.id || null, logo: apiStats.fixture.home?.logo || fixture.home?.logo || null };
+        fixture.away = { ...fixture.away, id: apiStats.fixture.away?.id || fixture.away?.id || null, logo: apiStats.fixture.away?.logo || fixture.away?.logo || null };
+        fixture.league = { ...fixture.league, id: apiStats.fixture.league?.id || fixture.league?.id || null, logo: apiStats.fixture.league?.logo || fixture.league?.logo || null, flag: apiStats.fixture.league?.flag || fixture.league?.flag || null, season: apiStats.fixture.league?.season || fixture.league?.season || null };
+      }
+      const engine = analyzeMarketRoute(fixture, stats);
       const ppgEngine = analyzePpgRoute(fixture, stats);
       const convergenceEngine = analyzeConvergence(fixture, stats);
       const selectedPicks = [
@@ -998,7 +1006,8 @@ async function apiRoute(req, res, url) {
         consensusEngine,
         venueForm: publicVenueForm(stats),
         statisticsAvailable: Boolean(stats?.homeSplit || stats?.awaySplit),
-        statisticsSource: apiStats ? 'SPORTYBET_CUSTOM_API' : embedded ? 'SPORTYBET_CUSTOM_API_EMBEDDED' : null,
+        statisticsSource: apiStats?.mapped ? 'API_FOOTBALL' : null,
+        apiFootball: apiStats ? { mapped: Boolean(apiStats.mapped), mappingConfidence: apiStats.mappingConfidence || 0, fixture: apiStats.fixture || null, standings: apiStats.standings || null, teamStatistics: apiStats.teamStatistics || null, h2h: apiStats.h2h || [], predictions: apiStats.predictions || null, injuries: apiStats.injuries || [], fixtureStatistics: apiStats.fixtureStatistics || [], lineups: apiStats.lineups || [], events: apiStats.events || [], players: apiStats.players || [] } : null,
         note: 'Three independent engines are measured separately. The Consensus System publishes the safest shared market only when their directions agree.',
         loadMs: Date.now() - started,
         cache: 'MISS'

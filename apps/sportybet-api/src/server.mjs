@@ -53,10 +53,11 @@ async function route(req, url) {
     return { status: 200, payload: {
       ok: true,
       service: 'Betynz SportyBet Core API',
-      version: '1.0.0',
+      version: '1.0.1',
       source: 'SPORTYBET_CUSTOM_API',
       apiKeyConfigured: Boolean(apiKey),
       capabilities: ['fixtures','all-markets','live-scores','results','event-details','team-history-from-results','streaks','competition-stats'],
+      fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null, pagination: 'UNTIL_EXHAUSTED' },
       providers: { sportybet: true, parseBot: false, apiFootball: false, oddsApi: false, betExplorer: false },
       time: new Date().toISOString()
     } };
@@ -183,6 +184,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, '0.0.0.0', () => {
-  console.log(`Betynz SportyBet Core API v1.0.0 listening on ${port}`);
+  console.log(`Betynz SportyBet Core API v1.0.1 listening on ${port}`);
   if (!apiKey) console.warn('[security] SPORTYBET_API_KEY is not configured; all private data routes will reject requests.');
 });

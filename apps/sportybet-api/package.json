@@ -1,10 +1,12 @@
 {
   "name": "betynz-sportybet-core-api",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Private SportyBet-only football data API for Betynz fixtures, markets, live scores and results.",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/server.mjs",
     "dev": "node --watch src/server.mjs",

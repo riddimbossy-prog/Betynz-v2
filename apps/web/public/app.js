@@ -20,7 +20,6 @@ const state = {
   fixtures: [],
   filtered: [],
   selected: null,
-  limit: window.innerWidth <= 560 ? 12 : window.innerWidth <= 1000 ? 20 : 30,
   routeByFixture: new Map(),
   ppgByFixture: new Map(),
   convergenceByFixture: new Map(),
@@ -109,7 +108,6 @@ function setHomeSpotlightMessage(message, detail = '') {
 
 async function loadDate(date, force = false) {
   state.selectedDate = date;
-  state.limit = window.innerWidth <= 560 ? 12 : window.innerWidth <= 1000 ? 20 : 30;
   state.fixtures = [];
   state.filtered = [];
   state.routeByFixture = new Map();
@@ -203,7 +201,7 @@ function teamCrest(team, country, fixtureId, side) {
 
 function renderList() {
   const list = $('#matchList');
-  const visible = state.filtered.slice(0, state.limit);
+  const visible = state.filtered;
   if (!visible.length) {
     list.innerHTML = '<div class="empty-state"><h3>No matches found</h3><p>Change the date or filters.</p></div>';
     $('#visibleMatches').textContent = '0 matches shown';
@@ -242,8 +240,8 @@ function renderList() {
     </button>`;
   }).join('');
   $$('.match-row').forEach(button => button.addEventListener('click', () => openMatch(button.dataset.fixtureId)));
-  $('#visibleMatches').textContent = `Showing ${visible.length} of ${state.filtered.length} matches`;
-  $('#loadMoreBtn').hidden = visible.length >= state.filtered.length;
+  $('#visibleMatches').textContent = `All ${state.filtered.length} matches for this day`;
+  $('#loadMoreBtn').hidden = true;
 }
 
 function homeConsensusCard(row, tone = '') {
@@ -609,7 +607,6 @@ function setupEvents() {
   $('#leagueFilter').addEventListener('change', applyFilters);
   $('#statusFilter').addEventListener('change', applyFilters);
   $('#searchInput').addEventListener('input', applyFilters);
-  $('#loadMoreBtn').addEventListener('click', () => { state.limit += window.innerWidth <= 560 ? 12 : 20; renderList(); });
   $('#closeMatchDialog').addEventListener('click', closeDialog);
   $('#matchIntelDialog').addEventListener('click', event => { if (event.target === $('#matchIntelDialog')) closeDialog(); });
   window.addEventListener('keydown', event => { if (event.key === 'Escape' && $('#matchIntelDialog').open) closeDialog(); });

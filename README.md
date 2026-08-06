@@ -1,36 +1,39 @@
-# Betynz Unified SportyBet Build v3.8.0
+# Betynz v4.0.1 — Unified SportyBet + API-Football Intelligence
 
-This repository deploys the complete Betynz platform as **one Render web service**.
+One GitHub repository, one Node process launcher, one Render web service and one root `render.yaml`.
 
-## Included in this one build
+## Data roles
 
-- Private SportyBet core API
-- Upcoming fixtures and full SportyBet markets
-- Live scores, minutes, half-time scores and incidents
-- Results and automatic settlement feed
-- Market Route Engine
-- PPG Route Engine
-- Convergence Engine
-- Consensus Bankers and automatic calibration
-- Proof, performance, league intelligence and odds movement
-- Supabase-backed admin, proof, settlement and learning storage
+| Role | Source |
+|---|---|
+| Fixtures and kickoff | Private SportyBet custom API |
+| Offered markets and odds | Private SportyBet custom API |
+| Live scores, minutes and incidents | Private SportyBet custom API |
+| Final results and settlement | Private SportyBet custom API |
+| Engine venue history and PPG | API-Football |
+| Standings, season profiles, H2H, predictions and injuries | API-Football |
+| Team crests and league visuals | API-Football |
+| Lineups, events, fixture/player statistics | API-Football, loaded on match open |
+| Admin, proof, settlement and learning storage | Supabase |
 
-## Runtime architecture
+API-Football enrichment never overwrites SportyBet fixture identity, market availability or prices.
 
-The root launcher starts two tightly coupled Node workers inside the same Render container:
+## Engines
 
-1. `apps/sportybet-api` listens only on the internal port configured by `SPORTYBET_INTERNAL_PORT`.
-2. `apps/web` listens on Render's public `PORT` and receives its API base URL and private key automatically.
-
-Only the Betynz web port is routed publicly. The engines cannot be pointed to a third-party sports provider through Render settings because the launcher injects the internal SportyBet core URL.
+- Market Route: SportyBet odds structure plus an API-Football support/contradiction gate.
+- PPG Route: last five home versus last five away API-Football venue PPG.
+- Convergence: API-Football attack, defence, venue and goal-profile evidence plus SportyBet market confirmation.
+- Consensus: combines only independently qualified engine selections.
 
 ## Deploy
 
-1. Create one blank GitHub repository.
-2. Upload the contents of this package to the repository root.
-3. In Render choose **New → Blueprint** and connect the repository.
-4. Render reads the single root `render.yaml` and creates one service named `betynz`.
-5. Add the three fresh Supabase values when prompted.
-6. Deploy and open `/api/health`.
+1. Upload the contents of this repository to one GitHub repository.
+2. In Render choose **New → Blueprint** and select the repository.
+3. Add `API_FOOTBALL_KEY` and the three Supabase values when prompted.
+4. Deploy and check `/api/health`.
 
-No separate SportyBet API Render service is required.
+See `START_HERE.md` and `DEPLOY_SINGLE_RENDER.md`.
+
+## Full-day fixture coverage
+
+There is no application-level daily fixture cap. SportyBet pagination continues until empty or repeated, every returned fixture is displayed, and API-Football enrichment is applied across the complete day.

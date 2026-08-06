@@ -1,61 +1,61 @@
-# Start here — Betynz single-Render build
+# Start here — Betynz v4.0.1
 
-This package replaces the earlier two-service setup.
+## 1. Upload one repository
 
-## What to upload
-
-Upload **everything inside this folder** to one blank GitHub repository. Do not upload the containing folder as another nested level.
-
-The repository root must show:
+Extract the ZIP and upload everything inside the extracted folder to one blank GitHub repository. The repository root must contain:
 
 ```text
-apps/
-package.json
-package-lock.json
 render.yaml
+package.json
+apps/
 scripts/
 test/
-README.md
-DEPLOY_SINGLE_RENDER.md
 ```
 
-## Render
+Do not upload an extra parent folder around these files.
 
-1. Choose **New → Blueprint**.
-2. Connect the new GitHub repository.
-3. Render reads the only `render.yaml` and creates one service named `betynz`.
-4. Enter the three new Supabase values when prompted.
-5. Deploy.
+## 2. Create one Render Blueprint
 
-You do not need a second Render service for the SportyBet API. The same container starts the private SportyBet core on an internal port, then starts the public Betynz website.
+In Render choose **New → Blueprint**, connect the repository and let Render read the single root `render.yaml`.
 
-## Supabase values
+Add these private values:
 
 ```env
-SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
+API_FOOTBALL_KEY=YOUR_DIRECT_API_SPORTS_KEY
+SUPABASE_URL=YOUR_NEW_SUPABASE_URL
+SUPABASE_ANON_KEY=YOUR_NEW_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_NEW_SUPABASE_SERVICE_ROLE_KEY
 ```
 
-## First checks
+The `API_FOOTBALL_KEY` is used only on the server. Do not place it in GitHub code, browser JavaScript or Supabase client settings.
+
+## 3. Verify
+
+Open:
 
 ```text
-https://YOUR-SERVICE.onrender.com/api/health
-https://YOUR-SERVICE.onrender.com/api/config
-https://YOUR-SERVICE.onrender.com/api/fixtures?date=YYYY-MM-DD
-https://YOUR-SERVICE.onrender.com/api/live?date=YYYY-MM-DD
+https://YOUR-RENDER-SERVICE.onrender.com/api/health
 ```
 
-Expected engines:
+Expected core fields:
 
-```text
-MARKET_ROUTE
-PPG_ROUTE
-CONVERGENCE_ROUTE
+```json
+{
+  "ok": true,
+  "version": "4.0.1",
+  "configured": {
+    "sportybet": true,
+    "apiFootball": true
+  }
+}
 ```
 
-Expected football-data source:
+Then test the dashboard, a match popup, `/live.html`, `/proof.html` and `/performance.html` before connecting `betynz.com`.
 
-```text
-SPORTYBET_CUSTOM_API
-```
+## 4. API responsibilities
+
+SportyBet remains the source for matches, odds, live state and results. API-Football supplies the statistics and official crests used by the engines. Supabase stores proof and learning data only.
+
+## Full-day fixture coverage
+
+There is no application-level daily fixture cap. SportyBet pagination continues until empty or repeated, every returned fixture is displayed, and API-Football enrichment is applied across the complete day.

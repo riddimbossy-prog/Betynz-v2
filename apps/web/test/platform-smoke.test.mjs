@@ -40,7 +40,8 @@ test('full platform keeps all boards, consensus, calibration and SportyBet API e
     '/api/qualified-picks','/api/consensus-picks','/api/admin/engine-audit','/api/admin/calibration'
   ]) assert.match(server, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(server, /isSrlFixture/);
-  assert.match(server, /getDataApiIntelligence/);
+  assert.match(server, /getApiFootballIntelligence/);
+  assert.match(server, /enrichApiFootballStatsBoard/);
   assert.match(server, /fetchDataApiFixtures/);
 });
 
@@ -59,7 +60,7 @@ test('responsive interface includes phone, Z Fold, tablet, desktop and reduced-m
   assert.match(css, /100dvw|100dvh/);
 });
 
-test('production server boots against the private SportyBet API only', async t => {
+test('production server boots with SportyBet authority and optional API-Football enrichment', async t => {
   const port = await freePort();
   const feedPort = await freePort();
   const today = new Date().toISOString().slice(0, 10);
@@ -127,7 +128,7 @@ test('production server boots against the private SportyBet API only', async t =
   t.after(() => child.kill('SIGTERM'));
 
   const health = await (await waitFor(`http://127.0.0.1:${port}/api/health`)).json();
-  assert.equal(health.version, '3.8.0');
+  assert.equal(health.version, '4.0.1');
   assert.deepEqual(health.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'CONVERGENCE_ROUTE']);
 
   const fixturePayload = await (await fetch(`http://127.0.0.1:${port}/api/fixtures?date=${today}`)).json();
