@@ -187,7 +187,20 @@ function averageAvailable(...values) {
   return valid.length ? round(valid.reduce((sum, value) => sum + value, 0) / valid.length, 1) : null;
 }
 
+function statisticsSource(stats, fixture) {
+  const source = stats?.source || fixture?.stats?.source || 'SPORTYBET_CUSTOM_API';
+  return String(source).toUpperCase();
+}
+
+function statisticsLabel(source) {
+  return source === 'SPORTYBET_CUSTOM_API' ? 'SportyBet primary statistics'
+    : source === 'API_FOOTBALL_FALLBACK' ? 'API-Football fallback statistics'
+      : 'Enriched statistics';
+}
+
 function statisticalValidation(selection, fixture, stats, structure) {
+  const source = statisticsSource(stats, fixture);
+  const sourceLabel = statisticsLabel(source);
   const home = stats?.homeSplit || stats?.home || fixture?.stats?.homeSplit || null;
   const away = stats?.awaySplit || stats?.away || fixture?.stats?.awaySplit || null;
   const homePlayed = statNumber(home?.played) || 0;
@@ -195,11 +208,11 @@ function statisticalValidation(selection, fixture, stats, structure) {
   const samples = { home: homePlayed, away: awayPlayed, required: 3 };
   if (!selection || homePlayed < 3 || awayPlayed < 3) {
     return {
-      source: 'API_FOOTBALL',
+      source,
       status: 'UNAVAILABLE',
       samples,
       score: null,
-      reasons: [`API-Football venue samples are incomplete (${homePlayed}/3 home, ${awayPlayed}/3 away).`]
+      reasons: [`${sourceLabel} venue samples are incomplete (${homePlayed}/3 home, ${awayPlayed}/3 away).`]
     };
   }
 
@@ -277,7 +290,7 @@ function statisticalValidation(selection, fixture, stats, structure) {
     const printable = typeof item.value === 'number' ? item.value.toFixed(1) : String(item.value);
     return `${item.label}: ${printable}${typeof item.value === 'number' && item.label.includes('rate') ? '%' : ''}${item.contradiction ? ' (strong contradiction)' : item.support ? ' (supports)' : ' (neutral)'}.`;
   });
-  return { source: 'API_FOOTBALL', status, samples, score, checks, reasons };
+  return { source, status, samples, score, checks, reasons };
 }
 
 function pickBest(candidates) {
@@ -424,7 +437,7 @@ export function analyzeMarketRoute(fixture = {}, stats = null) {
       candidates,
       structure,
       statisticalValidation: validation,
-      explanation: `${best.name} passed the SportyBet odds route, but API-Football venue statistics strongly contradict ${best.selection.label}. The engine rejected the pick.`
+      explanation: `${best.name} passed the SportyBet odds route, but ${statisticsLabel(validation.source)} strongly contradict ${best.selection.label}. The engine rejected the pick.`
     };
   }
   const selected = best?.selection
@@ -433,7 +446,7 @@ export function analyzeMarketRoute(fixture = {}, stats = null) {
         statisticalValidation: validation,
         reasons: [
           ...(best.selection.reasons || []),
-          ...(validation.status === 'SUPPORTED' ? [`API-Football statistics support the route (${validation.score ?? 0}% evidence agreement).`] : validation.status === 'NEUTRAL' ? ['API-Football statistics are neutral and do not oppose the SportyBet route.'] : [])
+          ...(validation.status === 'SUPPORTED' ? [`${statisticsLabel(validation.source)} support the route (${validation.score ?? 0}% evidence agreement).`] : validation.status === 'NEUTRAL' ? [`${statisticsLabel(validation.source)} are neutral and do not oppose the SportyBet route.`] : [])
         ]
       }
     : null;
@@ -445,7 +458,7 @@ export function analyzeMarketRoute(fixture = {}, stats = null) {
     structure,
     statisticalValidation: validation,
     explanation: selected
-      ? `${best.name} selected ${selected.label}${best.decision === 'SAFER' ? ` as the safer market after ${selected.missed} missed condition${selected.missed === 1 ? '' : 's'}` : ''}. ${validation.status === 'SUPPORTED' ? 'API-Football statistics support the direction.' : validation.status === 'NEUTRAL' ? 'API-Football statistics do not strongly oppose the direction.' : 'The statistical gate is waiting for enough venue history.'}`
+      ? `${best.name} selected ${selected.label}${best.decision === 'SAFER' ? ` as the safer market after ${selected.missed} missed condition${selected.missed === 1 ? '' : 's'}` : ''}. ${validation.status === 'SUPPORTED' ? `${statisticsLabel(validation.source)} support the direction.` : validation.status === 'NEUTRAL' ? `${statisticsLabel(validation.source)} do not strongly oppose the direction.` : 'The statistical gate is waiting for enough venue history.'}`
       : 'No route passed. Three or more conditions were missing from every market direction, or the safer market was unavailable.'
   };
 }

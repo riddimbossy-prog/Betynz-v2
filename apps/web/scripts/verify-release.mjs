@@ -6,7 +6,7 @@ const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const combinedRoot = resolve(root, '..', '..');
 const required = [
   'package.json','package-lock.json','.env.example','src/server.mjs','src/lib/dataApi.mjs','src/lib/apiFootball.mjs','src/lib/results.mjs',
-  'src/engines/marketRoute.mjs','src/engines/ppgRoute.mjs','src/engines/convergence.mjs','src/engines/consensus.mjs','src/engines/settlement.mjs',
+  'src/lib/sourcePriority.mjs','src/engines/marketRoute.mjs','src/engines/ppgRoute.mjs','src/engines/convergence.mjs','src/engines/consensus.mjs','src/engines/settlement.mjs',
   'public/index.html','public/app.js','public/styles.css','public/motion.js','public/sw.js','public/picks.html','public/picks.js',
   'public/market-route.html','public/ppg-route.html','public/convergence.html','public/live.html','public/proof.html','public/performance.html',
   'public/admin-engine-audit.html','public/admin-calibration.html','docs/SPORTYBET_CORE_API_CONTRACT.md','docs/API_FOOTBALL_ENRICHMENT.md'
@@ -45,23 +45,23 @@ const privateText = `${env}\n${render}\n${launcher}\n${server}\n${adapter}\n${ap
 for (const forbidden of ['parse.bot','betexplorer','the-odds-api','odds_api']) {
   if (privateText.includes(forbidden)) throw new Error(`A retired provider reference remains: ${forbidden}`);
 }
-if (!/const APP_VERSION = '4\.0\.2'/.test(server)) throw new Error('Server version is not 4.0.2.');
+if (!/const APP_VERSION = '4\.0\.3'/.test(server)) throw new Error('Server version is not 4.0.3.');
 if (!/fetchDataApiFixtures/.test(server) || !/enrichDataApiMarketOdds/.test(server)) throw new Error('SportyBet custom API is not wired into the server.');
 if (!/enrichApiFootballStatsBoard/.test(server) || !/getApiFootballIntelligence/.test(server) || !/resolveApiFootballTeam/.test(server)) throw new Error('API-Football enrichment is not wired into the server.');
 if (!/SPORTYBET_CUSTOM_API/.test(adapter) || !/getDataApiResults/.test(results)) throw new Error('SportyBet live/results data flow is incomplete.');
 if (!/x-apisports-key/.test(apiFootball) || !/fixtures\/statistics/.test(apiFootball) || !/fixtures\/lineups/.test(apiFootball) || !/injuries/.test(apiFootball)) throw new Error('API-Football deep-stat contract is incomplete.');
 if (!/STAT_CONFLICT/.test(marketRoute) || !/statisticalValidation/.test(marketRoute)) throw new Error('Market Route statistical gate is missing.');
-if (!/betynz-v4-0-2/.test(sw)) throw new Error('Service-worker cache was not bumped.');
-if (pkg.version !== '4.0.2' || lock.version !== '4.0.2') throw new Error('Package versions are not 4.0.2.');
-if (pkg.name !== 'betynz-sportybet-api-football-intelligence' || lock.name !== pkg.name) throw new Error('Package names do not match.');
+if (!/betynz-v4-0-3/.test(sw)) throw new Error('Service-worker cache was not bumped.');
+if (pkg.version !== '4.0.3' || lock.version !== '4.0.3') throw new Error('Package versions are not 4.0.3.');
+if (pkg.name !== 'betynz-sportybet-primary-api-football-enrichment' || lock.name !== pkg.name) throw new Error('Package names do not match.');
 if (!/@media\(max-width:380px\)/.test(styles) || !/@media\(min-width:600px\) and \(max-width:760px\)/.test(styles) || !/@media\(prefers-reduced-motion:reduce\)/.test(styles)) throw new Error('Responsive safeguards are missing.');
 if (!/IntersectionObserver/.test(motion) || !/prefers-reduced-motion/.test(motion)) throw new Error('Motion accessibility safeguards are missing.');
 
 const tests = (await readdir(resolve(root, 'test'))).sort();
 const allowed = [
   'market-route.test.mjs','ppg-route.test.mjs','convergence.test.mjs','consensus.test.mjs','calibration.test.mjs','settlement.test.mjs',
-  'three-engine-reset.test.mjs','qualified-picks.test.mjs','responsive-cinematic.test.mjs','custom-data-api.test.mjs','api-football.test.mjs','platform-smoke.test.mjs'
+  'three-engine-reset.test.mjs','source-priority.test.mjs','qualified-picks.test.mjs','responsive-cinematic.test.mjs','custom-data-api.test.mjs','api-football.test.mjs','platform-smoke.test.mjs'
 ].sort();
 if (JSON.stringify(tests) !== JSON.stringify(allowed)) throw new Error(`Unexpected test files remain: ${tests.join(', ')}`);
 
-console.log('Release verification passed: Betynz 4.0.2 SportyBet + API-Football intelligence release.');
+console.log('Release verification passed: Betynz 4.0.3 SportyBet-primary statistics + API-Football enrichment release.');

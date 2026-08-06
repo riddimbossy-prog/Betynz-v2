@@ -26,4 +26,4 @@ for (const required of ['apps/sportybet-api', 'apps/web', 'BETYNZ_DATA_API_BASE_
 for (const required of ['API_FOOTBALL_KEY', 'API_FOOTBALL_BASE_URL', 'API_FOOTBALL_KEY_HEADER']) {
   if (!render.includes(required)) throw new Error(`Root Render configuration is missing ${required}.`);
 }
-console.log('Single-Render verification passed: one service, one render.yaml, SportyBet core + API-Football intelligence + Betynz engines.');
+console.log('Single-Render verification passed: one service, one render.yaml, SportyBet primary statistics + API-Football enrichment + Betynz engines.');

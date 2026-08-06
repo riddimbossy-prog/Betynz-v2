@@ -83,6 +83,7 @@ export function apiFootballPublicConfig(env = process.env) {
     baseUrl: value.baseUrl,
     headerName: value.headerName,
     fixtureScope: 'ALL_DAILY_FIXTURES',
+    role: 'CRESTS_AND_SECONDARY_ENRICHMENT_ONLY',
     mappingThreshold: value.mappingThreshold,
     deepStats: value.deepStats
   };
@@ -123,7 +124,7 @@ async function apiRequest(path, params = {}, ttlSeconds = null) {
           headers: {
             [current.headerName]: current.key,
             accept: 'application/json',
-            'user-agent': 'Betynz-API-Football-Enrichment/4.0.2'
+            'user-agent': 'Betynz-API-Football-Enrichment/4.0.3'
           },
           signal: controller.signal
         });

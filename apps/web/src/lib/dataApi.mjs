@@ -1008,7 +1008,7 @@ async function requestFeedStrategy({ base, key, headerName, timeoutMs, retries, 
     try {
       body = await fetchFeedJsonWithRetry(
         url,
-        { headers: { [headerName]: key, accept: 'application/json', 'user-agent': 'Betynz-Data-API-Worker/4.0.2' } },
+        { headers: { [headerName]: key, accept: 'application/json', 'user-agent': 'Betynz-Data-API-Worker/4.0.3' } },
         timeoutMs,
         retries
       );
@@ -1202,7 +1202,7 @@ function actionPath(name, fallback = '') {
 function actionHeaders() {
   const config = resolveDataApiConfig();
   return config.configured
-    ? { [config.headerName]: config.key, accept: 'application/json', 'user-agent': 'Betynz-Data-API-Worker/4.0.2' }
+    ? { [config.headerName]: config.key, accept: 'application/json', 'user-agent': 'Betynz-Data-API-Worker/4.0.3' }
     : { accept: 'application/json' };
 }
 

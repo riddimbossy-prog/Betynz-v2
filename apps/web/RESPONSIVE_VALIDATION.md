@@ -8,7 +8,7 @@ Passed:        105
 Failed:        0
 ```
 
-The cinematic UI and CSS are unchanged from the previously rendered full-device baseline. Those headless Chromium screenshots and 105 layout results remain included in this package. For v4.0.2, the responsive source assertions and local page/API smoke tests were rerun after the custom-data-API data migration.
+The cinematic UI and CSS are unchanged from the previously rendered full-device baseline. Those headless Chromium screenshots and 105 layout results remain included in this package. For v4.0.3, the responsive source assertions and local page/API smoke tests were rerun after the custom-data-API data migration.
 
 ## Viewports tested
 

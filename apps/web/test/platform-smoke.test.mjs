@@ -128,7 +128,7 @@ test('production server boots with SportyBet authority and optional API-Football
   t.after(() => child.kill('SIGTERM'));
 
   const health = await (await waitFor(`http://127.0.0.1:${port}/api/health`)).json();
-  assert.equal(health.version, '4.0.2');
+  assert.equal(health.version, '4.0.3');
   assert.deepEqual(health.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'CONVERGENCE_ROUTE']);
 
   const fixturePayload = await (await fetch(`http://127.0.0.1:${port}/api/fixtures?date=${today}`)).json();

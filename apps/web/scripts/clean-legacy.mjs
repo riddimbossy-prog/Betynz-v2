@@ -22,6 +22,7 @@ const allowedTests = new Set([
   'responsive-cinematic.test.mjs',
   'custom-data-api.test.mjs',
   'api-football.test.mjs',
+  'source-priority.test.mjs',
   'platform-smoke.test.mjs'
 ]);
 

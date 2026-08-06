@@ -1,4 +1,4 @@
-# Betynz v4.0.2 — Unified SportyBet + API-Football Intelligence
+# Betynz v4.0.3 — SportyBet Primary + API-Football Enrichment
 
 One GitHub repository, one Node process launcher, one Render web service and one root `render.yaml`.
 

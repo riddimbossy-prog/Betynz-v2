@@ -1,40 +1,53 @@
-# Betynz v4.0.2 build validation
+# Betynz v4.0.3 build validation
 
-Validation date: 2026-08-06
+Validation date: 2026-08-06 UTC
 
-## 429-rate-limit repair
+## Required source hierarchy
 
-- Authenticated loopback calls bypass the public SportyBet core limit.
-- A regression test sent 60 authenticated local calls while the public limit was set to 30 per minute; all 60 returned HTTP 200 and none returned 429.
-- Three simultaneous full-day market-enrichment jobs for the same fixture produced one fixture-detail request.
-- SportyBet and API-Football use separate paced queues.
-- `Retry-After`, exponential backoff and jitter are applied to retryable responses.
-- Date-level fixture and Market Route jobs are single-flight deduplicated.
-
-## Full daily fixture coverage
-
-- SportyBet pagination continues until the upstream feed is exhausted.
-- `SPORTYBET_MAX_PAGES=0` is the production default.
-- Empty pages and repeated-page signatures terminate pagination safely.
-- API-Football enrichment covers every fixture returned for the selected date.
-- There is no 12, 20 or 30 fixture application cap.
+- SportyBet custom API is primary for fixtures, markets, odds, live scores, results, team histories, venue splits, streaks and competition statistics.
+- API-Football is secondary for team crests, league logos/flags, standings, injuries, H2H, lineups and missing statistical fields.
+- The primary-first merge never overwrites a populated SportyBet value.
+- API-Football is labelled `API_FOOTBALL_FALLBACK` only when the required SportyBet statistic is absent.
 
 ## Automated validation
 
 ```text
-SportyBet parser/API tests:                 6 passed, 0 failed
-Trusted-internal-rate-limit test:           passed (60/60 HTTP 200)
-SportyBet beyond-page-10 test:              passed (223 fixtures across 12 pages)
-Betynz engine/platform tests:               68 passed, 0 failed
-Duplicate-enrichment single-flight test:    passed (3 callers, 1 upstream request)
-API-Football beyond-30-fixture test:         passed (45/45 fixtures enriched)
-Release verification:                       passed
-Single-Render verification:                 passed
-Combined-process integration:               passed
-Render YAML files:                          1
-Render web services:                        1
+SportyBet core tests:                       6 passed, 0 failed
+Betynz engine/platform tests:              72 passed, 0 failed
+Primary-source conflict test:              passed
+Missing-field enrichment test:             passed
+SportyBet pagination beyond ten pages:     passed
+API-Football full-day enrichment:          passed
+Internal rate-limit bypass:                passed
+Duplicate request coalescing:              passed
+Release verification:                      passed
+Single-render verification:                passed
+Combined process integration:              passed
 ```
 
-## Source authority
+## Source-priority conflict fixture
 
-SportyBet remains authoritative for fixtures, kickoff, odds, markets, live status, scores and results. API-Football supplies statistics, venue histories, standings, injuries, H2H, predictions, crests, league logos and flags.
+The regression fixture deliberately supplied conflicting values:
+
+- SportyBet home PPG: 2.20; API-Football home PPG: 0.40
+- SportyBet home sample: 5; API-Football home sample: 10
+- SportyBet home Over 2.5: 80%; API-Football home Over 2.5: 10%
+
+The final engine object retained the SportyBet values. API-Football filled only missing fields such as home scoring average, BTTS rate and standings.
+
+## Combined service smoke test
+
+```json
+{
+  "ok": true,
+  "deployment": "ONE_RENDER_SERVICE",
+  "renderYamlCount": 1,
+  "source": "SPORTYBET_CUSTOM_API",
+  "engines": ["MARKET_ROUTE", "PPG_ROUTE", "CONVERGENCE_ROUTE"],
+  "webVersion": "4.0.3"
+}
+```
+
+## Production limitation
+
+The build environment did not call the user's private API-Football subscription or the live SportyBet production endpoints. Production endpoint availability, plan quotas and exact upstream responses must be confirmed after deployment. The code and tests use compatible local response contracts.

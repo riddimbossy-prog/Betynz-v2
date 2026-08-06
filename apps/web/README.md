@@ -1,4 +1,4 @@
-# Betynz Web v4.0.2
+# Betynz Web v4.0.3
 
 This web application is the public layer of the unified single-Render Betynz repository.
 

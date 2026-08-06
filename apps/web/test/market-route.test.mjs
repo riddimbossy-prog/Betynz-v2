@@ -143,7 +143,7 @@ test('a complete route cannot publish when the selected market price is absent',
   assert.notEqual(result.selection?.market, 'OVER_2_5');
 });
 
-test('API-Football venue statistics can veto a SportyBet odds route when strongly contradictory', () => {
+test('SportyBet primary venue statistics can veto a SportyBet odds route when strongly contradictory', () => {
   const stats = {
     homeSplit: { played: 5, over25: 1, over15: 2, goalsPerMatch: 1.4, rates: { over25: 20, over15: 40 } },
     awaySplit: { played: 5, over25: 1, over15: 2, goalsPerMatch: 1.6, rates: { over25: 20, over15: 40 } }
@@ -156,10 +156,10 @@ test('API-Football venue statistics can veto a SportyBet odds route when strongl
   assert.equal(result.decision, 'STAT_CONFLICT');
   assert.equal(result.selection, null);
   assert.equal(result.statisticalValidation.status, 'CONTRADICTED');
-  assert.equal(result.statisticalValidation.source, 'API_FOOTBALL');
+  assert.equal(result.statisticalValidation.source, 'SPORTYBET_CUSTOM_API');
 });
 
-test('API-Football venue statistics support a compatible SportyBet odds route', () => {
+test('SportyBet primary venue statistics support a compatible SportyBet odds route', () => {
   const stats = {
     homeSplit: { played: 5, over25: 4, over15: 5, goalsPerMatch: 3.2, rates: { over25: 80, over15: 100 } },
     awaySplit: { played: 5, over25: 3, over15: 4, goalsPerMatch: 2.8, rates: { over25: 60, over15: 80 } }
@@ -172,5 +172,5 @@ test('API-Football venue statistics support a compatible SportyBet odds route', 
   assert.equal(result.decision, 'FIRE');
   assert.equal(result.selection.market, 'OVER_2_5');
   assert.equal(result.statisticalValidation.status, 'SUPPORTED');
-  assert.ok(result.selection.reasons.some(reason => reason.includes('API-Football')));
+  assert.ok(result.selection.reasons.some(reason => reason.includes('SportyBet primary statistics')));
 });

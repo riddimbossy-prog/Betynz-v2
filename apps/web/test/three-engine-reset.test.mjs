@@ -59,3 +59,15 @@ test('fresh database schema accepts all three current engine codes', async () =>
   assert.match(sql, /consensus_candidates/);
   assert.match(sql, /consensus_snapshots/);
 });
+
+
+test('SportyBet statistics are primary and API-Football only enriches missing fields and visuals', async () => {
+  const server = await read('src/server.mjs');
+  assert.match(server, /enrichDataApiFixtures/);
+  assert.match(server, /combinePrimaryAndSecondaryStats/);
+  const priority = await read('src/lib/sourcePriority.mjs');
+  assert.match(priority, /sourcePriority:\s*\['SPORTYBET_CUSTOM_API', 'API_FOOTBALL'\]/);
+  assert.match(server, /primaryStatistics:\s*'SPORTYBET_CUSTOM_API'/);
+  assert.match(server, /enrichmentStatistics:\s*'API_FOOTBALL'/);
+  assert.match(priority, /mergeMissingPrimaryFirst/);
+});
