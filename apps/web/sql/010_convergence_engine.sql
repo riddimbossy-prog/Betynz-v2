@@ -1,5 +1,5 @@
 -- Betynz v3.3 upgrade for the Convergence Engine.
--- Existing frozen records are preserved. New writes may use all three active engines.
+-- Existing frozen records are preserved. At the time of this migration, new writes could use the three active engines. Migration 012 adds the fourth engine.
 
 alter table if exists public.engine_predictions
   drop constraint if exists engine_predictions_engine_check;

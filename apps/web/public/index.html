@@ -15,18 +15,19 @@
   <link rel="apple-touch-startup-image" href="/assets/pwa-splash-portrait.png" media="(orientation: portrait)">
   <link rel="apple-touch-startup-image" href="/assets/pwa-splash-landscape.png" media="(orientation: landscape)">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/styles.css?v=5.0.4">
+  <link rel="stylesheet" href="/styles.css?v=5.0.5">
 </head>
 <body>
 <div class="app-shell">
   <aside class="sidebar" id="sidebar">
-    <a class="brand brand-logo" href="/" aria-label="Betynz home"><img src="/assets/betynz-logo.png" alt="Betynz.com"><small>Three-engine football intelligence</small></a>
+    <a class="brand brand-logo" href="/" aria-label="Betynz home"><img src="/assets/betynz-logo.png" alt="Betynz.com"><small>Four-engine football intelligence</small></a>
     <nav>
       <a class="active" href="/">⌂ <span>Dashboard</span></a>
       <a href="/picks.html">★ <span>Qualified Picks</span><em>LIVE</em></a>
       <a href="/market-route.html">◆ <span>Market Route</span><em>LIVE</em></a>
       <a href="/ppg-route.html">◈ <span>PPG Route</span><em>LIVE</em></a>
       <a href="/convergence.html">◎ <span>Convergence</span><em>LIVE</em></a>
+      <a href="/momentum-streak.html">↗ <span>Momentum & Streak</span><em>NEW</em></a>
       <a href="/live.html">◉ <span>Live Matches</span></a>
       <a href="/proof.html">✓ <span>Proof</span></a>
       <a href="/performance.html">▥ <span>Performance</span></a>
@@ -36,7 +37,7 @@
       <a href="/admin-calibration.html">◫ <span>Calibration Lab</span></a>
       <a href="/admin-learning.html">⚙ <span>Learning Centre</span></a>
     </nav>
-    <div class="sidebar-status"><span class="pulse"></span><div><b>Consensus system</b><small>3 engines + settlement calibration</small></div></div>
+    <div class="sidebar-status"><span class="pulse"></span><div><b>Consensus system</b><small>4 engines + settlement calibration</small></div></div>
   </aside>
 
   <main class="main-shell">
@@ -49,6 +50,7 @@
         <a class="single-engine-chip" href="/market-route.html"><span class="pulse"></span><div><b>Market Route</b><small>Odds direction</small></div></a>
         <a class="single-engine-chip ppg-chip" href="/ppg-route.html"><span class="pulse blue-pulse"></span><div><b>PPG Route</b><small>Venue split PPG</small></div></a>
         <a class="single-engine-chip convergence-chip" href="/convergence.html"><span class="pulse convergence-pulse"></span><div><b>Convergence</b><small>4-block agreement</small></div></a>
+        <a class="single-engine-chip momentum-chip" href="/momentum-streak.html"><span class="pulse momentum-pulse"></span><div><b>Momentum</b><small>Ordered streaks</small></div></a>
       </div>
       <button class="refresh-btn" id="refreshBtn">↻ Refresh</button>
     </header>
@@ -76,11 +78,11 @@
 
       <section class="home-picks-spotlight cinematic-spotlight" id="homePicksSpotlight">
         <div class="spotlight-head">
-          <div><small>THREE ENGINES · SHARED DIRECTION</small><h2>Consensus Command Centre</h2><p>Elite and consensus tips appear early, then freeze before kickoff without rewriting the official selection.</p></div>
+          <div><small>FOUR ENGINES · SHARED DIRECTION</small><h2>Consensus Command Centre</h2><p>Elite and consensus tips appear early, then freeze before kickoff without rewriting the official selection.</p></div>
           <a href="/picks.html">Open all qualified picks →</a>
         </div>
-        <div class="home-consensus-section" id="homeEliteSection" data-board-aware><div class="home-consensus-label"><b>Today’s Elite Bankers</b><span>3/3 agreement</span></div><div class="spotlight-grid elite-home-grid" id="homeEliteGrid"><div class="spotlight-empty">Checking elite agreement…</div></div></div>
-        <div class="home-consensus-section" id="homeConsensusSection" data-board-aware><div class="home-consensus-label"><b>Today’s Consensus Bankers</b><span>2/3 agreement</span></div><div class="spotlight-grid" id="homeConsensusGrid"><div class="spotlight-empty">Checking consensus routes…</div></div></div>
+        <div class="home-consensus-section" id="homeEliteSection" data-board-aware><div class="home-consensus-label"><b>Today’s Elite Bankers</b><span>4/4 agreement</span></div><div class="spotlight-grid elite-home-grid" id="homeEliteGrid"><div class="spotlight-empty">Checking elite agreement…</div></div></div>
+        <div class="home-consensus-section" id="homeConsensusSection" data-board-aware><div class="home-consensus-label"><b>Today’s Consensus Bankers</b><span>3/4 agreement</span></div><div class="spotlight-grid" id="homeConsensusGrid"><div class="spotlight-empty">Checking consensus routes…</div></div></div>
         <div class="home-consensus-section" id="homeEarlySection" data-board-aware><div class="home-consensus-label"><b>Tomorrow’s Early Picks</b><span>Published before matchday</span></div><div class="spotlight-grid early-home-grid" id="homeEarlyGrid"><div class="spotlight-empty">Checking tomorrow’s early routes…</div></div></div>
       </section>
 
@@ -125,6 +127,7 @@
         <button class="active" data-tab="engine">Market Route</button>
         <button data-tab="ppg">PPG Route</button>
         <button data-tab="convergence">Convergence</button>
+        <button data-tab="momentum">Momentum</button>
         <button data-tab="consensus">Consensus</button>
         <button data-tab="statistics">Venue Form</button>
         <button data-tab="odds">All Odds</button>
@@ -162,18 +165,29 @@
         <article class="full-intel-card"><div class="card-title"><h3>Independent evidence</h3><span>Attack · Defence · Venue · Market</span></div><ul class="factor-list" id="convergenceReasons"><li>Waiting for five verified home and away venue matches.</li></ul></article>
       </div>
 
+      <div class="tab-panel" data-tab-panel="momentum" hidden>
+        <article class="route-result-card momentum-result-card" id="momentumResultCard">
+          <div class="route-result-head"><div><small>MOMENTUM & STREAK ENGINE</small><h2 id="momentumSelection">Checking ordered streaks…</h2><p id="momentumExplanation">Winning, unbeaten, winless, scoring, conceding and goal-line sequences must agree across at least two streak families.</p></div><div class="route-score"><strong id="momentumScore">—</strong><span id="momentumDecision">WAITING</span></div></div>
+          <div class="route-meta"><span id="momentumRouteName">No momentum route yet</span><span id="momentumPrice">Odds —</span></div>
+          <div class="momentum-team-grid" id="momentumTeamGrid"></div>
+          <div class="momentum-family-row" id="momentumFamilies"></div>
+          <div class="route-checks" id="momentumChecks"></div>
+        </article>
+        <article class="full-intel-card"><div class="card-title"><h3>Sequence evidence</h3><span>Form · Goals · Opposition · Market</span></div><ul class="factor-list" id="momentumReasons"><li>Waiting for five verified home and away venue matches.</li></ul></article>
+      </div>
+
       <div class="tab-panel" data-tab-panel="consensus" hidden>
         <article class="route-result-card consensus-result-card" id="consensusResultCard">
           <div class="route-result-head"><div><small>CONSENSUS SYSTEM</small><h2 id="consensusSelection">Checking engine agreement…</h2><p id="consensusExplanation">The safest shared market is selected only after independent engine directions are compared.</p></div><div class="route-score"><strong id="consensusScore">—</strong><span id="consensusDecision">WAITING</span></div></div>
           <div class="official-tip modal-official-tip"><span>SHARED MARKET</span><strong id="consensusMarket">No shared market yet</strong><b id="consensusPrice">—</b></div>
-          <div class="agreement-meter modal-agreement"><span id="consensusMeter"></span><b id="consensusAgreement">0/3 engines agree</b><em id="consensusFreeze">Provisional</em></div>
+          <div class="agreement-meter modal-agreement"><span id="consensusMeter"></span><b id="consensusAgreement">0/4 engines agree</b><em id="consensusFreeze">Provisional</em></div>
           <div class="engine-proof-row" id="consensusEnginePicks"></div>
           <div class="conflict-reasons" id="consensusConflicts"></div>
         </article>
       </div>
 
       <div class="tab-panel" data-tab-panel="statistics" hidden>
-        <article class="full-intel-card"><h3>Last five venue matches</h3><p>Home uses the last five home games. Away uses the last five away games. These splits power the PPG Route and Convergence engines and provide supporting context for the Market Route Engine.</p><div class="venue-form-grid" id="venueFormGrid"><div class="loading">Loading venue form…</div></div></article>
+        <article class="full-intel-card"><h3>Last five venue matches</h3><p>Home uses the last five home games. Away uses the last five away games. These splits power the PPG Route, Convergence and Momentum & Streak engines and provide supporting context for the Market Route Engine.</p><div class="venue-form-grid" id="venueFormGrid"><div class="loading">Loading venue form…</div></div></article>
       </div>
 
       <div class="tab-panel" data-tab-panel="odds" hidden>
@@ -184,7 +198,7 @@
 </dialog>
 
 <nav class="mobile-bottom-nav" aria-label="Mobile navigation"><a class="active" href="/">⌂<span>Board</span></a><a href="/picks.html">★<span>Picks</span></a><a href="/market-route.html">◆<span>Route</span></a><a href="/live.html">◉<span>Live</span></a><a href="/proof.html">✓<span>Proof</span></a></nav>
-<script type="module" src="/motion.js?v=5.0.4"></script>
-<script type="module" src="/app.js?v=5.0.4"></script>
+<script type="module" src="/motion.js?v=5.0.5"></script>
+<script type="module" src="/app.js?v=5.0.5"></script>
 </body>
 </html>

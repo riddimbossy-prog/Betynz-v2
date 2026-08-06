@@ -10,6 +10,7 @@ let requestedDays = 1;
 function engineName(code) {
   if (code === 'PPG_ROUTE') return 'PPG Route';
   if (code === 'CONVERGENCE_ROUTE') return 'Convergence';
+  if (code === 'MOMENTUM_STREAK') return 'Momentum & Streak';
   return 'Market Route';
 }
 function dayLabel(dateString) {
@@ -69,7 +70,7 @@ function consensusCard(row, compact = false) {
     <small>${esc(row.country)} · ${esc(row.league)} · ${esc(dayLabel(row.date))} · ${esc(kickoffLabel(row.kickoff))}</small>
     <h3>${esc(row.home?.name)} <i>vs</i> ${esc(row.away?.name)}</h3>
     ${row.final ? `<div class="official-tip"><span>OFFICIAL TIP</span><strong>${esc(row.final.label || row.final.market)}</strong><b>${odd(row.final.odds)}</b></div>` : ''}
-    <div class="agreement-meter"><span style="--agreement:${Math.max(1, Number(row.agreementCount || 0))}"></span><b>${Number(row.agreementCount || 0)}/3 engines agree</b><em>${Number(row.score || 0).toFixed(0)} agreement score</em></div>
+    <div class="agreement-meter"><span style="--agreement:${Math.max(1, Number(row.agreementCount || 0))}"></span><b>${Number(row.agreementCount || 0)}/4 engines agree</b><em>${Number(row.score || 0).toFixed(0)} agreement score</em></div>
     <div class="engine-proof-row">${engineChips(row)}</div>
     ${compact ? '' : `<ul>${(row.reasons || []).slice(0, 3).map(reason => `<li>${esc(reason)}</li>`).join('')}</ul>`}
   </article>`;
@@ -143,9 +144,9 @@ function render() {
   const failedEmpty = title => empty(title, payload.error || 'Refresh analysis to try again.');
   const chooseEmpty = (finishedTitle, finishedText, loadingTitle) => payload.failed ? failedEmpty('Analysis could not be completed') : processing ? processingEmpty(loadingTitle) : empty(finishedTitle, finishedText);
 
-  $('#eliteGrid').innerHTML = elite.length ? elite.map(row => consensusCard(row)).join('') : chooseEmpty('No Elite Banker matches this filter', 'Three independent engines must support the same safe direction.', 'Checking 3/3 engine agreement…');
-  $('#consensusGrid').innerHTML = consensus.length ? consensus.map(row => consensusCard(row)).join('') : chooseEmpty('No Consensus Banker matches this filter', 'Two independent engines must agree before banker status appears.', 'Checking 2/3 engine agreement…');
-  $('#qualifiedList').innerHTML = qualified.length ? qualified.map(row => consensusCard(row, true)).join('') : chooseEmpty('No single-engine qualified picks', 'Complete routes will appear here without being promoted to banker status.', 'Checking complete engine routes…');
+  $('#eliteGrid').innerHTML = elite.length ? elite.map(row => consensusCard(row)).join('') : chooseEmpty('No Elite Banker matches this filter', 'All four independent engines must support the same safe direction.', 'Checking 4/4 engine agreement…');
+  $('#consensusGrid').innerHTML = consensus.length ? consensus.map(row => consensusCard(row)).join('') : chooseEmpty('No Consensus Banker matches this filter', 'Three independent engines must agree before banker status appears.', 'Checking 3/4 engine agreement…');
+  $('#qualifiedList').innerHTML = qualified.length ? qualified.map(row => consensusCard(row, true)).join('') : chooseEmpty('No shared or single-engine qualified picks', 'Complete routes will appear here without being promoted to banker status.', 'Checking complete engine routes…');
   $('#saferList').innerHTML = safer.length ? safer.map(row => consensusCard(row, true)).join('') : chooseEmpty('No safer picks', 'Approved downgrade markets appear here.', 'Checking safer downgrade routes…');
   $('#conflictList').innerHTML = conflicts.length ? conflicts.map(conflictCard).join('') : chooseEmpty('No engine conflicts', 'No opposing qualified directions are visible under this filter.', 'Checking opposing engine directions…');
   setBoardAwareVisibility({ processing, elite, consensus, qualified, safer, conflicts });

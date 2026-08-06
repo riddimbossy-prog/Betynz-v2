@@ -1,6 +1,6 @@
 {
   "name": "betynz-api-football-only",
-  "version": "5.0.4",
+  "version": "5.0.5",
   "private": true,
   "type": "module",
   "description": "Single-Render Betynz platform using API-Football as the sole football data provider for fixtures, odds, live scores, results, statistics and visuals.",

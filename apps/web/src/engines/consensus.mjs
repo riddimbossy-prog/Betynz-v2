@@ -143,7 +143,7 @@ export function buildConsensusForFixture({ fixture = {}, picks = [], odds = {} }
   const finalMarket = sharedMarket(best.direction, best.picks);
   const finalOdds = marketPrice(finalMarket, odds, best.picks);
   const agreementCount = best.count;
-  let classification = agreementCount >= 3 ? 'ELITE_BANKER' : agreementCount === 2 ? 'CONSENSUS_BANKER' : best.picks[0]?.decision === 'FIRE' ? 'QUALIFIED_PICK' : 'SAFER_PICK';
+  let classification = agreementCount >= 4 ? 'ELITE_BANKER' : agreementCount === 3 ? 'CONSENSUS_BANKER' : agreementCount === 2 ? 'QUALIFIED_PICK' : best.picks[0]?.decision === 'FIRE' ? 'QUALIFIED_PICK' : 'SAFER_PICK';
   if (agreementCount >= 2 && !finalOdds) classification = 'HOLD_MISSING_SHARED_PRICE';
 
   return {
@@ -158,7 +158,7 @@ export function buildConsensusForFixture({ fixture = {}, picks = [], odds = {} }
     reasons: [
       `${agreementCount} independent engine${agreementCount === 1 ? '' : 's'} support ${best.direction.replaceAll('_', ' ').toLowerCase()}.`,
       finalMarket ? `The safest shared market is ${MARKET_LABELS[finalMarket] || finalMarket}.` : 'No common market could be selected.',
-      agreementCount >= 2 ? 'Consensus requires independent agreement, not repeated conditions from one engine.' : 'This remains a single-engine qualified route.'
+      agreementCount >= 3 ? 'Banker status requires at least three independent engines after the fourth-engine expansion.' : agreementCount === 2 ? 'Two engines agree, so this remains a shared qualified pick rather than a banker.' : 'This remains a single-engine qualified route.'
     ]
   };
 }

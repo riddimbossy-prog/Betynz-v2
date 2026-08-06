@@ -1,12 +1,17 @@
-# Betynz v5.0.4 modern UI
+# Betynz v5.0.5 modern UI
 
-The premium black, silver and orange interface now includes:
+The premium black, silver and orange interface now exposes four independent engines throughout the application.
 
-- Board-aware sections that disappear when empty
-- A rolling strip of officially settled wins
-- Settled/live scorelines on fixture rows
-- Animated KPI updates and section entrances
-- Premium card tilt on fine-pointer devices
-- Animated PWA launch splash
-- New favicon, Apple touch icon, maskable icons and launch artwork
-- Reduced-motion fallbacks for every continuous animation
+Added in v5.0.5:
+
+- Dedicated Momentum & Streak dashboard page
+- Momentum engine chip in the sticky dashboard controls
+- Momentum tab in match intelligence
+- Four-engine agreement meter
+- Four-of-four Elite Banker labels
+- Three-of-four Consensus Banker labels
+- Momentum filter on Qualified Picks
+- Responsive Momentum cards with ordered W/D/L sequences
+- Mobile navigation and PWA cache coverage for the new page
+
+Existing board-aware hiding, rolling settled wins, crest proxying, animated splash and reduced-motion protection remain active.

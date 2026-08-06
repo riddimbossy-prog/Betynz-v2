@@ -23,6 +23,7 @@ const state = {
   routeByFixture: new Map(),
   ppgByFixture: new Map(),
   convergenceByFixture: new Map(),
+  momentumByFixture: new Map(),
   consensusByFixture: new Map(),
   visualByFixture: new Map(),
   requestToken: 0,
@@ -127,6 +128,7 @@ async function loadDate(date, force = false) {
   state.routeByFixture = new Map();
   state.ppgByFixture = new Map();
   state.convergenceByFixture = new Map();
+  state.momentumByFixture = new Map();
   state.consensusByFixture = new Map();
   state.visualByFixture = new Map();
   state.selected = null;
@@ -166,6 +168,7 @@ async function loadDate(date, force = false) {
     state.routeByFixture = new Map();
     state.ppgByFixture = new Map();
     state.convergenceByFixture = new Map();
+  state.momentumByFixture = new Map();
     state.visualByFixture = new Map();
     renderKpis();
     populateLeagues();
@@ -259,7 +262,7 @@ function renderList() {
       : '';
     const consensus = state.consensusByFixture.get(String(fixture.id));
     const consensusBadge = consensus?.final && ['ELITE_BANKER','CONSENSUS_BANKER'].includes(consensus.classification)
-      ? `<span class="route-badge consensus ${consensus.classification === 'ELITE_BANKER' ? 'elite' : 'fire'}">${consensus.agreementCount}/3 · ${esc(consensus.final.label)}</span>`
+      ? `<span class="route-badge consensus ${consensus.classification === 'ELITE_BANKER' ? 'elite' : 'fire'}">${consensus.agreementCount}/4 · ${esc(consensus.final.label)}</span>`
       : consensus?.classification === 'CONFLICT' ? '<span class="route-badge conflict">ENGINE CONFLICT</span>' : '';
     const status = fixtureStatus(fixture);
     const hasScore = Number.isFinite(Number(fixture.score?.home)) && Number.isFinite(Number(fixture.score?.away));
@@ -290,7 +293,7 @@ function renderList() {
 function winCarouselItem(row) {
   const score = Number.isFinite(Number(row.homeScore)) && Number.isFinite(Number(row.awayScore))
     ? `${Number(row.homeScore)}–${Number(row.awayScore)}` : 'WON';
-  const agreement = row.recordType === 'CONSENSUS' && row.agreementCount ? `${row.agreementCount}/3 · ` : '';
+  const agreement = row.recordType === 'CONSENSUS' && row.agreementCount ? `${row.agreementCount}/4 · ` : '';
   return `<a class="win-carousel-item" href="/proof.html">
     <span class="win-check">✓</span>
     <span class="win-copy"><small>${esc(row.country || 'International')} · ${esc(row.league || 'League')}</small><b>${esc(row.home)} ${esc(score)} ${esc(row.away)}</b></span>
@@ -339,7 +342,7 @@ function homeConsensusCard(row, tone = '') {
     <small>${esc(row.country || 'International')} · ${esc(row.league || 'League')} · ${esc(kickoffTime(row.kickoff))}</small>
     <h3>${esc(row.home?.name || 'Home')} <i>vs</i> ${esc(row.away?.name || 'Away')}</h3>
     <div class="home-official-tip"><span>OFFICIAL TIP</span><strong>${esc(final.label || final.market || 'Qualified direction')}</strong><b>${odd(final.odds)}</b></div>
-    <p>${Number(row.agreementCount || 0)}/3 engines agree · ${row.status === 'FROZEN' ? 'Frozen' : 'Early provisional'}</p>
+    <p>${Number(row.agreementCount || 0)}/4 engines agree · ${row.status === 'FROZEN' ? 'Frozen' : 'Early provisional'}</p>
   </a>`;
 }
 
@@ -365,9 +368,9 @@ function renderHomeBankers(payload) {
   const progress = payload?.progress || {};
   const progressText = `${Number(progress.processed || 0)} of ${Number(progress.total || 0)} processed`;
   eliteGrid.innerHTML = elite.length ? elite.map(row => homeConsensusCard(row, 'elite')).join('') : processing
-    ? `<div class="spotlight-empty"><b>Checking 3/3 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
+    ? `<div class="spotlight-empty"><b>Checking 4/4 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
   consensusGrid.innerHTML = consensus.length ? consensus.map(row => homeConsensusCard(row, 'consensus')).join('') : processing
-    ? `<div class="spotlight-empty"><b>Checking 2/3 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
+    ? `<div class="spotlight-empty"><b>Checking 3/4 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
   earlyGrid.innerHTML = early.length ? early.map(row => homeConsensusCard(row, 'early')).join('') : processing
     ? '<div class="spotlight-empty"><b>Preparing early picks…</b><span>The selected date finishes before future dates are scanned.</span></div>' : '';
 
@@ -482,6 +485,7 @@ function openMatch(id) {
   renderEngine(state.routeByFixture.get(String(fixture.id)) || null);
   renderPpgEngine(state.ppgByFixture.get(String(fixture.id)) || null);
   renderConvergenceEngine(state.convergenceByFixture.get(String(fixture.id)) || null);
+  renderMomentumEngine(state.momentumByFixture.get(String(fixture.id)) || null);
   renderConsensusEngine(state.consensusByFixture.get(String(fixture.id)) || null);
   renderVenueForm(null);
   $('#matchIntelDialog').showModal();
@@ -506,10 +510,12 @@ async function loadIntelligence(fixture) {
   if (!payload.available) return renderEngineError();
   state.ppgByFixture.set(String(fixture.id), payload.ppgEngine || null);
   state.convergenceByFixture.set(String(fixture.id), payload.convergenceEngine || null);
+  state.momentumByFixture.set(String(fixture.id), payload.momentumEngine || null);
   state.consensusByFixture.set(String(fixture.id), payload.consensusEngine || null);
   renderEngine(payload.engine);
   renderPpgEngine(payload.ppgEngine);
   renderConvergenceEngine(payload.convergenceEngine);
+  renderMomentumEngine(payload.momentumEngine);
   renderConsensusEngine(payload.consensusEngine);
   renderVenueForm(payload.venueForm);
   renderList();
@@ -523,6 +529,7 @@ function renderEngineError() {
   $('#routeChecks').innerHTML = '';
   renderPpgEngineError();
   renderConvergenceEngineError();
+  renderMomentumEngineError();
   renderConsensusEngineError();
 }
 
@@ -646,14 +653,64 @@ function renderConvergenceEngine(engine) {
   $('#convergenceReasons').innerHTML = (selection?.reasons || candidate?.reasons || [engine.explanation]).filter(Boolean).slice(0, 8).map(reason => `<li>${esc(reason)}</li>`).join('');
 }
 
+
+function renderMomentumEngineError() {
+  $('#momentumSelection').textContent = 'Momentum unavailable';
+  $('#momentumExplanation').textContent = 'Ordered form and goal streaks could not be calculated for this match.';
+  $('#momentumDecision').textContent = 'UNAVAILABLE';
+  $('#momentumScore').textContent = '—';
+  $('#momentumRouteName').textContent = 'No momentum route';
+  $('#momentumPrice').textContent = 'Odds —';
+  $('#momentumTeamGrid').innerHTML = '';
+  $('#momentumFamilies').innerHTML = '';
+  $('#momentumChecks').innerHTML = '';
+  $('#momentumReasons').innerHTML = '<li>Momentum evidence is unavailable.</li>';
+}
+
+function renderMomentumEngine(engine) {
+  if (!engine) {
+    $('#momentumSelection').textContent = 'Checking ordered streaks…';
+    $('#momentumExplanation').textContent = 'Winning, unbeaten, winless, scoring, conceding and goal-line sequences must agree.';
+    $('#momentumDecision').textContent = 'WAITING';
+    $('#momentumScore').textContent = '—';
+    $('#momentumRouteName').textContent = 'No momentum route yet';
+    $('#momentumPrice').textContent = 'Odds —';
+    $('#momentumTeamGrid').innerHTML = '<div class="loading">Loading sequence evidence…</div>';
+    $('#momentumFamilies').innerHTML = '';
+    $('#momentumChecks').innerHTML = '';
+    $('#momentumReasons').innerHTML = '<li>Five verified home and away venue matches are required.</li>';
+    return;
+  }
+  const selection = engine.selection;
+  const candidate = selection
+    ? (engine.candidates || []).find(item => item.id === selection.routeId)
+    : [...(engine.candidates || [])].sort((a, b) => Number(b.score || 0) - Number(a.score || 0))[0];
+  $('#momentumSelection').textContent = selection?.label || (engine.decision === 'CONFLICT' ? 'No Pick — Streak Conflict' : engine.decision === 'WAITING' ? 'Waiting for complete streak samples' : 'No qualifying momentum route');
+  $('#momentumExplanation').textContent = engine.explanation || 'No momentum route qualified.';
+  $('#momentumDecision').textContent = selection?.decision || engine.decision || 'NO SIGNAL';
+  $('#momentumScore').textContent = selection?.score ? `${Number(selection.score).toFixed(0)}%` : candidate?.score ? `${Number(candidate.score).toFixed(0)}%` : '—';
+  $('#momentumRouteName').textContent = selection?.routeName || candidate?.name || 'No momentum route';
+  $('#momentumPrice').textContent = selection?.odds ? `Odds ${odd(selection.odds)}` : 'Odds —';
+  $('#momentumResultCard').className = `route-result-card momentum-result-card ${String(selection?.decision || engine.decision || '').toLowerCase()}`;
+  const teamCard = (label, split = {}) => {
+    const form = (split.form || []).map(value => `<span class="form-dot ${String(value).toLowerCase()}">${esc(value)}</span>`).join('');
+    const streaks = split.streaks || {};
+    return `<article><small>${esc(label)}</small><div class="momentum-form-row"><div>${form || '<span class="muted">No form</span>'}</div><small>${Number(streaks.wins || 0)}W run · ${Number(streaks.unbeaten || 0)} unbeaten · ${Number(streaks.winless || 0)} winless</small></div></article>`;
+  };
+  $('#momentumTeamGrid').innerHTML = teamCard('HOME STREAK', engine.home) + teamCard('AWAY STREAK', engine.away);
+  $('#momentumFamilies').innerHTML = (selection?.streakFamilies || candidate?.streakFamilies || []).map(value => `<span>${esc(String(value).replaceAll('_',' '))}</span>`).join('');
+  $('#momentumChecks').innerHTML = (candidate?.checks || []).map(item => `<div class="route-check ${item.pass ? 'pass' : 'fail'}"><span>${item.pass ? '✓' : '×'}</span><div><b>${esc(item.label)}</b><small>${esc(item.actual)} · required ${esc(item.rule)}</small></div></div>`).join('') || '<div class="empty-state">No streak checks available.</div>';
+  $('#momentumReasons').innerHTML = (selection?.reasons || candidate?.reasons || [engine.explanation]).filter(Boolean).slice(0, 8).map(reason => `<li>${esc(reason)}</li>`).join('');
+}
+
 function renderConsensusEngineError() {
   $('#consensusSelection').textContent = 'Consensus unavailable';
-  $('#consensusExplanation').textContent = 'The three engine decisions could not be compared for this match.';
+  $('#consensusExplanation').textContent = 'The four engine decisions could not be compared for this match.';
   $('#consensusDecision').textContent = 'UNAVAILABLE';
   $('#consensusScore').textContent = '—';
   $('#consensusMarket').textContent = 'No shared market';
   $('#consensusPrice').textContent = '—';
-  $('#consensusAgreement').textContent = '0/3 engines agree';
+  $('#consensusAgreement').textContent = '0/4 engines agree';
   $('#consensusFreeze').textContent = 'Unavailable';
   $('#consensusMeter').style.width = '0%';
   $('#consensusEnginePicks').innerHTML = '';
@@ -668,7 +725,7 @@ function renderConsensusEngine(engine) {
     $('#consensusScore').textContent = '—';
     $('#consensusMarket').textContent = 'No shared market yet';
     $('#consensusPrice').textContent = '—';
-    $('#consensusAgreement').textContent = '0/3 engines agree';
+    $('#consensusAgreement').textContent = '0/4 engines agree';
     $('#consensusFreeze').textContent = 'Provisional';
     $('#consensusMeter').style.width = '0%';
     $('#consensusEnginePicks').innerHTML = '<span class="engine-proof-chip"><b>Waiting</b><small>Engine routes are still loading</small></span>';
@@ -683,9 +740,9 @@ function renderConsensusEngine(engine) {
   $('#consensusScore').textContent = Number(engine.score || 0) ? `${Number(engine.score).toFixed(0)}%` : '—';
   $('#consensusMarket').textContent = final?.label || 'No shared market';
   $('#consensusPrice').textContent = final?.odds ? odd(final.odds) : '—';
-  $('#consensusAgreement').textContent = `${Number(engine.agreementCount || 0)}/3 engines agree`;
+  $('#consensusAgreement').textContent = `${Number(engine.agreementCount || 0)}/4 engines agree`;
   $('#consensusFreeze').textContent = engine.status === 'FROZEN' ? 'Frozen before kickoff' : `Provisional · freezes ${engine.freezeMinutes || 30} min before kickoff`;
-  $('#consensusMeter').style.width = `${Math.max(0, Math.min(100, Number(engine.agreementCount || 0) / 3 * 100))}%`;
+  $('#consensusMeter').style.width = `${Math.max(0, Math.min(100, Number(engine.agreementCount || 0) / 4 * 100))}%`;
   $('#consensusResultCard').className = `route-result-card consensus-result-card ${classification.toLowerCase().replaceAll('_', '-')}`;
   $('#consensusEnginePicks').innerHTML = (engine.enginePicks || []).map(item => `<span class="engine-proof-chip ${item.decision === 'FIRE' ? 'fire' : 'safer'}"><b>${esc(item.engineName || item.engine)}</b><small>${esc(item.label || item.market)} · ${esc(item.decision || '')}</small></span>`).join('') || '<span class="engine-proof-chip"><b>No qualified engines</b><small>Waiting for a complete route</small></span>';
   $('#consensusConflicts').innerHTML = (engine.conflictReasons || []).map(reason => `<p>× ${esc(reason)}</p>`).join('');

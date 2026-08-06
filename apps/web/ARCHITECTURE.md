@@ -1,13 +1,27 @@
-# Betynz v5.0.4 architecture
+# Betynz v5.0.5 architecture
 
 ```text
 API-Football
   → fixtures / odds / live / results / statistics / visuals
-  → Market Route + PPG Route + Convergence
-  → Consensus
+  → shared normalized fixture and venue-stat objects
+  → Market Route
+  → PPG Route
+  → Convergence
+  → Momentum & Streak
+  → four-engine Consensus
   → frozen Supabase proof
   → automatic settlement
   → performance / learning / rolling wins
 ```
 
-The browser never receives the API-Football key or Supabase service-role key. Settlement updates only already-frozen predictions using official completed results. Empty public sections are hidden only after analysis reaches a terminal state.
+## Fourth-engine isolation
+
+Momentum & Streak is evaluated independently and contributes no more than one decision per fixture. It cannot rewrite another engine's result. Consensus compares compatible directions only after each engine has completed its own gates.
+
+## Data and secrets
+
+The browser never receives the API-Football key or Supabase service-role key. The server caches shared date-level venue analysis so PPG, Convergence and Momentum do not repeat the same upstream history requests.
+
+## Settlement
+
+Settlement updates only frozen predictions using official completed results. `MOMENTUM_STREAK` is included in the same immutable proof and performance pipeline as the existing engines.

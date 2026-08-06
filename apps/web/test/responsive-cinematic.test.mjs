@@ -10,7 +10,7 @@ test('all public pages declare a device viewport and load cinematic motion', asy
   for (const name of files) {
     const html = await read(`public/${name}`);
     assert.match(html, /name="viewport"/i, `${name} is missing viewport metadata`);
-    assert.match(html, /motion\.js\?v=5\.0\.4/, `${name} is missing the motion layer`);
+    assert.match(html, /motion\.js\?v=5\.0\.5/, `${name} is missing the motion layer`);
     assert.match(html, /favicon\.ico/, `${name} is missing favicon metadata`);
     assert.match(html, /apple-touch-icon/, `${name} is missing Apple PWA metadata`);
   }

@@ -4,18 +4,19 @@
 
 The consensus system receives no more than one qualified decision from each engine:
 
-- Market Route
-- PPG Route
-- Convergence
+- Market Route;
+- PPG Route;
+- Convergence;
+- Momentum & Streak.
 
 Only FIRE or SAFER decisions can enter consensus comparison.
 
 ## Classifications
 
 ```text
-ELITE_BANKER       = three engines support one compatible direction
-CONSENSUS_BANKER   = two engines support one compatible direction
-QUALIFIED_PICK     = one engine produces a complete FIRE decision
+ELITE_BANKER       = four engines support one compatible direction
+CONSENSUS_BANKER   = three engines support one compatible direction
+QUALIFIED_PICK     = one or two engines support a complete compatible direction
 SAFER_PICK         = one engine produces an approved SAFER decision
 CONFLICT           = qualified engines oppose each other
 HOLD_MISSING_SHARED_PRICE = agreement exists but the shared market cannot be priced
@@ -31,7 +32,7 @@ Home Win + Home/Draw → Home/Draw
 Away Win + Draw/Away → Draw/Away
 ```
 
-Two straight wins for the same team retain the straight-win market.
+Only unanimous straight wins retain the straight-win market.
 
 ### Goals
 

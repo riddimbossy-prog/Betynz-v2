@@ -9,7 +9,7 @@ const revealSelector = [
 ].join(',');
 
 
-const SPLASH_KEY = 'betynz:pwa-splash:5.0.4';
+const SPLASH_KEY = 'betynz:pwa-splash:5.0.5';
 
 function splashAlreadySeen() {
   try { return sessionStorage.getItem(SPLASH_KEY) === '1'; } catch { return false; }
@@ -24,7 +24,7 @@ function showLaunchSplash() {
   const splash = document.createElement('div');
   splash.className = 'pwa-launch-splash';
   splash.setAttribute('aria-hidden', 'true');
-  splash.innerHTML = `<div class="pwa-splash-noise"></div><div class="pwa-splash-bolt"></div><div class="pwa-splash-core"><img src="/assets/betynz-mark.png" alt=""><strong>BETYNZ<span>.com</span></strong><small>THREE ENGINES · ONE SHARED DIRECTION</small><i></i></div>`;
+  splash.innerHTML = `<div class="pwa-splash-noise"></div><div class="pwa-splash-bolt"></div><div class="pwa-splash-core"><img src="/assets/betynz-mark.png" alt=""><strong>BETYNZ<span>.com</span></strong><small>FOUR ENGINES · ONE SHARED DIRECTION</small><i></i></div>`;
   document.body.appendChild(splash);
   requestAnimationFrame(() => splash.classList.add('is-visible'));
   const started = performance.now();
