@@ -1,4 +1,4 @@
-# Start here — Betynz v5.0.10
+# Start here — Betynz v5.0.11
 
 ## Upgrade from v5.0.9
 
@@ -6,11 +6,11 @@ No Supabase migration is required.
 
 1. Back up the current Render environment values.
 2. In the local GitHub repository, keep the hidden `.git` folder and delete the other old files.
-3. Copy every file from the extracted v5.0.10 folder into the repository root.
-4. Commit: `Betynz v5.0.10 adaptive API rate recovery`.
+3. Copy every file from the extracted v5.0.11 folder into the repository root.
+4. Commit: `Betynz v5.0.11 Render build isolation hotfix`.
 5. Push to GitHub.
 6. In Render choose **Manual Deploy → Clear build cache & deploy**.
-7. Open `/api/health` and confirm version `5.0.10`, five engine codes and a `providerQueue` object.
+7. Open `/api/health` and confirm version `5.0.11`, five engine codes and a `providerQueue` object.
 8. Hard-refresh the website with `Ctrl + Shift + R`.
 
 ## New Supabase project

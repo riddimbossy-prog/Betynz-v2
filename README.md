@@ -1,4 +1,4 @@
-# Betynz v5.0.10 — Adaptive API Rate Recovery
+# Betynz v5.0.11 — Render Build Isolation Hotfix
 
 Betynz is an API-Football-only football-analysis platform deployed as one Render web service.
 
@@ -10,11 +10,13 @@ Betynz is an API-Football-only football-analysis platform deployed as one Render
 4. Convergence
 5. Momentum & Streak
 
-## What v5.0.10 fixes
+## What v5.0.11 fixes
+
+Render production pacing variables are now isolated from the Node test runner. The live service still uses the subscription-safe queue, while build mocks run with a deterministic local queue.
 
 API-Football can report its per-minute limit inside a normal HTTP 200 JSON body. Earlier builds treated that message as a final enrichment failure, which could leave Apex at `151 fixtures checked` but `0 complete samples`.
 
-v5.0.10 adds one adaptive queue for every API-Football request. It detects body-level and HTTP 429 limits, pauses globally, honours reset headers, retries after cooldown, prioritises fixtures/odds/live data, and keeps unfinished engine work queued. Successful league and team histories are cached and shared across all five engines.
+v5.0.11 adds one adaptive queue for every API-Football request. It detects body-level and HTTP 429 limits, pauses globally, honours reset headers, retries after cooldown, prioritises fixtures/odds/live data, and keeps unfinished engine work queued. Successful league and team histories are cached and shared across all five engines.
 
 ## Consensus
 

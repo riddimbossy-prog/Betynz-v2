@@ -1,4 +1,4 @@
-# Betynz v5.0.10 Build Validation
+# Betynz v5.0.11 Build Validation
 
 ## Completed checks
 
@@ -16,6 +16,21 @@
 - Release verification: passed
 - Single-Render verification: passed
 - One-service API-Football integration smoke test: passed
+
+
+## Render build isolation regression
+
+The complete build was executed with the production Render values present:
+
+```text
+NODE_ENV=production
+API_FOOTBALL_REQUESTS_PER_MINUTE=8
+API_FOOTBALL_REQUEST_CONCURRENCY=1
+API_FOOTBALL_REQUEST_MIN_INTERVAL_MS=750
+API_FOOTBALL_RATE_LIMIT_COOLDOWN_MS=65000
+```
+
+The Node test runner used its isolated mock queue and completed **83/83 tests in under 5 seconds**. The deployed service continues to honour the production values above.
 
 ## Rate-limit regression
 
@@ -55,7 +70,7 @@ Render YAML files: 1
 Render web services: 1
 Application folders: apps/web only
 Football provider: API_FOOTBALL only
-Health version: 5.0.10
+Health version: 5.0.11
 ```
 
 The integration suite uses an API-Football-compatible local mock. Actual production coverage depends on the subscription and provider availability.

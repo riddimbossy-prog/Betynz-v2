@@ -23,7 +23,7 @@ const [server, apiFootball, sw, styles, motion, env, render, rootPkgText, pkgTex
   read('src/server.mjs'), read('src/lib/apiFootball.mjs'), read('public/sw.js'), read('public/styles.css'), read('public/motion.js'), read('.env.example'), readRoot('render.yaml'), readRoot('package.json'), read('package.json'), read('package-lock.json'), read('public/index.html'), read('public/app.js'), read('public/picks.html')
 ]);
 
-if (!/const APP_VERSION = '5\.0\.10'/.test(server)) throw new Error('Server version is not 5.0.10.');
+if (!/const APP_VERSION = '5\.0\.11'/.test(server)) throw new Error('Server version is not 5.0.11.');
 for (const code of ['MARKET_ROUTE','PPG_ROUTE','APEX_INTELLIGENCE','CONVERGENCE_ROUTE','MOMENTUM_STREAK']) if (!server.includes(code)) throw new Error(`Missing engine ${code}.`);
 for (const token of ['analyzeMarketRoute','analyzePpgRoute','analyzeApexIntelligence','analyzeConvergence','analyzeMomentumStreak']) if (!server.includes(token)) throw new Error(`Missing analysis function ${token}.`);
 for (const route of ['market-route-board','ppg-route-board','apex-intelligence-board','convergence-route-board','momentum-streak-board']) if (!server.includes(route)) throw new Error(`Missing route ${route}.`);
@@ -42,7 +42,7 @@ if ((render.match(/^\s*-\s+type:\s+web\s*$/gm) || []).length !== 1) throw new Er
 const pkg = JSON.parse(pkgText);
 const lock = JSON.parse(lockText);
 const rootPkg = JSON.parse(rootPkgText);
-if (pkg.version !== '5.0.10' || lock.version !== '5.0.10' || rootPkg.version !== '5.0.10') throw new Error('Package versions are not 5.0.10.');
+if (pkg.version !== '5.0.11' || lock.version !== '5.0.11' || rootPkg.version !== '5.0.11') throw new Error('Package versions are not 5.0.11.');
 
 const tests = (await readdir(resolve(appRoot, 'test'))).sort();
 const allowed = [
@@ -50,4 +50,4 @@ const allowed = [
 ].sort();
 if (JSON.stringify(tests) !== JSON.stringify(allowed)) throw new Error(`Unexpected test files remain: ${tests.join(', ')}`);
 
-console.log('Release verification passed: Betynz 5.0.10 adaptive rate-limit recovery edition.');
+console.log('Release verification passed: Betynz 5.0.11 Render build isolation hotfix edition.');

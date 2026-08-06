@@ -1,4 +1,4 @@
-# Deploy Betynz v5.0.10 on one Render service
+# Deploy Betynz v5.0.11 Render build hotfix on one Render service
 
 The repository contains exactly one root `render.yaml` and one web service named `betynz`.
 
@@ -25,5 +25,5 @@ The non-secret adaptive queue defaults are already declared in `render.yaml`. Ke
 1. Replace the repository contents, keeping only the hidden `.git` directory.
 2. Commit and push.
 3. Select **Manual Deploy → Clear build cache & deploy** in Render.
-4. Confirm `/api/health` reports `5.0.10`, five engines and `providerQueue`.
+4. Confirm `/api/health` reports `5.0.11`, five engines and `providerQueue`.
 5. Hard-refresh with `Ctrl + Shift + R`.

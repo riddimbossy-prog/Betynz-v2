@@ -47,16 +47,32 @@ function config(env = process.env) {
     rapidApiHost: text(env.API_FOOTBALL_RAPIDAPI_HOST),
     timeoutMs: Math.max(3000, number(env.API_FOOTBALL_TIMEOUT_MS, 20000)),
     retries: Math.max(0, Math.min(4, number(env.API_FOOTBALL_RETRIES, 2))),
-    rateLimitRetries: Math.max(0, Math.min(12, number(env.API_FOOTBALL_RATE_LIMIT_RETRIES, isTest ? 0 : 6))),
-    rateLimitCooldownMs: Math.max(1000, Math.min(180000, number(env.API_FOOTBALL_RATE_LIMIT_COOLDOWN_MS, isTest ? 50 : 65000))),
-    requestsPerMinute: Math.max(1, Math.min(600, number(env.API_FOOTBALL_REQUESTS_PER_MINUTE, isTest ? 600 : 8))),
+    // Render injects production environment variables during the build. Node's
+    // test runner also exports NODE_TEST_CONTEXT, so tests must use a fully
+    // deterministic local queue instead of inheriting the live 8-RPM / 65s
+    // cooldown settings. Production remains controlled by the normal variables.
+    rateLimitRetries: isTest
+      ? Math.max(0, Math.min(6, number(env.API_FOOTBALL_TEST_RATE_LIMIT_RETRIES, 2)))
+      : Math.max(0, Math.min(12, number(env.API_FOOTBALL_RATE_LIMIT_RETRIES, 6))),
+    rateLimitCooldownMs: isTest
+      ? Math.max(10, Math.min(5000, number(env.API_FOOTBALL_TEST_RATE_LIMIT_COOLDOWN_MS, 50)))
+      : Math.max(1000, Math.min(180000, number(env.API_FOOTBALL_RATE_LIMIT_COOLDOWN_MS, 65000))),
+    requestsPerMinute: isTest
+      ? Math.max(60, Math.min(600, number(env.API_FOOTBALL_TEST_REQUESTS_PER_MINUTE, 600)))
+      : Math.max(1, Math.min(600, number(env.API_FOOTBALL_REQUESTS_PER_MINUTE, 8))),
     cacheTtlSeconds: Math.max(60, number(env.API_FOOTBALL_CACHE_TTL_SECONDS, 1800)),
     fixtureTtlSeconds: Math.max(20, number(env.API_FOOTBALL_FIXTURE_CACHE_TTL_SECONDS, 120)),
     oddsTtlSeconds: Math.max(60, number(env.API_FOOTBALL_ODDS_CACHE_TTL_SECONDS, 300)),
     visualTtlSeconds: Math.max(300, number(env.API_FOOTBALL_VISUAL_CACHE_TTL_SECONDS, 604800)),
-    enrichConcurrency: Math.max(1, Math.min(8, number(env.API_FOOTBALL_ENRICH_CONCURRENCY, isTest ? 4 : 2))),
-    requestConcurrency: Math.max(1, Math.min(6, number(env.API_FOOTBALL_REQUEST_CONCURRENCY, isTest ? 3 : 1))),
-    requestMinIntervalMs: Math.max(0, Math.min(10000, number(env.API_FOOTBALL_REQUEST_MIN_INTERVAL_MS, isTest ? 0 : 750))),
+    enrichConcurrency: isTest
+      ? Math.max(2, Math.min(8, number(env.API_FOOTBALL_TEST_ENRICH_CONCURRENCY, 4)))
+      : Math.max(1, Math.min(8, number(env.API_FOOTBALL_ENRICH_CONCURRENCY, 2))),
+    requestConcurrency: isTest
+      ? Math.max(2, Math.min(6, number(env.API_FOOTBALL_TEST_REQUEST_CONCURRENCY, 4)))
+      : Math.max(1, Math.min(6, number(env.API_FOOTBALL_REQUEST_CONCURRENCY, 1))),
+    requestMinIntervalMs: isTest
+      ? Math.max(0, Math.min(1000, number(env.API_FOOTBALL_TEST_REQUEST_MIN_INTERVAL_MS, 0)))
+      : Math.max(0, Math.min(10000, number(env.API_FOOTBALL_REQUEST_MIN_INTERVAL_MS, 750))),
     retryBaseMs: Math.max(250, Math.min(10000, number(env.API_FOOTBALL_RETRY_BASE_MS, 1000))),
     retryMaxMs: Math.max(1000, Math.min(120000, number(env.API_FOOTBALL_RETRY_MAX_MS, 30000))),
     historyLast: Math.max(10, Math.min(100, number(env.API_FOOTBALL_HISTORY_LAST, 40))),
@@ -256,7 +272,7 @@ function requestHeaders(current) {
   const headers = {
     [current.headerName]: current.key,
     accept: 'application/json',
-    'user-agent': 'Betynz-API-Football-Only/5.0.10'
+    'user-agent': 'Betynz-API-Football-Only/5.0.11'
   };
   if (current.rapidApiHost) headers['x-rapidapi-host'] = current.rapidApiHost;
   return headers;

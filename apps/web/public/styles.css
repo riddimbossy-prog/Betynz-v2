@@ -333,7 +333,7 @@ a{color:inherit;text-decoration:none}
 .minimal-board-motion .pulse{animation-duration:2.8s}
 
 
-/* Betynz v5.0.10 — five-engine unified logo palette */
+/* Betynz v5.0.11 — five-engine unified logo palette */
 :root{
   --brand-black:#07090b;
   --brand-charcoal:#111419;
@@ -404,7 +404,7 @@ a{color:inherit;text-decoration:none}
   .engine-chip-row .single-engine-chip b{font-size:8px!important}
 }
 
-/* v5.0.10 PPG + Apex five-engine edition */
+/* v5.0.11 PPG + Apex five-engine edition */
 .apex-chip,.route-badge.apex,.apex-result-card,.apex-pick-card{border-color:rgba(255,152,0,.34)!important;background:linear-gradient(145deg,rgba(255,152,0,.09),rgba(255,255,255,.018))!important;color:var(--brand-silver)!important}
 .apex-hero{background:radial-gradient(circle at 88% 0,rgba(255,152,0,.18),transparent 40%),linear-gradient(145deg,#121417,#08090b)!important}
 .apex-rules-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0 18px}.apex-rules-strip article{padding:15px;border:1px solid rgba(255,152,0,.18);border-radius:14px;background:linear-gradient(145deg,#111419,#0b0d10)}.apex-rules-strip b,.apex-rules-strip span{display:block}.apex-rules-strip b{color:var(--brand-white)}.apex-rules-strip span{margin-top:5px;color:#9da5ae;font-size:11px}
@@ -413,7 +413,7 @@ a{color:inherit;text-decoration:none}
 @media(max-width:900px){.apex-rules-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.apex-rules-strip,.apex-score-row,.apex-split-grid{grid-template-columns:1fr}}
 
-/* Betynz v5.0.10 — five-engine logo palette */
+/* Betynz v5.0.11 — five-engine logo palette */
 .engine-chip-row{grid-template-columns:repeat(5,minmax(108px,1fr))!important}
 .engine-chip-row .single-engine-chip,
 .engine-chip-row .ppg-chip,
@@ -462,7 +462,7 @@ a{color:inherit;text-decoration:none}
 @media(max-width:760px){.engine-chip-row{grid-template-columns:repeat(5,minmax(0,1fr))!important}}
 @media(max-width:560px){.ppg-rules-strip,.apex-rules-strip,.convergence-rules-strip,.momentum-rules-strip{grid-template-columns:1fr}.ppg-versus,.ppg-card-values{grid-template-columns:1fr 34px 1fr;gap:7px;padding:12px}.ppg-versus strong,.ppg-card-values strong{font-size:25px}}
 
-/* v5.0.10 · light engine motion only. The long fixture board remains minimal. */
+/* v5.0.11 · light engine motion only. The long fixture board remains minimal. */
 .apex-soft-pulse{position:relative;overflow:hidden}
 .apex-soft-pulse::after{content:"";position:absolute;inset:auto 12% 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,152,0,.78),transparent);transform:translateX(-110%);animation:apexSoftSweep 2.4s ease-in-out infinite}
 .apex-loader-dot{display:inline-block;width:9px;height:9px;margin-bottom:12px;border-radius:50%;background:var(--brand-orange-2,#ff9800);box-shadow:0 0 0 0 rgba(255,152,0,.35);animation:apexDotPulse 1.55s ease-out infinite}

@@ -1,4 +1,4 @@
--- Betynz v5.0.10 fresh database schema with five engines, consensus and calibration.
+-- Betynz v5.0.11 fresh database schema with five engines, consensus and calibration.
 -- Use this only for a new Supabase project.
 
 create extension if not exists pgcrypto;
