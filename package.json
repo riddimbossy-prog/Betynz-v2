@@ -1,6 +1,6 @@
 {
   "name": "betynz-unified-sportybet-api-football",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "private": true,
   "type": "module",
   "description": "Single-Render Betynz platform: SportyBet custom API for fixtures, odds, live scores and results; API-Football for engine statistics and official visuals.",

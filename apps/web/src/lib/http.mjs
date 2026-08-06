@@ -11,6 +11,14 @@ export async function fetchJson(url, options = {}, timeoutMs = 15000) {
       const error = new Error(`Upstream returned ${response.status}`);
       error.status = response.status;
       error.body = body;
+      const retryAfter = response.headers.get('retry-after');
+      if (retryAfter) {
+        const seconds = Number(retryAfter);
+        const when = Date.parse(retryAfter);
+        error.retryAfterMs = Number.isFinite(seconds) && seconds >= 0
+          ? seconds * 1000
+          : Number.isFinite(when) ? Math.max(0, when - Date.now()) : 0;
+      }
       throw error;
     }
     return body;

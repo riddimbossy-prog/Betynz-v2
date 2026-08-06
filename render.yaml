@@ -43,6 +43,28 @@ services:
         value: "120"
       - key: API_RATE_LIMIT_PER_MINUTE
         value: "180"
+      - key: ALLOW_INTERNAL_RATE_LIMIT_BYPASS
+        value: "true"
+      - key: SPORTYBET_UPSTREAM_CONCURRENCY
+        value: "2"
+      - key: SPORTYBET_UPSTREAM_MIN_INTERVAL_MS
+        value: "250"
+      - key: SPORTYBET_UPSTREAM_RETRIES
+        value: "4"
+      - key: SPORTYBET_UPSTREAM_BACKOFF_BASE_MS
+        value: "1000"
+      - key: SPORTYBET_UPSTREAM_BACKOFF_MAX_MS
+        value: "30000"
+      - key: BETYNZ_DATA_API_ENRICH_CONCURRENCY
+        value: "2"
+      - key: BETYNZ_DATA_API_ACTION_CONCURRENCY
+        value: "2"
+      - key: BETYNZ_DATA_API_ACTION_MIN_INTERVAL_MS
+        value: "250"
+      - key: BETYNZ_DATA_API_RETRY_BASE_MS
+        value: "1000"
+      - key: BETYNZ_DATA_API_RETRY_MAX_MS
+        value: "30000"
       - key: CACHE_TTL_SECONDS
         value: "120"
       - key: FIXTURE_BOARD_CACHE_TTL_SECONDS
@@ -76,7 +98,15 @@ services:
       - key: API_FOOTBALL_VISUAL_CACHE_TTL_SECONDS
         value: "604800"
       - key: API_FOOTBALL_ENRICH_CONCURRENCY
+        value: "2"
+      - key: API_FOOTBALL_REQUEST_CONCURRENCY
         value: "3"
+      - key: API_FOOTBALL_REQUEST_MIN_INTERVAL_MS
+        value: "200"
+      - key: API_FOOTBALL_RETRY_BASE_MS
+        value: "1000"
+      - key: API_FOOTBALL_RETRY_MAX_MS
+        value: "30000"
       - key: API_FOOTBALL_HISTORY_LAST
         value: "40"
       - key: API_FOOTBALL_MAPPING_THRESHOLD

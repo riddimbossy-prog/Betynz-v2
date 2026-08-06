@@ -9,6 +9,10 @@ const apiHeader = env('SPORTYBET_API_KEY_HEADER', 'X-API-Key').toLowerCase();
 const rate = new Map();
 
 function clientIp(req) { return text(req.headers['x-forwarded-for']).split(',')[0] || req.socket.remoteAddress || 'unknown'; }
+function isLoopbackRequest(req) {
+  const ip = clientIp(req).toLowerCase();
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === 'localhost';
+}
 function rateAllowed(req) {
   const now = Date.now();
   const key = clientIp(req);
@@ -22,6 +26,10 @@ function authorized(req) {
   if (!apiKey) return false;
   const bearer = text(req.headers.authorization).replace(/^Bearer\s+/i, '');
   return text(req.headers[apiHeader]) === apiKey || bearer === apiKey;
+}
+function trustedInternalRequest(req) {
+  const bypass = !/^(0|false|no|off)$/i.test(env('ALLOW_INTERNAL_RATE_LIMIT_BYPASS', 'true'));
+  return bypass && isLoopbackRequest(req) && authorized(req);
 }
 function corsHeaders(req) {
   const allowed = env('CORS_ALLOWED_ORIGINS', 'https://betynz.com,https://www.betynz.com').split(',').map(text).filter(Boolean);
@@ -53,11 +61,12 @@ async function route(req, url) {
     return { status: 200, payload: {
       ok: true,
       service: 'Betynz SportyBet Core API',
-      version: '1.0.1',
+      version: '1.0.2',
       source: 'SPORTYBET_CUSTOM_API',
       apiKeyConfigured: Boolean(apiKey),
       capabilities: ['fixtures','all-markets','live-scores','results','event-details','team-history-from-results','streaks','competition-stats'],
       fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null, pagination: 'UNTIL_EXHAUSTED' },
+      rateLimit: { externalPerMinute: Math.max(30, integer(env('API_RATE_LIMIT_PER_MINUTE', '180'), 180)), trustedInternalBypass: true },
       providers: { sportybet: true, parseBot: false, apiFootball: false, oddsApi: false, betExplorer: false },
       time: new Date().toISOString()
     } };
@@ -172,7 +181,11 @@ async function route(req, url) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-  if (!rateAllowed(req)) { send(req, res, 429, { error: 'Too many requests' }); return; }
+  if (!trustedInternalRequest(req) && !rateAllowed(req)) {
+    res.setHeader('retry-after', '60');
+    send(req, res, 429, { error: 'Too many requests', retryAfterSeconds: 60 });
+    return;
+  }
   try {
     const result = await route(req, url);
     if (result.status === 204) { res.writeHead(204, corsHeaders(req)); res.end(); return; }
@@ -184,6 +197,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, '0.0.0.0', () => {
-  console.log(`Betynz SportyBet Core API v1.0.1 listening on ${port}`);
+  console.log(`Betynz SportyBet Core API v1.0.2 listening on ${port}`);
   if (!apiKey) console.warn('[security] SPORTYBET_API_KEY is not configured; all private data routes will reject requests.');
 });

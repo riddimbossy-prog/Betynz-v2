@@ -152,7 +152,7 @@ try {
   assert.equal(coreResults.body.fixtures[0].score.away, 1);
 
   const webHealth = await waitJson(`http://127.0.0.1:${webPort}/api/health`);
-  assert.equal(webHealth.body.version, '4.0.1');
+  assert.equal(webHealth.body.version, '4.0.2');
   assert.deepEqual(webHealth.body.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'CONVERGENCE_ROUTE']);
 
   const config = await waitJson(`http://127.0.0.1:${webPort}/api/config`);

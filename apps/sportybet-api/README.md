@@ -1,4 +1,4 @@
-# Betynz SportyBet Core API v1.0.1
+# Betynz SportyBet Core API v1.0.2
 
 This private Node.js service is Betynz’s authoritative SportyBet source for fixtures, offered markets, live state and results. It reads logged-out public SportyBet football feeds and normalizes fixtures, complete offered markets, live scores, match status, incidents and finished results.
 

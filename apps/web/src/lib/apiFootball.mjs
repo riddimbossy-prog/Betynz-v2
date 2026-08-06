@@ -5,6 +5,38 @@ import { normalizeName, round, similarity } from './utils.mjs';
 const DEFAULT_BASE_URL = 'https://v3.football.api-sports.io';
 const FINISHED = new Set(['FT', 'AET', 'PEN']);
 
+const apiInFlight = new Map();
+const apiQueue = [];
+let apiActive = 0;
+let apiNextAt = 0;
+let apiTimer = null;
+
+function pumpApiQueue() {
+  const current = config();
+  if (apiTimer || !apiQueue.length || apiActive >= current.requestConcurrency) return;
+  const delay = Math.max(0, apiNextAt - Date.now());
+  if (delay > 0) {
+    apiTimer = setTimeout(() => { apiTimer = null; pumpApiQueue(); }, delay);
+    apiTimer.unref?.();
+    return;
+  }
+  const job = apiQueue.shift();
+  apiActive += 1;
+  apiNextAt = Date.now() + current.requestMinIntervalMs;
+  Promise.resolve().then(job.task).then(job.resolve, job.reject).finally(() => {
+    apiActive -= 1;
+    pumpApiQueue();
+  });
+  pumpApiQueue();
+}
+
+function scheduleApiRequest(task) {
+  return new Promise((resolve, reject) => {
+    apiQueue.push({ task, resolve, reject });
+    pumpApiQueue();
+  });
+}
+
 function number(value, fallback = null) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -29,7 +61,11 @@ function config(env = process.env) {
     retries: Math.max(0, Math.min(3, number(env.API_FOOTBALL_RETRIES, 2))),
     cacheTtlSeconds: Math.max(60, number(env.API_FOOTBALL_CACHE_TTL_SECONDS, 1800)),
     visualTtlSeconds: Math.max(300, number(env.API_FOOTBALL_VISUAL_CACHE_TTL_SECONDS, 604800)),
-    enrichConcurrency: Math.max(1, Math.min(8, number(env.API_FOOTBALL_ENRICH_CONCURRENCY, 3))),
+    enrichConcurrency: Math.max(1, Math.min(8, number(env.API_FOOTBALL_ENRICH_CONCURRENCY, 2))),
+    requestConcurrency: Math.max(1, Math.min(6, number(env.API_FOOTBALL_REQUEST_CONCURRENCY, 3))),
+    requestMinIntervalMs: Math.max(0, Math.min(5000, number(env.API_FOOTBALL_REQUEST_MIN_INTERVAL_MS, 200))),
+    retryBaseMs: Math.max(250, Math.min(10000, number(env.API_FOOTBALL_RETRY_BASE_MS, 1000))),
+    retryMaxMs: Math.max(1000, Math.min(120000, number(env.API_FOOTBALL_RETRY_MAX_MS, 30000))),
     historyLast: Math.max(10, Math.min(100, number(env.API_FOOTBALL_HISTORY_LAST, 40))),
     mappingThreshold: Math.max(0.45, Math.min(0.95, number(env.API_FOOTBALL_MAPPING_THRESHOLD, 0.55))),
     deepStats: !['0', 'false', 'no', 'off'].includes(text(env.API_FOOTBALL_DEEP_STATS).toLowerCase())
@@ -73,45 +109,64 @@ async function apiRequest(path, params = {}, ttlSeconds = null) {
   const cacheKey = `api-football:${url.toString()}`;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
+  if (apiInFlight.has(cacheKey)) return apiInFlight.get(cacheKey);
 
-  let lastError = null;
-  for (let attempt = 0; attempt <= current.retries; attempt += 1) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), current.timeoutMs);
-    try {
-      const response = await fetch(url, {
-        headers: {
-          [current.headerName]: current.key,
-          accept: 'application/json',
-          'user-agent': 'Betynz-API-Football-Enrichment/4.0.1'
-        },
-        signal: controller.signal
-      });
-      const body = await response.json().catch(() => ({}));
-      const errors = apiErrors(body);
-      if (!response.ok || errors.length) {
-        const error = new Error(errors.join('; ') || `API-Football returned HTTP ${response.status}`);
-        error.status = response.status;
-        throw error;
+  const task = scheduleApiRequest(async () => {
+    const secondCached = cacheGet(cacheKey);
+    if (secondCached) return secondCached;
+    let lastError = null;
+    for (let attempt = 0; attempt <= current.retries; attempt += 1) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), current.timeoutMs);
+      try {
+        const response = await fetch(url, {
+          headers: {
+            [current.headerName]: current.key,
+            accept: 'application/json',
+            'user-agent': 'Betynz-API-Football-Enrichment/4.0.2'
+          },
+          signal: controller.signal
+        });
+        const body = await response.json().catch(() => ({}));
+        const errors = apiErrors(body);
+        if (!response.ok || errors.length) {
+          const error = new Error(errors.join('; ') || `API-Football returned HTTP ${response.status}`);
+          error.status = response.status;
+          const retryAfter = response.headers.get('retry-after');
+          if (retryAfter) {
+            const seconds = Number(retryAfter);
+            const when = Date.parse(retryAfter);
+            error.retryAfterMs = Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : Number.isFinite(when) ? Math.max(0, when - Date.now()) : 0;
+          }
+          throw error;
+        }
+        const rawResponse = body?.response ?? null;
+        const normalized = {
+          configured: true,
+          ...body,
+          rawResponse,
+          response: Array.isArray(rawResponse) ? rawResponse : rawResponse && typeof rawResponse === 'object' ? [rawResponse] : [],
+          fetchedAt: new Date().toISOString()
+        };
+        cacheSet(cacheKey, normalized, ttlSeconds ?? current.cacheTtlSeconds);
+        return normalized;
+      } catch (error) {
+        lastError = error;
+        const retryable = !error?.status || error.status === 408 || error.status === 429 || error.status >= 500;
+        if (!retryable || attempt >= current.retries) break;
+        const exponential = Math.min(current.retryMaxMs, current.retryBaseMs * (2 ** attempt));
+        const wait = Math.max(Number(error?.retryAfterMs || 0), exponential) + Math.floor(Math.random() * 251);
+        await new Promise(resolve => setTimeout(resolve, wait));
+      } finally {
+        clearTimeout(timer);
       }
-      const rawResponse = body?.response ?? null;
-      const normalized = {
-        configured: true,
-        ...body,
-        rawResponse,
-        response: Array.isArray(rawResponse) ? rawResponse : rawResponse && typeof rawResponse === 'object' ? [rawResponse] : [],
-        fetchedAt: new Date().toISOString()
-      };
-      cacheSet(cacheKey, normalized, ttlSeconds ?? current.cacheTtlSeconds);
-      clearTimeout(timer);
-      return normalized;
-    } catch (error) {
-      clearTimeout(timer);
-      lastError = error;
-      if (attempt < current.retries) await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
     }
-  }
-  throw lastError || new Error('API-Football request failed');
+    throw lastError || new Error('API-Football request failed');
+  });
+
+  apiInFlight.set(cacheKey, task);
+  try { return await task; }
+  finally { apiInFlight.delete(cacheKey); }
 }
 
 function kickoffMs(fixture) {

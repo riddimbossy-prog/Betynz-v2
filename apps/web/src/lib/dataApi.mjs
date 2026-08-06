@@ -5,6 +5,45 @@ import { configuredValue } from "./env.mjs";
 
 const STRICT_ODDS_VERSION = "STRICT_MARKET_IDENTITY_V2_AUDIT";
 
+const actionInFlight = new Map();
+const actionQueue = [];
+let actionActive = 0;
+let actionNextAt = 0;
+let actionTimer = null;
+
+function actionConcurrency() {
+  return Math.max(1, Math.min(4, Number(process.env.BETYNZ_DATA_API_ACTION_CONCURRENCY || 2)));
+}
+
+function actionMinIntervalMs() {
+  return Math.max(0, Math.min(5000, Number(process.env.BETYNZ_DATA_API_ACTION_MIN_INTERVAL_MS || 250)));
+}
+
+function pumpActionQueue() {
+  if (actionTimer || !actionQueue.length || actionActive >= actionConcurrency()) return;
+  const delay = Math.max(0, actionNextAt - Date.now());
+  if (delay > 0) {
+    actionTimer = setTimeout(() => { actionTimer = null; pumpActionQueue(); }, delay);
+    actionTimer.unref?.();
+    return;
+  }
+  const job = actionQueue.shift();
+  actionActive += 1;
+  actionNextAt = Date.now() + actionMinIntervalMs();
+  Promise.resolve().then(job.task).then(job.resolve, job.reject).finally(() => {
+    actionActive -= 1;
+    pumpActionQueue();
+  });
+  pumpActionQueue();
+}
+
+function scheduleAction(task) {
+  return new Promise((resolve, reject) => {
+    actionQueue.push({ task, resolve, reject });
+    pumpActionQueue();
+  });
+}
+
 const MAIN_RESULT_MARKETS = new Set([
   "1x2", "match result", "full time result", "fulltime result", "ft result",
   "match winner", "three way", "3 way", "result"
@@ -937,6 +976,8 @@ function safeRequestTarget(base, path, date) {
 
 async function fetchFeedJsonWithRetry(url, options, timeoutMs, retries = 2) {
   let lastError = null;
+  const baseMs = Math.max(250, Number(process.env.BETYNZ_DATA_API_RETRY_BASE_MS || 1000));
+  const maxMs = Math.max(baseMs, Number(process.env.BETYNZ_DATA_API_RETRY_MAX_MS || 30000));
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
       return await fetchJson(url, options, timeoutMs);
@@ -944,7 +985,9 @@ async function fetchFeedJsonWithRetry(url, options, timeoutMs, retries = 2) {
       lastError = error;
       const retryable = !error?.status || error.status === 408 || error.status === 429 || error.status >= 500;
       if (!retryable || attempt >= retries) break;
-      await new Promise(resolve => setTimeout(resolve, Math.min(2500, 350 * (2 ** attempt))));
+      const exponential = Math.min(maxMs, baseMs * (2 ** attempt));
+      const wait = Math.max(Number(error?.retryAfterMs || 0), exponential) + Math.floor(Math.random() * 251);
+      await new Promise(resolve => setTimeout(resolve, wait));
     }
   }
   throw lastError || new Error('Feed request failed');
@@ -965,7 +1008,7 @@ async function requestFeedStrategy({ base, key, headerName, timeoutMs, retries, 
     try {
       body = await fetchFeedJsonWithRetry(
         url,
-        { headers: { [headerName]: key, accept: 'application/json', 'user-agent': 'Betynz-Data-API-Worker/4.0.1' } },
+        { headers: { [headerName]: key, accept: 'application/json', 'user-agent': 'Betynz-Data-API-Worker/4.0.2' } },
         timeoutMs,
         retries
       );
@@ -1159,7 +1202,7 @@ function actionPath(name, fallback = '') {
 function actionHeaders() {
   const config = resolveDataApiConfig();
   return config.configured
-    ? { [config.headerName]: config.key, accept: 'application/json', 'user-agent': 'Betynz-Data-API-Worker/4.0.1' }
+    ? { [config.headerName]: config.key, accept: 'application/json', 'user-agent': 'Betynz-Data-API-Worker/4.0.2' }
     : { accept: 'application/json' };
 }
 
@@ -1182,27 +1225,37 @@ async function callAction(path, params = {}, ttl = 900) {
   const key = `data-api-action:${path}:${JSON.stringify(params)}`;
   const cached = cacheGet(key);
   if (cached) return cached;
-  const url = new URL(path.replace(/^\//, ''), config.base.endsWith('/') ? config.base : `${config.base}/`);
-  for (const [name, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && value !== '') url.searchParams.set(name, String(value));
-  }
-  try {
-    const body = await fetchFeedJsonWithRetry(
-      url.toString(),
-      { headers: actionHeaders() },
-      config.timeoutMs,
-      config.retries
-    );
-    cacheSet(key, body, ttl);
-    return body;
-  } catch (error) {
-    console.error('[data-api-action] request failed', JSON.stringify({
-      action: path,
-      status: error.status || null,
-      reason: safeErrorReason(error)
-    }));
-    return null;
-  }
+  if (actionInFlight.has(key)) return actionInFlight.get(key);
+
+  const task = scheduleAction(async () => {
+    const secondCached = cacheGet(key);
+    if (secondCached) return secondCached;
+    const url = new URL(path.replace(/^\//, ''), config.base.endsWith('/') ? config.base : `${config.base}/`);
+    for (const [name, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== '') url.searchParams.set(name, String(value));
+    }
+    try {
+      const body = await fetchFeedJsonWithRetry(
+        url.toString(),
+        { headers: actionHeaders() },
+        config.timeoutMs,
+        config.retries
+      );
+      cacheSet(key, body, ttl);
+      return body;
+    } catch (error) {
+      console.error('[data-api-action] request failed', JSON.stringify({
+        action: path,
+        status: error.status || null,
+        reason: safeErrorReason(error)
+      }));
+      return null;
+    }
+  });
+
+  actionInFlight.set(key, task);
+  try { return await task; }
+  finally { actionInFlight.delete(key); }
 }
 
 function intelligenceParams(context = {}) {
@@ -1294,7 +1347,7 @@ function mergeFixtureDetail(fixture, detail) {
 }
 
 export async function enrichDataApiMarketOdds(date, fixtures = []) {
-  const concurrency = Math.max(1, Math.min(8, Number(process.env.BETYNZ_DATA_API_ENRICH_CONCURRENCY || 3)));
+  const concurrency = Math.max(1, Math.min(8, Number(process.env.BETYNZ_DATA_API_ENRICH_CONCURRENCY || 2)));
   const fixturePath = actionPath('BETYNZ_DATA_API_FIXTURE_STATS_PATH', 'get_fixture_stats');
   const enriched = await mapLimit(fixtures, concurrency, async fixture => {
     const context = {
@@ -1327,7 +1380,7 @@ async function mapLimit(items, limit, mapper) {
 }
 
 export async function enrichDataApiFixtures(date, fixtures = [], extractStats) {
-  const concurrency = Math.max(1, Math.min(8, Number(process.env.BETYNZ_DATA_API_ENRICH_CONCURRENCY || 3)));
+  const concurrency = Math.max(1, Math.min(8, Number(process.env.BETYNZ_DATA_API_ENRICH_CONCURRENCY || 2)));
   const enriched = await mapLimit(fixtures, concurrency, async fixture => {
     const context = {
       sourceEventId: fixture.sourceId || fixture.id,

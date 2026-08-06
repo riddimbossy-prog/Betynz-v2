@@ -1,4 +1,4 @@
-# Betynz v4.0.1 base intelligence release
+# Betynz v4.0.2 base intelligence release
 
 ## New
 

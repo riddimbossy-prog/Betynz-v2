@@ -45,14 +45,14 @@ const privateText = `${env}\n${render}\n${launcher}\n${server}\n${adapter}\n${ap
 for (const forbidden of ['parse.bot','betexplorer','the-odds-api','odds_api']) {
   if (privateText.includes(forbidden)) throw new Error(`A retired provider reference remains: ${forbidden}`);
 }
-if (!/const APP_VERSION = '4\.0\.1'/.test(server)) throw new Error('Server version is not 4.0.1.');
+if (!/const APP_VERSION = '4\.0\.2'/.test(server)) throw new Error('Server version is not 4.0.2.');
 if (!/fetchDataApiFixtures/.test(server) || !/enrichDataApiMarketOdds/.test(server)) throw new Error('SportyBet custom API is not wired into the server.');
 if (!/enrichApiFootballStatsBoard/.test(server) || !/getApiFootballIntelligence/.test(server) || !/resolveApiFootballTeam/.test(server)) throw new Error('API-Football enrichment is not wired into the server.');
 if (!/SPORTYBET_CUSTOM_API/.test(adapter) || !/getDataApiResults/.test(results)) throw new Error('SportyBet live/results data flow is incomplete.');
 if (!/x-apisports-key/.test(apiFootball) || !/fixtures\/statistics/.test(apiFootball) || !/fixtures\/lineups/.test(apiFootball) || !/injuries/.test(apiFootball)) throw new Error('API-Football deep-stat contract is incomplete.');
 if (!/STAT_CONFLICT/.test(marketRoute) || !/statisticalValidation/.test(marketRoute)) throw new Error('Market Route statistical gate is missing.');
-if (!/betynz-v4-0-1/.test(sw)) throw new Error('Service-worker cache was not bumped.');
-if (pkg.version !== '4.0.1' || lock.version !== '4.0.1') throw new Error('Package versions are not 4.0.1.');
+if (!/betynz-v4-0-2/.test(sw)) throw new Error('Service-worker cache was not bumped.');
+if (pkg.version !== '4.0.2' || lock.version !== '4.0.2') throw new Error('Package versions are not 4.0.2.');
 if (pkg.name !== 'betynz-sportybet-api-football-intelligence' || lock.name !== pkg.name) throw new Error('Package names do not match.');
 if (!/@media\(max-width:380px\)/.test(styles) || !/@media\(min-width:600px\) and \(max-width:760px\)/.test(styles) || !/@media\(prefers-reduced-motion:reduce\)/.test(styles)) throw new Error('Responsive safeguards are missing.');
 if (!/IntersectionObserver/.test(motion) || !/prefers-reduced-motion/.test(motion)) throw new Error('Motion accessibility safeguards are missing.');
@@ -64,4 +64,4 @@ const allowed = [
 ].sort();
 if (JSON.stringify(tests) !== JSON.stringify(allowed)) throw new Error(`Unexpected test files remain: ${tests.join(', ')}`);
 
-console.log('Release verification passed: Betynz 4.0.1 SportyBet + API-Football intelligence release.');
+console.log('Release verification passed: Betynz 4.0.2 SportyBet + API-Football intelligence release.');

@@ -24,6 +24,51 @@ const maxPages = () => {
 const timeoutMs = () => Math.max(3000, Math.min(60000, integer(env('SPORTYBET_TIMEOUT_MS', '20000'), 20000)));
 const ttl = kind => kind === 'results' ? integer(env('SPORTYBET_RESULTS_CACHE_TTL_SECONDS', '300'), 300) : integer(env('SPORTYBET_CACHE_TTL_SECONDS', '60'), 60);
 
+const upstreamQueue = [];
+let upstreamActive = 0;
+let upstreamNextAt = 0;
+let upstreamTimer = null;
+
+const upstreamConcurrency = () => Math.max(1, Math.min(4, integer(env('SPORTYBET_UPSTREAM_CONCURRENCY', '2'), 2)));
+const upstreamMinIntervalMs = () => Math.max(0, Math.min(5000, integer(env('SPORTYBET_UPSTREAM_MIN_INTERVAL_MS', '250'), 250)));
+const upstreamRetries = () => Math.max(0, Math.min(6, integer(env('SPORTYBET_UPSTREAM_RETRIES', '4'), 4)));
+const upstreamBackoffBaseMs = () => Math.max(250, Math.min(10000, integer(env('SPORTYBET_UPSTREAM_BACKOFF_BASE_MS', '1000'), 1000)));
+const upstreamBackoffMaxMs = () => Math.max(1000, Math.min(120000, integer(env('SPORTYBET_UPSTREAM_BACKOFF_MAX_MS', '30000'), 30000)));
+
+function retryAfterMs(response) {
+  const raw = text(response?.headers?.get?.('retry-after'));
+  if (!raw) return 0;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const when = Date.parse(raw);
+  return Number.isFinite(when) ? Math.max(0, when - Date.now()) : 0;
+}
+
+function pumpUpstreamQueue() {
+  if (upstreamTimer || !upstreamQueue.length || upstreamActive >= upstreamConcurrency()) return;
+  const delay = Math.max(0, upstreamNextAt - Date.now());
+  if (delay > 0) {
+    upstreamTimer = setTimeout(() => { upstreamTimer = null; pumpUpstreamQueue(); }, delay);
+    upstreamTimer.unref?.();
+    return;
+  }
+  const job = upstreamQueue.shift();
+  upstreamActive += 1;
+  upstreamNextAt = Date.now() + upstreamMinIntervalMs();
+  Promise.resolve().then(job.task).then(job.resolve, job.reject).finally(() => {
+    upstreamActive -= 1;
+    pumpUpstreamQueue();
+  });
+  pumpUpstreamQueue();
+}
+
+function scheduleUpstream(task) {
+  return new Promise((resolve, reject) => {
+    upstreamQueue.push({ task, resolve, reject });
+    pumpUpstreamQueue();
+  });
+}
+
 function templateFor(kind) {
   const name = {
     upcoming: 'SPORTYBET_PUBLIC_UPCOMING_URL',
@@ -103,22 +148,35 @@ function balanced(source, start) {
 }
 
 async function fetchPayload(url) {
-  const target = permittedUrl(url);
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs());
-  try {
-    const response = await fetch(target, { headers: headers(), redirect: 'follow', signal: controller.signal });
-    const raw = await response.text();
-    if (!response.ok) {
-      const error = new Error(`SportyBet returned HTTP ${response.status}`);
-      error.status = response.status;
-      throw error;
+  return scheduleUpstream(async () => {
+    const target = permittedUrl(url);
+    let lastError = null;
+    for (let attempt = 0; attempt <= upstreamRetries(); attempt += 1) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs());
+      try {
+        const response = await fetch(target, { headers: headers(), redirect: 'follow', signal: controller.signal });
+        const raw = await response.text();
+        if (!response.ok) {
+          const error = new Error(`SportyBet returned HTTP ${response.status}`);
+          error.status = response.status;
+          error.retryAfterMs = retryAfterMs(response);
+          throw error;
+        }
+        return parsePayload(raw, response.headers.get('content-type') || '');
+      } catch (error) {
+        lastError = error?.name === 'AbortError' ? new Error('SportyBet request timed out') : error;
+        const retryable = !lastError?.status || lastError.status === 408 || lastError.status === 429 || lastError.status >= 500;
+        if (!retryable || attempt >= upstreamRetries()) throw lastError;
+        const exponential = Math.min(upstreamBackoffMaxMs(), upstreamBackoffBaseMs() * (2 ** attempt));
+        const wait = Math.max(Number(lastError.retryAfterMs || 0), exponential) + Math.floor(Math.random() * 251);
+        await sleep(wait);
+      } finally {
+        clearTimeout(timer);
+      }
     }
-    return parsePayload(raw, response.headers.get('content-type') || '');
-  } catch (error) {
-    if (error?.name === 'AbortError') throw new Error('SportyBet request timed out');
-    throw error;
-  } finally { clearTimeout(timer); }
+    throw lastError || new Error('SportyBet request failed');
+  });
 }
 
 function mergeRows(rows) {

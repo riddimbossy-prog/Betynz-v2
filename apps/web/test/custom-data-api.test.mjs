@@ -249,3 +249,55 @@ test('SportyBet live feed preserves score minute half-time and incidents', async
   assert.equal(result.fixtures[0].score.htHome, 1);
   assert.equal(result.fixtures[0].events.length, 1);
 });
+
+test('duplicate full-day market enrichment shares one in-flight fixture-detail request', async t => {
+  const targetDate = '2037-02-14';
+  let requests = 0;
+  const { server, base } = await listen((req, res) => {
+    const url = new URL(req.url, base);
+    assert.equal(url.pathname, '/get_fixture_stats');
+    requests += 1;
+    setTimeout(() => {
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({
+        fixture: {
+          id: 'dedupe-99', date: targetDate, time: '20:00',
+          home_team: { name: 'Queue Home' }, away_team: { name: 'Queue Away' },
+          league: { name: 'Queue League', country: 'Ghana' },
+          odds: { home: 1.70, draw: 3.50, away: 4.80, over15: 1.22, under35: 1.40 }
+        }
+      }));
+    }, 40);
+  });
+  t.after(() => server.close());
+
+  const keys = [
+    'BETYNZ_DATA_API_BASE_URL','BETYNZ_DATA_API_KEY','BETYNZ_DATA_API_FIXTURE_STATS_PATH',
+    'BETYNZ_DATA_API_ACTION_CONCURRENCY','BETYNZ_DATA_API_ACTION_MIN_INTERVAL_MS'
+  ];
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  Object.assign(process.env, {
+    BETYNZ_DATA_API_BASE_URL: base,
+    BETYNZ_DATA_API_KEY: 'test-key',
+    BETYNZ_DATA_API_FIXTURE_STATS_PATH: 'get_fixture_stats',
+    BETYNZ_DATA_API_ACTION_CONCURRENCY: '2',
+    BETYNZ_DATA_API_ACTION_MIN_INTERVAL_MS: '1'
+  });
+  t.after(() => restoreEnv(previous));
+
+  const fixture = normalizeFixture({
+    id: 'dedupe-99', date: targetDate, time: '20:00',
+    home_team: { name: 'Queue Home' }, away_team: { name: 'Queue Away' },
+    league: { name: 'Queue League', country: 'Ghana' },
+    odds: { home: 1.70, draw: 3.50, away: 4.80 }
+  }, 0, targetDate);
+
+  const results = await Promise.all([
+    enrichDataApiMarketOdds(targetDate, [fixture]),
+    enrichDataApiMarketOdds(targetDate, [fixture]),
+    enrichDataApiMarketOdds(targetDate, [fixture])
+  ]);
+  assert.equal(requests, 1);
+  assert.equal(results[0].fixtures[0].odds.under35, 1.40);
+  assert.equal(results[2].fixtures[0].odds.over15, 1.22);
+});

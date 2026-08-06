@@ -1,6 +1,6 @@
 {
   "name": "betynz-sportybet-api-football-intelligence",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "private": true,
   "type": "module",
   "description": "Betynz three-engine platform using SportyBet for fixtures/odds/live/results and API-Football for engine statistics, crests and league visuals.",

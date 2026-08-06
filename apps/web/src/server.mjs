@@ -48,7 +48,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '4.0.1';
+const APP_VERSION = '4.0.2';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const CONVERGENCE_ROUTE_CODE = 'CONVERGENCE_ROUTE';
@@ -138,28 +138,36 @@ function captureBoardOdds(fixtures = []) {
   logOddsSnapshots(rows).catch(error => console.error('Odds snapshot failed:', error.message));
 }
 
+const fixtureBoardInflight = new Map();
+
 async function getFastFixtureBoard(date) {
   const key = `single-engine-fixtures:${date}`;
   const cached = cacheGet(key);
   if (cached) return { ...cached, cache: 'HIT' };
-  const started = Date.now();
-  const feed = await fetchDataApiFixtures(date);
-  const fixtures = (feed.fixtures || [])
-    .filter(item => !isSrlFixture(item))
-    .map(item => ({ ...publicFixture(item), boardStatus: fixtureStatusForDate(item) }))
-    .filter(Boolean);
-  captureBoardOdds(fixtures);
-  const response = {
-    date,
-    fixtures,
-    source: 'SPORTYBET_CUSTOM_API',
-    warning: feed.warning || null,
-    generatedAt: new Date().toISOString(),
-    loadMs: Date.now() - started,
-    cache: 'MISS'
-  };
-  cacheSet(key, response, Number(process.env.FIXTURE_BOARD_CACHE_TTL_SECONDS || 120));
-  return response;
+  if (fixtureBoardInflight.has(key)) return fixtureBoardInflight.get(key);
+  const task = (async () => {
+    const started = Date.now();
+    const feed = await fetchDataApiFixtures(date);
+    const fixtures = (feed.fixtures || [])
+      .filter(item => !isSrlFixture(item))
+      .map(item => ({ ...publicFixture(item), boardStatus: fixtureStatusForDate(item) }))
+      .filter(Boolean);
+    captureBoardOdds(fixtures);
+    const response = {
+      date,
+      fixtures,
+      source: 'SPORTYBET_CUSTOM_API',
+      warning: feed.warning || null,
+      generatedAt: new Date().toISOString(),
+      loadMs: Date.now() - started,
+      cache: 'MISS'
+    };
+    cacheSet(key, response, Number(process.env.FIXTURE_BOARD_CACHE_TTL_SECONDS || 120));
+    return response;
+  })();
+  fixtureBoardInflight.set(key, task);
+  try { return await task; }
+  finally { fixtureBoardInflight.delete(key); }
 }
 
 function publicVenueForm(stats) {
@@ -332,42 +340,50 @@ async function storePredictions(date, items, engineCode = MARKET_ROUTE_CODE) {
   if (frozen.status === 'rejected') console.error('Prediction freeze failed:', frozen.reason?.message || frozen.reason);
 }
 
+const marketBoardInflight = new Map();
+
 async function getMarketRouteBoard(date) {
   const key = `market-route-board:${date}`;
   const cached = cacheGet(key);
   if (cached) return { ...cached, cache: 'HIT' };
-  const board = await getFastFixtureBoard(date);
-  const marketEnrichment = await enrichDataApiMarketOdds(date, board.fixtures);
-  const pricedFixtures = marketEnrichment.fixtures || board.fixtures;
-  const statisticsEnrichment = await enrichApiFootballStatsBoard(date, pricedFixtures, extractVenueStats);
-  const fixtures = statisticsEnrichment.fixtures || pricedFixtures;
-  const items = fixtures.map(fixture => {
-    const stats = fixture?.stats?.homeSplit || fixture?.stats?.awaySplit
-      ? { homeSplit: fixture.stats?.homeSplit || null, awaySplit: fixture.stats?.awaySplit || null }
-      : null;
-    return { fixture: publicFixture(fixture), engine: analyzeMarketRoute(fixture, stats), venueForm: publicVenueForm(stats) };
-  }).filter(item => item.fixture);
-  await storePredictions(date, items, MARKET_ROUTE_CODE);
-  const response = {
-    date,
-    engine: 'Market Route Engine',
-    source: 'SPORTYBET_CUSTOM_API',
-    statisticsSource: statisticsEnrichment.configured ? 'API_FOOTBALL' : null,
-    warning: statisticsEnrichment.warning || board.warning || null,
-    qualified: items.filter(item => item.engine.selection),
-    all: items,
-    summary: {
-      fixtures: items.length,
-      fire: items.filter(item => item.engine.decision === 'FIRE').length,
-      safer: items.filter(item => item.engine.decision === 'SAFER').length,
-      conflict: items.filter(item => item.engine.decision === 'CONFLICT').length,
-      noSignal: items.filter(item => !item.engine.selection).length
-    },
-    generatedAt: new Date().toISOString(),
-    cache: 'MISS'
-  };
-  cacheSet(key, response, 120);
-  return response;
+  if (marketBoardInflight.has(key)) return marketBoardInflight.get(key);
+  const task = (async () => {
+      const board = await getFastFixtureBoard(date);
+      const marketEnrichment = await enrichDataApiMarketOdds(date, board.fixtures);
+      const pricedFixtures = marketEnrichment.fixtures || board.fixtures;
+      const statisticsEnrichment = await enrichApiFootballStatsBoard(date, pricedFixtures, extractVenueStats);
+      const fixtures = statisticsEnrichment.fixtures || pricedFixtures;
+      const items = fixtures.map(fixture => {
+        const stats = fixture?.stats?.homeSplit || fixture?.stats?.awaySplit
+          ? { homeSplit: fixture.stats?.homeSplit || null, awaySplit: fixture.stats?.awaySplit || null }
+          : null;
+        return { fixture: publicFixture(fixture), engine: analyzeMarketRoute(fixture, stats), venueForm: publicVenueForm(stats) };
+      }).filter(item => item.fixture);
+      await storePredictions(date, items, MARKET_ROUTE_CODE);
+      const response = {
+        date,
+        engine: 'Market Route Engine',
+        source: 'SPORTYBET_CUSTOM_API',
+        statisticsSource: statisticsEnrichment.configured ? 'API_FOOTBALL' : null,
+        warning: statisticsEnrichment.warning || board.warning || null,
+        qualified: items.filter(item => item.engine.selection),
+        all: items,
+        summary: {
+          fixtures: items.length,
+          fire: items.filter(item => item.engine.decision === 'FIRE').length,
+          safer: items.filter(item => item.engine.decision === 'SAFER').length,
+          conflict: items.filter(item => item.engine.decision === 'CONFLICT').length,
+          noSignal: items.filter(item => !item.engine.selection).length
+        },
+        generatedAt: new Date().toISOString(),
+        cache: 'MISS'
+      };
+      cacheSet(key, response, 120);
+      return response;
+  })();
+  marketBoardInflight.set(key, task);
+  try { return await task; }
+  finally { marketBoardInflight.delete(key); }
 }
 
 const statsBoardInflight = new Map();

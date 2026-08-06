@@ -1,4 +1,4 @@
-# Deploy Betynz v4.0.1 on one Render service
+# Deploy Betynz v4.0.2 on one Render service
 
 The root `render.yaml` declares exactly one Render web service. The launcher starts:
 
@@ -33,7 +33,7 @@ The default 30-fixture daily automatic-enrichment cap protects API quota. Matche
 4. Deploy.
 5. Check `/api/health` and confirm both `sportybet` and `apiFootball` are `true`.
 6. Open a mapped fixture and confirm team crests, five-home/five-away venue history, standings and season statistics appear.
-7. Hard-refresh with `Ctrl + Shift + R` so the `betynz-v4-0-1` service-worker cache activates.
+7. Hard-refresh with `Ctrl + Shift + R` so the `betynz-v4-0-2` service-worker cache activates.
 
 No second Render service and no second `render.yaml` are required.
 

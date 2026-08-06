@@ -1,6 +1,6 @@
 # API-Football enrichment contract
 
-Betynz v4.0.1 uses two private server-side data roles.
+Betynz v4.0.2 uses two private server-side data roles.
 
 ## Authority boundary
 

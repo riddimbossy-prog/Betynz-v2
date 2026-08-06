@@ -1,4 +1,4 @@
-# Betynz v4.0.1 — Full Daily Fixture Coverage
+# Betynz v4.0.2 — Full Daily Fixture Coverage
 
 ## No fixture cap
 
