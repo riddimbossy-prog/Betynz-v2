@@ -1,4 +1,4 @@
-# Betynz v5.0.14 — Seven-Engine Stats + HT/FT Edition
+# Betynz v5.0.15 — Seven-Engine Stats + HT/FT Edition
 
 Betynz uses API-Football for core fixtures, odds, live scores, results, visuals and venue history. TheStatsAPI is an additive enrichment lane for Atlas Streak Value, including best/worst classification, streak discovery and xG/SOT evidence.
 

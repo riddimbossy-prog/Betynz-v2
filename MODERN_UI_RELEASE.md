@@ -1,3 +1,3 @@
-# Betynz v5.0.14 UI
+# Betynz v5.0.15 UI
 
-All seven engines use the Betynz black, charcoal, silver, white and orange logo palette. Fixture-board animation remains minimal. Engine processing uses only subtle orange pulses and quick pick-card reveals, with reduced-motion support.
+Atlas now uses a readable black/silver/white/orange card system with larger team metrics, compact streak tiles, clean xG/SOT signal blocks, market-category filtering and responsive one-column cards below wide-desktop widths. Motion remains intentionally light.

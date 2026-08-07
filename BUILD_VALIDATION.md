@@ -1,17 +1,17 @@
-# Betynz v5.0.14 Build Validation
+# Betynz v5.0.15 Build Validation
 
-Validated on 2026-08-07.
+Atlas UI readability release based on v5.0.14 seven-engine Stats/HTFT build.
 
-- Engine/platform tests: 92/92 passed.
-- Atlas Streak Value tests: passed, including 1.20–1.55 price-gate and xG/SOT confirmation/contradiction.
-- Chronos HT/FT Momentum tests: passed.
-- Seven-engine Consensus tests: passed (7/7 Elite, 5–6/7 Consensus).
-- Transient HTTP 502/503/504 engine-page recovery: passed.
-- Progressive engine responses: passed.
-- API-Football minute-limit recovery: passed.
-- Production-style 8-request-per-minute build: passed.
-- Release verification: passed.
-- Single-Render verification: passed.
-- One-service integration smoke test: passed.
+## Validation
+- Engine/platform tests: 92/92 passed
+- Syntax checks: passed
+- Release verification: passed
+- Single-Render verification: passed
+- Seven-engine architecture unchanged
+- Atlas engine rules unchanged
+- Stats API xG/SOT logic unchanged
+- HTTP 502 recovery unchanged
+- Supabase migration: not required from v5.0.14
 
-Production provider responses were not called with private user credentials during this build. Provider contracts were exercised with local mocks and the existing validated API adapters.
+## Atlas UI regression repaired
+The prior Atlas layout applied a four-column grid to the entire team evidence block. This compressed classification, PPG, GF/GA and streak chips into narrow vertical columns. v5.0.15 replaces that structure with dedicated team cards, horizontal metrics, compact streak tiles and responsive signal rows.
