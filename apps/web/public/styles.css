@@ -491,7 +491,7 @@ a{color:inherit;text-decoration:none}
 @media(max-width:460px){.engine-chip-row,.atlas-advanced-row,.atlas-team-evidence,.htft-transition-grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.apex-loader-dot,.engine-loader-dot,.route-pick-card,.consensus-card{animation:none!important}}
 
-/* Betynz v5.0.15 — Atlas readability/UI repair */
+/* Betynz v5.0.16 — Atlas readability/UI repair */
 .atlas-page{max-width:1580px;padding-top:28px}
 .atlas-hero{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:28px;padding:30px!important;overflow:hidden;position:relative}
 .atlas-hero::after{content:"A";position:absolute;right:2%;top:-34%;font-size:300px;font-weight:1000;line-height:1;color:rgba(255,255,255,.018);pointer-events:none}

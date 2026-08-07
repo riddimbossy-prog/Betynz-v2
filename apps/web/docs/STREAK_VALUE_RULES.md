@@ -1,6 +1,6 @@
 # Atlas Streak Value Engine
 
-Atlas uses TheStatsAPI as an additive intelligence source. It classifies recent team quality and ordered streaks, then permits only selections whose actual offered price is 1.20–1.55.
+Atlas uses TheStatsAPI as an additive intelligence source. It classifies recent team quality and ordered streaks, then permits only selections whose actual offered price is 1.20–2.00.
 
 ## Evidence
 - best/strong vs weak/worst form

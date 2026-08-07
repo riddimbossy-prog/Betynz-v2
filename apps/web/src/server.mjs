@@ -10,6 +10,7 @@ import { analyzeConvergence, convergenceSummary } from './engines/convergence.mj
 import { analyzeMomentumStreak, momentumStreakSummary } from './engines/momentumStreak.mjs';
 import { analyzeStreakValue, streakValueSummary } from './engines/streakValue.mjs';
 import { analyzeHtftMomentum, htftMomentumSummary } from './engines/htftMomentum.mjs';
+import { applyUniversalOddsGate, isUniversalOddsPublishable, UNIVERSAL_ODDS_GATE } from './engines/universalOddsGate.mjs';
 import { buildConsensusForFixture, buildConsensusWindow, consensusSummary } from './engines/consensus.mjs';
 import { extractVenueStats, matchFixture } from './lib/venueStats.mjs';
 import { statsApiConfigured, statsApiRateState, buildStatsApiFixtureEvidence, addGoalEvidence } from './lib/statsApi.mjs';
@@ -53,7 +54,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.15';
+const APP_VERSION = '5.0.16';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const APEX_INTELLIGENCE_CODE = 'APEX_INTELLIGENCE';
@@ -128,7 +129,7 @@ async function loadApiFootballMedia(kind, id) {
       const keyValue = String(process.env.API_FOOTBALL_KEY || '');
       const headers = {
         accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'user-agent': 'Betynz-Media-Proxy/5.0.15'
+        'user-agent': 'Betynz-Media-Proxy/5.0.16'
       };
       if (keyValue) headers[keyHeader] = keyValue;
       const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
@@ -528,7 +529,8 @@ function predictionRows(date, items = [], engineCode = MARKET_ROUTE_CODE) {
   const now = Date.now();
   return items.flatMap(item => {
     const fixture = item.fixture || {};
-    const selection = item.engine?.selection;
+    const gatedEngine = applyUniversalOddsGate(item.engine || {}, fixture.odds || {});
+    const selection = gatedEngine?.selection;
     const kickoff = new Date(fixture.kickoff).getTime();
     if (!selection || !Number.isFinite(kickoff) || kickoff <= now) return [];
     return [{
@@ -550,7 +552,7 @@ function predictionRows(date, items = [], engineCode = MARKET_ROUTE_CODE) {
       settlement_status: 'PENDING',
       reasons: selection.reasons || [],
       odds_snapshot: fixture.odds || {},
-      payload: { fixture: publicFixture(fixture), engine: engineSummary(engineCode, item.engine) },
+      payload: { fixture: publicFixture(fixture), engine: engineSummary(engineCode, gatedEngine), oddsGate: gatedEngine.oddsGate || null },
       frozen_at: new Date().toISOString()
     }];
   });
@@ -603,7 +605,7 @@ async function getMarketRouteBoard(date) {
     // added later from the shared stats job and in match intelligence.
     const items = (board.fixtures || []).map(fixture => ({
       fixture: publicFixture(fixture),
-      engine: analyzeMarketRoute(fixture, null),
+      engine: applyUniversalOddsGate(analyzeMarketRoute(fixture, null), fixture.odds || {}),
       venueForm: null
     })).filter(item => item.fixture);
     storePredictions(date, items, MARKET_ROUTE_CODE).catch(error => console.error('Market prediction storage failed:', error.message));
@@ -667,7 +669,7 @@ function predictionPriority(fixtures = []) {
 function routeItem(fixture, stats, analyser) {
   const safeFixture = publicFixture(fixture);
   if (!safeFixture) return null;
-  return { fixture: safeFixture, engine: analyser(fixture, stats), venueForm: publicVenueForm(stats) };
+  return { fixture: safeFixture, engine: applyUniversalOddsGate(analyser(fixture, stats), fixture.odds || {}), venueForm: publicVenueForm(stats) };
 }
 
 function responseSummary(items = [], eligible = 0, processed = 0) {
@@ -989,7 +991,7 @@ function publicStatsValueEvidence(evidence = null) {
 function streakValueItem(fixture, evidence = null) {
   const safeFixture = publicFixture(fixture);
   if (!safeFixture) return null;
-  return { fixture: safeFixture, engine: analyzeStreakValue(fixture, evidence), statsEvidence: publicStatsValueEvidence(evidence) };
+  return { fixture: safeFixture, engine: applyUniversalOddsGate(analyzeStreakValue(fixture, evidence), fixture.odds || {}), statsEvidence: publicStatsValueEvidence(evidence) };
 }
 
 function waitingStreakValueResponse(date, fixtures = [], oddsPending = false) {
@@ -1070,12 +1072,12 @@ async function getStreakValueBoard(date) {
         const fixture = queue.shift();
         try {
           let evidence = await buildStatsApiFixtureEvidence(date, fixture);
-          let analysed = analyzeStreakValue(fixture, evidence);
+          let analysed = applyUniversalOddsGate(analyzeStreakValue(fixture, evidence), fixture.odds || {});
           // Expensive match-stat calls are reserved for goal/team-total routes
           // that already have meaningful streak + price support.
           if (evidence?.mapped && goalCandidate(analysed)) {
             evidence = await addGoalEvidence(evidence);
-            analysed = analyzeStreakValue(fixture, evidence);
+            analysed = applyUniversalOddsGate(analyzeStreakValue(fixture, evidence), fixture.odds || {});
           }
           items.set(String(fixture.id), { fixture: publicFixture(fixture), engine: analysed, statsEvidence: publicStatsValueEvidence(evidence) });
         } catch (error) {
@@ -1115,8 +1117,9 @@ async function ensureStreakValueView(date) {
 
 function publicQualifiedPick(item, date, engineCode = MARKET_ROUTE_CODE) {
   const fixture = item?.fixture || {};
-  const selection = item?.engine?.selection || null;
-  if (!selection) return null;
+  const gatedEngine = applyUniversalOddsGate(item?.engine || {}, fixture.odds || item?._odds || {});
+  const selection = gatedEngine?.selection || null;
+  if (!selection || !isUniversalOddsPublishable(selection.odds)) return null;
   const kickoff = new Date(fixture.kickoff).getTime();
   if (!Number.isFinite(kickoff) || kickoff <= Date.now()) return null;
   return {
@@ -1146,7 +1149,7 @@ function publicQualifiedPick(item, date, engineCode = MARKET_ROUTE_CODE) {
 
 function publicSnapshotQualifiedPick(row) {
   const kickoff = new Date(row?.kickoff).getTime();
-  if (!Number.isFinite(kickoff) || kickoff <= Date.now() || !['FIRE','SAFER'].includes(String(row?.decision || '').toUpperCase())) return null;
+  if (!Number.isFinite(kickoff) || kickoff <= Date.now() || !['FIRE','SAFER'].includes(String(row?.decision || '').toUpperCase()) || !isUniversalOddsPublishable(row?.odds)) return null;
   return {
     fixtureId: row.fixture_id,
     engine: row.engine,
@@ -1566,6 +1569,7 @@ async function apiRoute(req, res, url) {
     statsProviderQueue: statsApiRateState(),
     sourceRoles: { fixtures: 'API_FOOTBALL', odds: 'API_FOOTBALL', live: 'API_FOOTBALL', results: 'API_FOOTBALL', coreStatistics: 'API_FOOTBALL', streakIntelligence: 'STATS_API', xg: 'STATS_API', visuals: 'API_FOOTBALL' },
     fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null },
+    oddsGate: UNIVERSAL_ODDS_GATE,
     time: new Date().toISOString()
   });
 
@@ -1577,6 +1581,7 @@ async function apiRoute(req, res, url) {
     consensusFreezeMinutes: Math.max(5, Number(process.env.CONSENSUS_FREEZE_MINUTES || 30)),
     dataSources: { fixtures: 'API-Football', odds: 'API-Football', primaryStatistics: 'API-Football', streaksAndXg: 'Stats API', visuals: 'API-Football', live: 'API-Football', results: 'API-Football' },
     fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null },
+    oddsGate: UNIVERSAL_ODDS_GATE,
     responsiblePlay: 'Predictions are informational, not guarantees. Adults only.'
   });
 
@@ -1813,15 +1818,15 @@ async function apiRoute(req, res, url) {
         fixture.away = { ...fixture.away, id: apiStats.fixture.away?.id || fixture.away?.id || null, logo: apiStats.fixture.away?.logo || fixture.away?.logo || null };
         fixture.league = { ...fixture.league, id: apiStats.fixture.league?.id || fixture.league?.id || null, logo: apiStats.fixture.league?.logo || fixture.league?.logo || null, flag: apiStats.fixture.league?.flag || fixture.league?.flag || null, season: apiStats.fixture.league?.season || fixture.league?.season || null };
       }
-      const engine = analyzeMarketRoute(fixture, stats);
-      const ppgEngine = analyzePpgRoute(fixture, stats);
-      const apexEngine = analyzeApexIntelligence(fixture, stats);
-      const convergenceEngine = analyzeConvergence(fixture, stats);
-      const momentumEngine = analyzeMomentumStreak(fixture, stats);
-      const htftEngine = analyzeHtftMomentum(fixture, stats);
+      const engine = applyUniversalOddsGate(analyzeMarketRoute(fixture, stats), fixture.odds || {});
+      const ppgEngine = applyUniversalOddsGate(analyzePpgRoute(fixture, stats), fixture.odds || {});
+      const apexEngine = applyUniversalOddsGate(analyzeApexIntelligence(fixture, stats), fixture.odds || {});
+      const convergenceEngine = applyUniversalOddsGate(analyzeConvergence(fixture, stats), fixture.odds || {});
+      const momentumEngine = applyUniversalOddsGate(analyzeMomentumStreak(fixture, stats), fixture.odds || {});
+      const htftEngine = applyUniversalOddsGate(analyzeHtftMomentum(fixture, stats), fixture.odds || {});
       const atlasSnapshot = await ensureStreakValueView(date);
       const atlasItem = (atlasSnapshot?.all || []).find(item => String(item?.fixture?.id || '') === String(fixture.id || ''));
-      const streakValueEngine = atlasItem?.engine || analyzeStreakValue(fixture, null);
+      const streakValueEngine = atlasItem?.engine || applyUniversalOddsGate(analyzeStreakValue(fixture, null), fixture.odds || {});
       const selectedPicks = [
         publicQualifiedPick({ fixture, engine }, date, MARKET_ROUTE_CODE),
         publicQualifiedPick({ fixture, engine: ppgEngine }, date, PPG_ROUTE_CODE),

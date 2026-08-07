@@ -850,7 +850,7 @@ function renderStreakValueEngineError() {
 function renderStreakValueEngine(engine) {
   if (!engine) {
     $('#atlasSelection').textContent = 'Checking Stats API streak value…';
-    $('#atlasExplanation').textContent = 'Best/worst form and streaks must meet the 1.20–1.55 market gate; xG and SOT confirm goal routes.';
+    $('#atlasExplanation').textContent = 'Best/worst form and streaks must meet the 1.20–2.00 market gate; xG and SOT confirm goal routes.';
     $('#atlasDecision').textContent = 'WAITING';
     $('#atlasScore').textContent = '—';
     $('#atlasRouteName').textContent = 'No Atlas route yet';

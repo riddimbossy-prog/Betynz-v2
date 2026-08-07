@@ -1,3 +1,5 @@
+import { isUniversalOddsPublishable } from './universalOddsGate.mjs';
+
 const n = value => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 1 ? parsed : null;
@@ -129,7 +131,7 @@ function publicEnginePick(pick) {
 
 export function buildConsensusForFixture({ fixture = {}, picks = [], odds = {} } = {}) {
   const usable = picks
-    .filter(item => item?.engine && item?.market && ['FIRE', 'SAFER'].includes(String(item.decision || '').toUpperCase()))
+    .filter(item => item?.engine && item?.market && ['FIRE', 'SAFER'].includes(String(item.decision || '').toUpperCase()) && isUniversalOddsPublishable(item.odds))
     .filter((item, index, rows) => rows.findIndex(other => other.engine === item.engine) === index)
     .map(item => ({ ...item, direction: directionForMarket(item.market) }));
 
@@ -176,14 +178,14 @@ export function buildConsensusForFixture({ fixture = {}, picks = [], odds = {} }
   const finalOdds = marketPrice(finalMarket, odds, best.picks);
   const agreementCount = best.count;
   let classification = agreementCount >= 7 ? 'ELITE_BANKER' : agreementCount >= 5 ? 'CONSENSUS_BANKER' : agreementCount >= 2 ? 'QUALIFIED_PICK' : best.picks[0]?.decision === 'FIRE' ? 'QUALIFIED_PICK' : 'SAFER_PICK';
-  if (agreementCount >= 2 && !finalOdds) classification = 'HOLD_MISSING_SHARED_PRICE';
+  if (agreementCount >= 2 && !isUniversalOddsPublishable(finalOdds)) classification = 'HOLD_MISSING_SHARED_PRICE';
 
   return {
     ...base,
     classification,
     agreementCount,
     agreementDirection: best.direction,
-    final: finalMarket ? { market: finalMarket, label: MARKET_LABELS[finalMarket] || best.picks[0]?.label || finalMarket, odds: finalOdds } : null,
+    final: finalMarket && isUniversalOddsPublishable(finalOdds) ? { market: finalMarket, label: MARKET_LABELS[finalMarket] || best.picks[0]?.label || finalMarket, odds: finalOdds } : null,
     engines: best.picks.map(item => item.engine),
     enginePicks: usable.map(publicEnginePick),
     score: Number(best.averageScore.toFixed(1)),
