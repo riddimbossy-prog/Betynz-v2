@@ -34,7 +34,8 @@ const allowedTests = new Set([
   'universal-odds-gate.test.mjs',
   'runtime-stability.test.mjs',
   'data-backed-validation.test.mjs',
-  'adaptive-market-recovery.test.mjs'
+  'adaptive-market-recovery.test.mjs',
+  'foundation-intelligence.test.mjs'
 ]);
 
 try {

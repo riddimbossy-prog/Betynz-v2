@@ -34,18 +34,31 @@ export async function fetchResultsForDate(date) {
 export function matchResultToPrediction(prediction, rows = []) {
   const sourceId = String(prediction?.source_fixture_id || prediction?.fixture_id || '');
   const direct = rows.find(row => row.sourceId && sourceId && String(row.sourceId) === sourceId);
-  if (direct) return { row: direct, confidence: 1 };
+  if (direct) return { row: direct, confidence: 1, identityMatch: 'EXACT_PROVIDER_FIXTURE_ID' };
 
   const home = prediction?.home_team || '';
   const away = prediction?.away_team || '';
+  const predictionKickoff = Date.parse(prediction?.kickoff || 0);
   let best = null;
   for (const row of rows) {
-    const directScore = (similarity(home, row.home) + similarity(away, row.away)) / 2;
-    const reverseScore = (similarity(home, row.away) + similarity(away, row.home)) / 2;
-    const score = Math.max(directScore, reverseScore * 0.7);
-    const leagueBoost = prediction?.league_name && row.league && normalizeName(prediction.league_name) === normalizeName(row.league) ? 0.06 : 0;
-    const confidence = Math.min(1, score + leagueBoost);
-    if (!best || confidence > best.confidence) best = { row, confidence };
+    const homeScore = similarity(home, row.home);
+    const awayScore = similarity(away, row.away);
+    // Settlement never reverses the home/away orientation. A wrong settlement
+    // is worse than leaving one row for manual review.
+    if (homeScore < 0.82 || awayScore < 0.82) continue;
+    let confidence = ((homeScore + awayScore) / 2) * 0.86;
+    if (prediction?.league_name && row.league) confidence += normalizeName(prediction.league_name) === normalizeName(row.league) ? 0.05 : similarity(prediction.league_name, row.league) * 0.03;
+    if (prediction?.country && row.country) confidence += normalizeName(prediction.country) === normalizeName(row.country) ? 0.02 : 0;
+    const resultKickoff = Date.parse(row.kickoff || 0);
+    if (Number.isFinite(predictionKickoff) && Number.isFinite(resultKickoff)) {
+      const minutes = Math.abs(predictionKickoff - resultKickoff) / 60000;
+      if (minutes <= 5) confidence += 0.07;
+      else if (minutes <= 30) confidence += 0.05;
+      else if (minutes <= 120) confidence += 0.02;
+      else if (minutes > 360) continue;
+    }
+    confidence = Math.min(1, confidence);
+    if (!best || confidence > best.confidence) best = { row, confidence, identityMatch: 'STRICT_FUZZY_TEAM_LEAGUE_KICKOFF' };
   }
-  return best && best.confidence >= 0.72 ? best : null;
+  return best && best.confidence >= 0.90 ? best : null;
 }

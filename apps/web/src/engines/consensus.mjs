@@ -1,4 +1,5 @@
 import { isUniversalOddsPublishable } from './universalOddsGate.mjs';
+import { correlationAdjustedConfidence } from './evidenceIndependence.mjs';
 
 const n = value => {
   const parsed = Number(value);
@@ -148,6 +149,10 @@ export function buildConsensusForFixture({ fixture = {}, picks = [], odds = {} }
     classification: 'NO_SIGNAL',
     agreementCount: 0,
     agreementDirection: null,
+    effectiveEvidence: 0,
+    independenceRatio: 0,
+    evidenceFamilies: [],
+    correlationAdjustedConfidence: 0,
     final: null,
     engines: usable.map(item => item.engine),
     enginePicks: usable.map(publicEnginePick),
@@ -179,7 +184,14 @@ export function buildConsensusForFixture({ fixture = {}, picks = [], odds = {} }
   const finalMarket = sharedMarket(best.direction, best.picks);
   const finalOdds = marketPrice(finalMarket, odds, best.picks);
   const agreementCount = best.count;
-  let classification = agreementCount >= 7 ? 'ELITE_BANKER' : agreementCount >= 5 ? 'CONSENSUS_BANKER' : agreementCount >= 2 ? 'QUALIFIED_PICK' : best.picks[0]?.decision === 'FIRE' ? 'QUALIFIED_PICK' : 'SAFER_PICK';
+  const independence = correlationAdjustedConfidence(best.picks, best.averageScore);
+  let classification = agreementCount >= 7 && independence.effectiveCount >= 5
+    ? 'ELITE_BANKER'
+    : agreementCount >= 5 && independence.effectiveCount >= 3.5
+      ? 'CONSENSUS_BANKER'
+      : agreementCount >= 2 && independence.effectiveCount >= 1.35
+        ? 'QUALIFIED_PICK'
+        : best.picks[0]?.decision === 'FIRE' ? 'QUALIFIED_PICK' : 'SAFER_PICK';
   if (agreementCount >= 2 && !isUniversalOddsPublishable(finalOdds)) classification = 'HOLD_MISSING_SHARED_PRICE';
   const validationAware = usable.some(item => item?.dataValidation);
   const finalValidation = best.picks.find(item =>
@@ -193,14 +205,19 @@ export function buildConsensusForFixture({ fixture = {}, picks = [], odds = {} }
     classification,
     agreementCount,
     agreementDirection: best.direction,
+    effectiveEvidence: independence.effectiveCount,
+    independenceRatio: independence.independenceRatio,
+    evidenceFamilies: independence.families,
+    evidenceOverlap: independence.overlaps,
+    correlationAdjustedConfidence: independence.confidence,
     final: finalMarket && isUniversalOddsPublishable(finalOdds) && (!validationAware || Boolean(finalValidation)) ? { market: finalMarket, label: MARKET_LABELS[finalMarket] || best.picks[0]?.label || finalMarket, odds: finalOdds, dataBacked: Boolean(finalValidation), dataValidation: finalValidation } : null,
     engines: best.picks.map(item => item.engine),
     enginePicks: usable.map(publicEnginePick),
     score: Number(best.averageScore.toFixed(1)),
     reasons: [
-      `${agreementCount} independent engine${agreementCount === 1 ? '' : 's'} support ${best.direction.replaceAll('_', ' ').toLowerCase()}.`,
+      `${agreementCount} engine${agreementCount === 1 ? '' : 's'} support ${best.direction.replaceAll('_', ' ').toLowerCase()}; correlation adjustment estimates ${independence.effectiveCount.toFixed(2)} effective independent evidence units.`,
       classification === 'HOLD_DATA_VALIDATION' ? 'The shared market is waiting for exact statistical validation before publication.' : finalMarket ? `The safest shared market is ${MARKET_LABELS[finalMarket] || finalMarket}.` : 'No common market could be selected.',
-      agreementCount >= 7 ? 'Elite status requires complete seven-engine agreement.' : agreementCount >= 5 ? `${agreementCount} of seven independent engines agree, so this qualifies as a consensus banker.` : agreementCount >= 2 ? `${agreementCount} engines agree, so this remains a shared qualified pick rather than a banker.` : 'This remains a single-engine qualified route.'
+      agreementCount >= 7 ? 'Elite status requires complete seven-engine agreement.' : agreementCount >= 5 ? `${agreementCount} of seven specialist engines agree, so this qualifies as a consensus banker.` : agreementCount >= 2 ? `${agreementCount} engines agree, so this remains a shared qualified pick rather than a banker.` : 'This remains a single-engine qualified route.'
     ]
   };
 }

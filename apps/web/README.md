@@ -1,5 +1,27 @@
-# Betynz web — v5.0.20
+# Betynz web — v5.1.0
 
-Final publication order: engine logic → universal odds gate → exact-market data validation → match-specific adaptive recovery when needed → seven-engine Consensus → Zeus supervision → freeze/proof/settlement.
+The web application contains the public/PWA interface, server API, provider adapters, seven specialist engines, Consensus, Zeus, settlement, calibration, identity mapping, feature caching and Supabase persistence.
 
-Adaptive recovery never uses a fixed fallback ladder. Every replacement market must be available, inside 1.20–2.00 and independently `BACKED_BY_DATA`.
+## Active specialist engines
+
+- MARKET_ROUTE
+- PPG_ROUTE
+- APEX_INTELLIGENCE
+- CONVERGENCE_ROUTE
+- MOMENTUM_STREAK
+- STREAK_VALUE
+- HTFT_MOMENTUM
+
+`ZEUS_SUPERVISOR` sits above the seven-engine vote. It does not turn 7/7 into 8/8.
+
+## Foundation services
+
+- `evidenceIndependence.mjs` — correlation-aware effective evidence.
+- `predictionLineage.mjs` — original → gate → validation → recovery → final audit trail.
+- `identityRegistry.mjs` — canonical cross-provider identities.
+- `featureStore.mjs` — bounded precomputed intelligence cache + Supabase snapshots.
+- `requestGuard.mjs` — rate limiting and historical/future analysis window.
+- `telemetry.mjs` — route/error/latency/event-loop telemetry.
+- `api-client.js` — shared browser API transport/recovery behavior.
+
+Historical official predictions are never recomputed from current data. Use Proof for past dates.

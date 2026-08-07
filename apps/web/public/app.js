@@ -966,7 +966,7 @@ function renderZeusEngineError() {
 function renderZeusEngine(engine) {
   if (!engine) {
     $('#zeusSelection').textContent = 'Assembling the statistical picture…';
-    $('#zeusExplanation').textContent = 'Zeus supervises the seven independent engines using raw statistics, data quality and contradiction control.';
+    $('#zeusExplanation').textContent = 'Zeus supervises the seven specialist engines using raw statistics, data quality and contradiction control.';
     $('#zeusDecision').textContent = 'WAITING';
     $('#zeusScore').textContent = '—';
     $('#zeusDataQuality').textContent = '—';

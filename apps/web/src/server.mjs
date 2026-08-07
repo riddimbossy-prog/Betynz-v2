@@ -14,11 +14,15 @@ import { analyzeZeusIntelligence, applyZeusSupervisor, zeusSummary } from './eng
 import { applyUniversalOddsGate, isUniversalOddsPublishable, UNIVERSAL_ODDS_GATE } from './engines/universalOddsGate.mjs';
 import { applyDataBackedValidation, DATA_BACKED_POLICY } from './engines/dataBackedValidation.mjs';
 import { recoverSelectionByMatchReasoning, ADAPTIVE_RECOVERY_POLICY } from './engines/adaptiveMarketRecovery.mjs';
+import { buildPredictionLineage } from './engines/predictionLineage.mjs';
 import { buildConsensusForFixture, buildConsensusWindow, consensusSummary } from './engines/consensus.mjs';
 import { extractVenueStats, matchFixture } from './lib/venueStats.mjs';
 import { statsApiConfigured, statsApiRateState, buildStatsApiFixtureEvidence, addGoalEvidence } from './lib/statsApi.mjs';
 import { cacheGet, cacheSet, cacheStats, cachePrune } from './lib/cache.mjs';
 import { safeDate, normalizeName } from './lib/utils.mjs';
+import { rememberFeatureSnapshot, persistFeatureSnapshots, loadFeatureSnapshot, featureStoreStats } from './lib/featureStore.mjs';
+import { consumeRateLimit, publicAnalysisDateState, requestGuardStats } from './lib/requestGuard.mjs';
+import { recordHttpRequest, recordRuntimeError, telemetrySnapshot } from './lib/telemetry.mjs';
 import {
   logEnginePredictions,
   freezePredictionSnapshots,
@@ -30,9 +34,10 @@ import {
   freezeConsensusSnapshots,
   getConsensusSnapshots,
   getConsensusCandidates,
+  logPredictionLineage,
   supabaseConfigured
 } from './lib/supabase.mjs';
-import { clearSessionCookies, getAdminSession, sessionCookies, signInWithPassword } from './lib/adminAuth.mjs';
+import { clearSessionCookies, getAdminSession, sessionCookies, signInWithPassword, sameOriginRequest } from './lib/adminAuth.mjs';
 import { buildLearningRecommendations, buildPerformance, proofData, settleDate } from './lib/learning.mjs';
 import { summarizeOddsSnapshots, closingLineValue } from './lib/oddsMovement.mjs';
 import { buildLeagueIntelligence } from './lib/leagueIntelligence.mjs';
@@ -57,7 +62,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.20';
+const APP_VERSION = '5.1.0';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const APEX_INTELLIGENCE_CODE = 'APEX_INTELLIGENCE';
@@ -183,7 +188,7 @@ async function loadApiFootballMedia(kind, id) {
       const keyValue = String(process.env.API_FOOTBALL_KEY || '');
       const headers = {
         accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'user-agent': 'Betynz-Media-Proxy/5.0.20'
+        'user-agent': 'Betynz-Media-Proxy/5.1.0'
       };
       if (keyValue) headers[keyHeader] = keyValue;
       const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
@@ -617,7 +622,8 @@ function finalizeEngineOutput(rawEngine, fixture = {}, stats = null, statsEviden
   const source = rawEngine || {};
   const oddsGated = applyUniversalOddsGate(source, fixture?.odds || {});
   const dataChecked = applyDataBackedValidation(oddsGated, fixture, stats, statsEvidence);
-  return recoverSelectionByMatchReasoning(dataChecked, source, fixture, stats, statsEvidence);
+  const recovered = recoverSelectionByMatchReasoning(dataChecked, source, fixture, stats, statsEvidence);
+  return { ...recovered, lineage: buildPredictionLineage({ rawEngine: source, oddsGated, dataChecked, recovered }) };
 }
 
 function predictionRows(date, items = [], engineCode = MARKET_ROUTE_CODE) {
@@ -647,7 +653,7 @@ function predictionRows(date, items = [], engineCode = MARKET_ROUTE_CODE) {
       settlement_status: 'PENDING',
       reasons: selection.reasons || [],
       odds_snapshot: fixture.odds || {},
-      payload: { fixture: publicFixture(fixture), engine: engineSummary(engineCode, gatedEngine), oddsGate: gatedEngine.oddsGate || null, dataValidation: gatedEngine.dataValidation || null },
+      payload: { fixture: publicFixture(fixture), engine: engineSummary(engineCode, gatedEngine), oddsGate: gatedEngine.oddsGate || null, dataValidation: gatedEngine.dataValidation || null, lineage: gatedEngine.lineage || null },
       frozen_at: new Date().toISOString()
     }];
   });
@@ -673,12 +679,27 @@ async function storePredictions(date, items, engineCode = MARKET_ROUTE_CODE) {
     status: 'PENDING',
     payload: row.payload
   }));
-  const [logged, frozen] = await Promise.allSettled([
+  const lineageRows = rows.map(row => ({
+    fixture_id: row.fixture_id,
+    fixture_date: row.fixture_date,
+    kickoff: row.kickoff,
+    engine: row.engine,
+    original_market: row.payload?.lineage?.original?.market || null,
+    final_market: row.market,
+    final_odds: row.odds,
+    odds_gate_action: row.payload?.lineage?.oddsGate?.action || null,
+    validation_status: row.payload?.lineage?.dataValidation?.status || null,
+    recovery_used: Boolean(row.payload?.lineage?.adaptiveRecovery?.recovered),
+    lineage: row.payload?.lineage || {}
+  }));
+  const [logged, frozen, lineageLogged] = await Promise.allSettled([
     logEnginePredictions(liveRows),
-    freezePredictionSnapshots(rows)
+    freezePredictionSnapshots(rows),
+    logPredictionLineage(lineageRows)
   ]);
   if (logged.status === 'rejected') console.error('Engine prediction log failed:', logged.reason?.message || logged.reason);
   if (frozen.status === 'rejected') console.error('Prediction freeze failed:', frozen.reason?.message || frozen.reason);
+  if (lineageLogged.status === 'rejected') console.error('Prediction lineage log failed:', lineageLogged.reason?.message || lineageLogged.reason);
 }
 
 async function enrichPrimaryStatsAndVisuals(date, fixtures = [], options = {}) {
@@ -1225,6 +1246,7 @@ function composeZeusBoard(date, board, marketBoard, statsSnapshot, streakSnapsho
   const htft = byFixtureId(statsSnapshot?.htft?.all || []);
   const atlas = byFixtureId(streakSnapshot?.all || []);
   const fixtures = predictionPriority((board?.fixtures || []).filter(Boolean));
+  const featureSnapshots = [];
   const all = fixtures.map(fixture => {
     const id = String(fixture.id || '');
     const venueForm = apex.get(id)?.venueForm || ppg.get(id)?.venueForm || null;
@@ -1240,12 +1262,17 @@ function composeZeusBoard(date, board, marketBoard, statsSnapshot, streakSnapsho
       { code: HTFT_MOMENTUM_CODE, result: htft.get(id)?.engine }
     ].filter(item => item.result);
     const raw = analyzeZeusIntelligence({ fixture, stats, statsEvidence, engineResults });
-    return { fixture: publicFixture(fixture), engine: finalizeEngineOutput(raw, fixture, stats, statsEvidence), venueForm, statsEvidence };
+    const zeusEngine = finalizeEngineOutput(raw, fixture, stats, statsEvidence);
+    const publicFx = publicFixture(fixture);
+    const featureSnapshot = rememberFeatureSnapshot({ date, fixture: publicFx, venueForm, statsEvidence, zeus: zeusEngine, engines: engineResults.map(item => ({ code: item.code, decision: item.result?.decision || null, market: item.result?.selection?.market || null, score: item.result?.selection?.score || item.result?.score || null })) });
+    if (featureSnapshot) featureSnapshots.push(featureSnapshot);
+    return { fixture: publicFx, engine: zeusEngine, venueForm, statsEvidence };
   }).filter(item => item.fixture);
   const statsComplete = Boolean(statsSnapshot?.ppg?.complete && statsSnapshot?.apex?.complete && statsSnapshot?.convergence?.complete && statsSnapshot?.momentum?.complete && statsSnapshot?.htft?.complete);
   const complete = Boolean(statsComplete && streakSnapshot?.complete && !board?.oddsPending);
   const processed = Math.max(Number(statsSnapshot?.apex?.progress?.processed || 0), Number(streakSnapshot?.progress?.processed || 0));
   const total = Math.max(Number(statsSnapshot?.apex?.progress?.total || 0), Number(streakSnapshot?.progress?.total || 0), fixtures.filter(isUpcomingPredictionFixture).length);
+  if (complete && featureSnapshots.length) persistFeatureSnapshots(featureSnapshots).catch(() => null);
   return {
     date,
     engine: 'Zeus Statistical Intelligence Engine',
@@ -1760,7 +1787,35 @@ async function requireAdmin(req, res) {
   }
 }
 
+const HEAVY_PUBLIC_ANALYSIS_PATHS = new Set([
+  '/api/market-route-board','/api/predictions','/api/ppg-route-board','/api/apex-intelligence-board',
+  '/api/convergence-route-board','/api/momentum-streak-board','/api/streak-value-board','/api/htft-momentum-board',
+  '/api/zeus-board','/api/qualified-picks','/api/consensus-picks','/api/match-intelligence'
+]);
+
+function rateLimitOrRespond(req, res, group, options) {
+  const state = consumeRateLimit(req, group, options);
+  if (state.allowed) return true;
+  res.setHeader('retry-after', String(state.retryAfterSeconds));
+  json(res, 429, { error: 'Too many requests. Please retry shortly.', code: 'BETYNZ_RATE_LIMIT', retryAfterSeconds: state.retryAfterSeconds });
+  return false;
+}
+
+function analysisDateOrRespond(res, date) {
+  const state = publicAnalysisDateState(date, { pastDays: 0, futureDays: 7 });
+  if (state.allowed) return true;
+  const message = state.reason === 'HISTORICAL_ANALYSIS_LOCKED'
+    ? 'Historical official predictions are frozen. Use Proof instead of recomputing past matches with newer data.'
+    : 'Public deep analysis is limited to today through the next seven days.';
+  json(res, 409, { error: message, code: state.reason, allowedWindow: { from: state.min, to: state.max }, proof: '/proof.html' });
+  return false;
+}
+
 async function apiRoute(req, res, url) {
+  if (!['/api/health','/api/config'].includes(url.pathname)) {
+    if (!rateLimitOrRespond(req, res, 'public-api', { limit: Math.max(30, Number(process.env.PUBLIC_API_REQUESTS_PER_MINUTE || 180)), windowMs: 60_000 })) return;
+    if (HEAVY_PUBLIC_ANALYSIS_PATHS.has(url.pathname) && !rateLimitOrRespond(req, res, 'deep-analysis', { limit: Math.max(10, Number(process.env.PUBLIC_DEEP_ANALYSIS_REQUESTS_PER_MINUTE || 45)), windowMs: 60_000 })) return;
+  }
   if (url.pathname === '/api/health') return json(res, 200, {
     ok: true,
     app: 'Betynz',
@@ -1772,6 +1827,9 @@ async function apiRoute(req, res, url) {
     statsProviderQueue: statsApiRateState(),
     runtime: runtimeMemory(),
     runtimeCaches: pruneRuntimeCaches(),
+    featureStore: featureStoreStats(),
+    requestGuards: requestGuardStats(),
+    telemetry: { uptimeSeconds: Math.round(process.uptime()), eventLoopLagMs: telemetrySnapshot().eventLoopLagMs },
     sourceRoles: { fixtures: 'API_FOOTBALL', odds: 'API_FOOTBALL', live: 'API_FOOTBALL', results: 'API_FOOTBALL', coreStatistics: 'API_FOOTBALL', streakIntelligence: 'STATS_API', xg: 'STATS_API', visuals: 'API_FOOTBALL', supervisor: 'ZEUS_COMPOSITE' },
     fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null },
     oddsGate: UNIVERSAL_ODDS_GATE,
@@ -1809,7 +1867,7 @@ async function apiRoute(req, res, url) {
   }
 
   if (url.pathname === '/api/team-visuals') {
-    const names = String(url.searchParams.get('names') || '').split('|').map(value => value.trim()).filter(value => value.length >= 3);
+    const names = String(url.searchParams.get('names') || '').split('|').map(value => value.trim()).filter(value => value.length >= 3).slice(0, 12);
     const country = String(url.searchParams.get('country') || '').trim();
     const teams = await Promise.all(names.map(async name => {
       const visual = await findApiFootballTeamVisual(name, country).catch(() => null);
@@ -1821,6 +1879,7 @@ async function apiRoute(req, res, url) {
   if (url.pathname === '/api/fixture-visuals') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    if (!analysisDateOrRespond(res, date)) return;
     const board = await getFastFixtureBoard(date);
     const enrichment = await enrichApiFootballVisuals(date, board.fixtures || []).catch(() => ({ configured: apiFootballConfigured(), source: null, visuals: [] }));
     return jsonCached(res, 200, {
@@ -1833,6 +1892,7 @@ async function apiRoute(req, res, url) {
   }
 
   if (url.pathname === '/api/auth/login') {
+    if (!rateLimitOrRespond(req, res, 'admin-login', { limit: 6, windowMs: 5 * 60_000 })) return;
     if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
     const body = await readJsonBody(req);
     const email = String(body.email || '').trim().toLowerCase();
@@ -1872,6 +1932,11 @@ async function apiRoute(req, res, url) {
         supabase: supabaseConfigured()
       }
     });
+  }
+
+  if (url.pathname === '/api/admin/telemetry') {
+    if (!await requireAdmin(req, res)) return;
+    return json(res, 200, { version: APP_VERSION, telemetry: telemetrySnapshot(), featureStore: featureStoreStats(), requestGuards: requestGuardStats(), providerQueue: apiFootballRateState(), statsProviderQueue: statsApiRateState(), runtime: runtimeMemory() });
   }
 
   if (url.pathname === '/api/admin/feed-diagnostics' || url.pathname === '/api/admin/api-football-diagnostics') {
@@ -1952,48 +2017,56 @@ async function apiRoute(req, res, url) {
   if (url.pathname === '/api/market-route-board' || url.pathname === '/api/predictions') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    if (!analysisDateOrRespond(res, date)) return;
     return jsonCached(res, 200, await getMarketRouteBoard(date), 60);
   }
 
   if (url.pathname === '/api/ppg-route-board') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    if (!analysisDateOrRespond(res, date)) return;
     return jsonCached(res, 200, await getPpgRouteView(date), 5);
   }
 
   if (url.pathname === '/api/apex-intelligence-board') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    if (!analysisDateOrRespond(res, date)) return;
     return jsonCached(res, 200, await getApexIntelligenceView(date), 5);
   }
 
   if (url.pathname === '/api/convergence-route-board') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    if (!analysisDateOrRespond(res, date)) return;
     return jsonCached(res, 200, await getConvergenceRouteView(date), 5);
   }
 
   if (url.pathname === '/api/momentum-streak-board') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    if (!analysisDateOrRespond(res, date)) return;
     return jsonCached(res, 200, await getMomentumRouteView(date), 5);
   }
 
   if (url.pathname === '/api/streak-value-board') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    if (!analysisDateOrRespond(res, date)) return;
     return jsonCached(res, 200, await ensureStreakValueView(date), 5);
   }
 
   if (url.pathname === '/api/htft-momentum-board') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    if (!analysisDateOrRespond(res, date)) return;
     return jsonCached(res, 200, await getHtftMomentumView(date), 5);
   }
 
   if (url.pathname === '/api/zeus-board') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    if (!analysisDateOrRespond(res, date)) return;
     return jsonCached(res, 200, await getZeusBoard(date), 5);
   }
 
@@ -2001,6 +2074,7 @@ async function apiRoute(req, res, url) {
     const from = url.searchParams.get('from') || utcDateOffset(0);
     const days = Number(url.searchParams.get('days') || 7);
     if (!safeDate(from)) return json(res, 400, { error: 'from must be YYYY-MM-DD' });
+    if (!analysisDateOrRespond(res, from)) return;
     return jsonCached(res, 200, await getQualifiedPicksWindowView(from, days), 5);
   }
 
@@ -2008,6 +2082,7 @@ async function apiRoute(req, res, url) {
     const started = Date.now();
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    if (!analysisDateOrRespond(res, date)) return;
     const context = {
       sourceEventId: String(url.searchParams.get('event_id') || '').trim(),
       beforeDate: date,
@@ -2026,23 +2101,32 @@ async function apiRoute(req, res, url) {
       const board = await getFastFixtureBoard(date);
       const fixture = matchFixture(board.fixtures, context);
       if (!fixture) return json(res, 200, { available: false, error: 'FIXTURE_NOT_FOUND', loadMs: Date.now() - started });
-      const apiStats = await getApiFootballIntelligence({ ...context, date }, fixture, { mode: 'deep' }).catch(() => null);
-      const stats = extractVenueStats(apiStats, context);
+      const warmFeatures = await loadFeatureSnapshot(date, fixture.id).catch(() => null);
+      let apiStats = null;
+      let stats = warmFeatures?.venueForm ? { home: warmFeatures.venueForm.home || null, away: warmFeatures.venueForm.away || null, source: 'FEATURE_STORE' } : null;
+      let statsEvidence = warmFeatures?.statsEvidence || null;
+      if (!stats) {
+        apiStats = await getApiFootballIntelligence({ ...context, date }, fixture, { mode: 'deep' }).catch(() => null);
+        stats = extractVenueStats(apiStats, context);
+      }
       if (apiStats?.fixture) {
         fixture.home = { ...fixture.home, id: apiStats.fixture.home?.id || fixture.home?.id || null, logo: apiStats.fixture.home?.logo || fixture.home?.logo || null };
         fixture.away = { ...fixture.away, id: apiStats.fixture.away?.id || fixture.away?.id || null, logo: apiStats.fixture.away?.logo || fixture.away?.logo || null };
         fixture.league = { ...fixture.league, id: apiStats.fixture.league?.id || fixture.league?.id || null, logo: apiStats.fixture.league?.logo || fixture.league?.logo || null, flag: apiStats.fixture.league?.flag || fixture.league?.flag || null, season: apiStats.fixture.league?.season || fixture.league?.season || null };
       }
-      const atlasSnapshot = await ensureStreakValueView(date);
-      const atlasItem = (atlasSnapshot?.all || []).find(item => String(item?.fixture?.id || '') === String(fixture.id || ''));
-      const statsEvidence = atlasItem?.statsEvidence || null;
+      let atlasItem = null;
+      if (!statsEvidence) {
+        const atlasSnapshot = await ensureStreakValueView(date);
+        atlasItem = (atlasSnapshot?.all || []).find(item => String(item?.fixture?.id || '') === String(fixture.id || '')) || null;
+        statsEvidence = atlasItem?.statsEvidence || null;
+      }
       const engine = finalizeEngineOutput(analyzeMarketRoute(fixture, stats), fixture, stats, statsEvidence);
       const ppgEngine = finalizeEngineOutput(analyzePpgRoute(fixture, stats), fixture, stats, statsEvidence);
       const apexEngine = finalizeEngineOutput(analyzeApexIntelligence(fixture, stats), fixture, stats, statsEvidence);
       const convergenceEngine = finalizeEngineOutput(analyzeConvergence(fixture, stats), fixture, stats, statsEvidence);
       const momentumEngine = finalizeEngineOutput(analyzeMomentumStreak(fixture, stats), fixture, stats, statsEvidence);
       const htftEngine = finalizeEngineOutput(analyzeHtftMomentum(fixture, stats), fixture, stats, statsEvidence);
-      const streakValueEngine = atlasItem?.engine || finalizeEngineOutput(analyzeStreakValue(fixture, null), fixture, stats, atlasItem?.statsEvidence || null);
+      const streakValueEngine = atlasItem?.engine || finalizeEngineOutput(analyzeStreakValue(fixture, statsEvidence), fixture, stats, statsEvidence);
       const selectedPicks = [
         publicQualifiedPick({ fixture, engine }, date, MARKET_ROUTE_CODE),
         publicQualifiedPick({ fixture, engine: ppgEngine }, date, PPG_ROUTE_CODE),
@@ -2055,14 +2139,14 @@ async function apiRoute(req, res, url) {
       const zeusEngine = finalizeEngineOutput(analyzeZeusIntelligence({
         fixture,
         stats,
-        statsEvidence: atlasItem?.statsEvidence || null,
+        statsEvidence,
         engineResults: [
           { code: MARKET_ROUTE_CODE, result: engine }, { code: PPG_ROUTE_CODE, result: ppgEngine },
           { code: APEX_INTELLIGENCE_CODE, result: apexEngine }, { code: CONVERGENCE_ROUTE_CODE, result: convergenceEngine },
           { code: MOMENTUM_STREAK_CODE, result: momentumEngine }, { code: STREAK_VALUE_CODE, result: streakValueEngine },
           { code: HTFT_MOMENTUM_CODE, result: htftEngine }
         ]
-      }), fixture, stats, atlasItem?.statsEvidence || null);
+      }), fixture, stats, statsEvidence);
       const consensusEngine = decorateConsensusWithZeus(consensusLifecycle(buildConsensusForFixture({
         fixture: {
           fixtureId: fixture.id,
@@ -2099,12 +2183,12 @@ async function apiRoute(req, res, url) {
         htftEngine,
         zeusEngine,
         consensusEngine,
-        venueForm: publicVenueForm(stats),
-        statisticsAvailable: Boolean(stats?.homeSplit || stats?.awaySplit),
-        statisticsSource: stats?.homeSplit || stats?.awaySplit ? 'API_FOOTBALL' : null,
-        enrichmentSource: apiStats?.mapped ? 'API_FOOTBALL' : null,
+        venueForm: warmFeatures?.venueForm || publicVenueForm(stats),
+        statisticsAvailable: Boolean(warmFeatures?.venueForm || stats?.homeSplit || stats?.awaySplit || stats?.home || stats?.away),
+        statisticsSource: warmFeatures?.venueForm ? 'FEATURE_STORE' : stats?.homeSplit || stats?.awaySplit ? 'API_FOOTBALL' : null,
+        enrichmentSource: warmFeatures ? 'PRECOMPUTED_FEATURE_STORE' : apiStats?.mapped ? 'API_FOOTBALL' : null,
         apiFootball: apiStats ? { mapped: Boolean(apiStats.mapped), mappingConfidence: apiStats.mappingConfidence || 0, fixture: apiStats.fixture || null, standings: apiStats.standings || null, teamStatistics: apiStats.teamStatistics || null, h2h: apiStats.h2h || [], predictions: apiStats.predictions || null, injuries: apiStats.injuries || [], fixtureStatistics: apiStats.fixtureStatistics || [], lineups: apiStats.lineups || [], events: apiStats.events || [], players: apiStats.players || [] } : null,
-        note: 'Five independent engines are measured separately. The Consensus System publishes the safest shared market only when their directions agree.',
+        note: 'Seven specialist engines are measured separately. Consensus reports both raw agreement and correlation-adjusted effective evidence before Zeus supervision.',
         loadMs: Date.now() - started,
         cache: 'MISS'
       };
@@ -2263,6 +2347,7 @@ async function apiRoute(req, res, url) {
   if (url.pathname === '/api/admin/settle') {
     if (!await requireAdmin(req, res)) return;
     if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
+    if (!sameOriginRequest(req)) return json(res, 403, { error: 'Cross-site admin request blocked.', code: 'ADMIN_ORIGIN_REQUIRED' });
     const body = await readJsonBody(req);
     const date = String(body.date || url.searchParams.get('date') || utcDateOffset(-1));
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
@@ -2284,6 +2369,22 @@ async function apiRoute(req, res, url) {
 async function staticRoute(req, res, url) {
   let pathname = decodeURIComponent(url.pathname);
   if (pathname === '/') pathname = '/index.html';
+  if (/^\/admin-(?!login\.html$).*\.html$/i.test(pathname)) {
+    try {
+      const session = await getAdminSession(req);
+      if (!session.authenticated) {
+        const next = encodeURIComponent(pathname);
+        res.writeHead(302, { ...securityHeaders(), location: `/admin-login.html?next=${next}`, 'cache-control': 'no-store' });
+        res.end();
+        return;
+      }
+      if (session.refreshed) res.setHeader('set-cookie', sessionCookies(session.refreshed));
+    } catch {
+      res.writeHead(302, { ...securityHeaders(), location: '/admin-login.html', 'cache-control': 'no-store' });
+      res.end();
+      return;
+    }
+  }
   const safe = normalize(pathname).replace(/^([.][.][/\\])+/, '');
   const filePath = join(root, safe);
   if (!filePath.startsWith(root)) return json(res, 403, { error: 'Forbidden' });
@@ -2301,12 +2402,34 @@ async function staticRoute(req, res, url) {
   }
 }
 
+async function precomputeToday() {
+  const date = utcDateOffset(0);
+  const started = Date.now();
+  try {
+    await getFastFixtureBoard(date);
+    await getMarketRouteBoard(date);
+    await ensureStatsRouteView(date);
+    await ensureStreakValueView(date);
+    await getZeusBoard(date);
+    await getQualifiedPicksWindowView(date, 1);
+    console.log(JSON.stringify({ event: 'precompute_complete', date, ms: Date.now() - started }));
+  } catch (error) {
+    recordRuntimeError('precompute', error);
+    console.error('Background precompute failed:', error?.message || error);
+  }
+}
+
 const server = createServer(async (req, res) => {
+  const requestStarted = Date.now();
+  let requestPath = '/';
+  res.once('finish', () => recordHttpRequest(requestPath, res.statusCode, Date.now() - requestStarted));
   try {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    requestPath = url.pathname;
     if (url.pathname.startsWith('/api/')) return await apiRoute(req, res, url);
     return await staticRoute(req, res, url);
   } catch (error) {
+    recordRuntimeError('request', error);
     console.error(error);
     json(res, error.status || 500, { error: error.message || 'Internal server error' });
   }
@@ -2315,11 +2438,19 @@ const server = createServer(async (req, res) => {
 server.keepAliveTimeout = 5_000;
 server.headersTimeout = 15_000;
 server.requestTimeout = 30_000;
-server.on('error', error => console.error('HTTP server error:', error?.message || error));
-process.on('unhandledRejection', reason => console.error('Unhandled promise rejection:', reason?.message || reason));
-process.on('uncaughtExceptionMonitor', error => console.error('Uncaught exception:', error?.message || error));
+server.on('error', error => { recordRuntimeError('http_server', error); console.error('HTTP server error:', error?.message || error); });
+process.on('unhandledRejection', reason => { recordRuntimeError('unhandled_rejection', reason); console.error('Unhandled promise rejection:', reason?.message || reason); });
+process.on('uncaughtExceptionMonitor', error => { recordRuntimeError('uncaught_exception', error); console.error('Uncaught exception:', error?.message || error); });
 
-server.listen(port, () => console.log(`Betynz ${APP_VERSION} listening on ${port}`));
+server.listen(port, () => {
+  console.log(`Betynz ${APP_VERSION} listening on ${port}`);
+  if (String(process.env.PRECOMPUTE_ENABLED || 'true').toLowerCase() === 'true') {
+    const delay = Math.max(10, Number(process.env.PRECOMPUTE_START_DELAY_SECONDS || 20)) * 1000;
+    const interval = Math.max(30, Number(process.env.PRECOMPUTE_INTERVAL_MINUTES || 60)) * 60_000;
+    setTimeout(() => precomputeToday().catch(() => null), delay).unref?.();
+    setInterval(() => precomputeToday().catch(() => null), interval).unref?.();
+  }
+});
 
 if (String(process.env.AUTO_SETTLEMENT_ENABLED || 'true').toLowerCase() === 'true') {
   const interval = Math.max(5, Number(process.env.AUTO_SETTLEMENT_INTERVAL_MINUTES || 10)) * 60_000;

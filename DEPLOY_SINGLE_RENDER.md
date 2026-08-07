@@ -1,9 +1,9 @@
-# Deploy Betynz v5.0.20 on one Render service
+# Deploy Betynz v5.1.0 on one Render service
 
-The repository contains one `render.yaml` and one web service.
+The repository contains one `render.yaml` and one web service. Provider fetching and precomputation use bounded background lanes inside the same service so the deployment remains simple.
 
-Keep the existing `API_FOOTBALL_KEY`, `STATS_API_KEY`, Supabase variables and the v5.0.17+ runtime-safety values.
+Before deployment on an existing Supabase project, run `apps/web/sql/017_foundation_intelligence.sql` once.
 
-No new database migration is required when upgrading from v5.0.19 with SQL 016 already applied.
+Keep the existing `API_FOOTBALL_KEY`, `STATS_API_KEY`, Supabase variables and the runtime-safety values already in Render.
 
-Deploy with **Manual Deploy → Clear build cache & deploy** and verify `/api/health` reports `5.0.20`.
+Deploy with **Manual Deploy → Clear build cache & deploy** and verify `/api/health` reports `5.1.0`.

@@ -92,7 +92,7 @@ services:
       - key: STATS_API_TEAM_CACHE_TTL_SECONDS
         value: "43200"
       - key: STATS_API_MAPPING_THRESHOLD
-        value: "0.72"
+        value: "0.82"
       - key: STATS_API_GOAL_STATS_LOOKBACK
         value: "4"
       - key: STATS_VALUE_CONCURRENCY
@@ -111,6 +111,18 @@ services:
         value: "8"
       - key: CONSENSUS_SNAPSHOT_MAX_WINDOWS
         value: "8"
+      - key: FEATURE_STORE_MAX_ENTRIES
+        value: "1200"
+      - key: PRECOMPUTE_ENABLED
+        value: "true"
+      - key: PRECOMPUTE_START_DELAY_SECONDS
+        value: "20"
+      - key: PRECOMPUTE_INTERVAL_MINUTES
+        value: "60"
+      - key: PUBLIC_API_REQUESTS_PER_MINUTE
+        value: "180"
+      - key: PUBLIC_DEEP_ANALYSIS_REQUESTS_PER_MINUTE
+        value: "45"
       - key: AUTO_SETTLEMENT_START_DELAY_SECONDS
         value: "60"
       - key: CACHE_TTL_SECONDS

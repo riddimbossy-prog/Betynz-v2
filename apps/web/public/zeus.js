@@ -1,4 +1,5 @@
 import { dataBackedButton } from './data-backed-ui.js';
+import { fetchJson } from './api-client.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -10,7 +11,6 @@ $('#zeusDate').addEventListener('change',()=>load());
 $('#zeusDecisionFilter').addEventListener('change',render);
 
 function kickoff(value){const d=new Date(value);return Number.isNaN(d.getTime())?'Kickoff TBA':d.toLocaleString([],{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}
-async function fetchJson(url,timeoutMs=20000){const c=new AbortController(),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{cache:'no-store',signal:c.signal});const data=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(data.message||data.error||`HTTP ${r.status}`);e.transient=[502,503,504].includes(r.status);throw e;}return data;}finally{clearTimeout(t);}}
 function schedule(date,v){clearTimeout(timer);timer=setTimeout(()=>{if(v===version&&($('#zeusDate').value||today)===date)load({silent:true});},polls++<18?1800:5000);}
 
 async function load({silent=false}={}){

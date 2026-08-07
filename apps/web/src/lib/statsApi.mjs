@@ -1,4 +1,6 @@
 import { normalizeName } from './utils.mjs';
+import { getProviderIdentityMappings, upsertProviderIdentityMappings } from './supabase.mjs';
+import { canonicalFixtureKey, providerFixtureIdentityRow, providerTeamIdentityRows } from './identityRegistry.mjs';
 
 const cache = new Map();
 const inflight = new Map();
@@ -175,6 +177,10 @@ function responseRows(body) { return Array.isArray(body?.data) ? body.data : Arr
 function rowDate(row) { return Date.parse(row?.date || row?.start_time || row?.kickoff || row?.match_date || row?.scheduled || 0) || 0; }
 function sideName(row, side) { return text(row?.[`${side}_team`]?.name || row?.[side]?.name || row?.teams?.[side]?.name); }
 function sideId(row, side) { return row?.[`${side}_team`]?.id ?? row?.[side]?.team_id ?? row?.[side]?.id ?? row?.teams?.[side]?.id ?? null; }
+function rowLeague(row) { return text(row?.league?.name || row?.competition?.name || row?.tournament?.name || row?.league_name || row?.competition_name); }
+function rowCountry(row) { return text(row?.league?.country || row?.competition?.country || row?.country?.name || row?.country || row?.country_name); }
+function fixtureLeague(fixture) { return text(fixture?.league?.name || fixture?.leagueName); }
+function fixtureCountry(fixture) { return text(fixture?.league?.country || fixture?.country); }
 function score(row, side) {
   const names = side === 'home'
     ? [row?.home_score, row?.home_goals, row?.score?.home, row?.scores?.home, row?.goals?.home, row?.home?.score, row?.home_team?.score]
@@ -213,15 +219,35 @@ export async function getStatsApiMatchesForDate(date) {
   return { configured: true, date, matches, pages };
 }
 
+export function statsApiFixtureMatchScore(fixture, row) {
+  const direct = (similarity(fixture?.home?.name, sideName(row, 'home')) + similarity(fixture?.away?.name, sideName(row, 'away'))) / 2;
+  const reverse = (similarity(fixture?.home?.name, sideName(row, 'away')) + similarity(fixture?.away?.name, sideName(row, 'home'))) / 2;
+  if (reverse > direct + 0.04) return 0;
+  let score = direct * 0.80;
+  const wantedLeague = fixtureLeague(fixture), actualLeague = rowLeague(row);
+  score += wantedLeague && actualLeague ? similarity(wantedLeague, actualLeague) * 0.10 : 0.05;
+  const wantedCountry = fixtureCountry(fixture), actualCountry = rowCountry(row);
+  score += wantedCountry && actualCountry ? similarity(wantedCountry, actualCountry) * 0.04 : 0.02;
+  const wantedKickoff = Date.parse(fixture?.kickoff || fixture?.date || 0);
+  const actualKickoff = rowDate(row);
+  if (Number.isFinite(wantedKickoff) && actualKickoff) {
+    const minutes = Math.abs(wantedKickoff - actualKickoff) / 60000;
+    if (minutes <= 5) score += 0.06;
+    else if (minutes <= 30) score += 0.045;
+    else if (minutes <= 120) score += 0.025;
+    else if (minutes > 720) score -= 0.08;
+  } else score += 0.03;
+  return Math.max(0, Math.min(1, score));
+}
+
 export function matchStatsApiFixture(fixture, matches = []) {
   let best = null;
   for (const row of matches) {
-    const direct = (similarity(fixture?.home?.name, sideName(row, 'home')) + similarity(fixture?.away?.name, sideName(row, 'away'))) / 2;
-    const reverse = (similarity(fixture?.home?.name, sideName(row, 'away')) + similarity(fixture?.away?.name, sideName(row, 'home'))) / 2;
-    if (reverse > direct) continue;
-    if (!best || direct > best.score) best = { row, score: direct };
+    const score = statsApiFixtureMatchScore(fixture, row);
+    if (!best || score > best.score) best = { row, score };
   }
-  return best && best.score >= Number(process.env.STATS_API_MAPPING_THRESHOLD || 0.72) ? best : null;
+  const threshold = Math.max(0.72, Math.min(0.95, Number(process.env.STATS_API_MAPPING_THRESHOLD || 0.82)));
+  return best && best.score >= threshold ? best : null;
 }
 
 function perspective(row, teamId, teamName) {
@@ -283,10 +309,13 @@ export function buildStatsTeamProfile(rows = [], teamId = null, teamName = '') {
   return profile;
 }
 
-export async function getStatsApiTeamHistory(teamId, teamName = '') {
+export async function getStatsApiTeamHistory(teamId, teamName = '', beforeCutoff = null) {
   if (!statsApiConfigured() || teamId == null) return { profile: null, rows: [] };
-  const body = await request('/football/matches', { team_id: teamId, status: 'finished', per_page: config().historyLast }, config().teamTtlSeconds);
-  const rows = responseRows(body);
+  const cutoffMs = beforeCutoff ? Date.parse(beforeCutoff) : NaN;
+  const params = { team_id: teamId, status: 'finished', per_page: config().historyLast };
+  if (Number.isFinite(cutoffMs)) params.date_to = new Date(cutoffMs - 1000).toISOString().slice(0, 10);
+  const body = await request('/football/matches', params, config().teamTtlSeconds);
+  const rows = responseRows(body).filter(row => !Number.isFinite(cutoffMs) || !rowDate(row) || rowDate(row) < cutoffMs);
   return { rows, profile: buildStatsTeamProfile(rows, teamId, teamName) };
 }
 
@@ -346,21 +375,44 @@ export async function enrichStatsApiGoalProfile(teamHistory = {}, teamId = null,
 
 export async function buildStatsApiFixtureEvidence(date, fixture) {
   const dateMatches = await getStatsApiMatchesForDate(date);
-  const matched = matchStatsApiFixture(fixture, dateMatches.matches);
-  if (!matched) return { configured: true, mapped: false, fixtureId: fixture?.id || null, home: null, away: null };
+  const canonicalKey = canonicalFixtureKey(fixture);
+  let matched = null;
+  let mappingSource = 'FUZZY_MULTI_SIGNAL';
+  try {
+    const registry = await getProviderIdentityMappings({ provider: 'STATS_API', canonicalKey, limit: 5 });
+    const saved = (registry.rows || []).find(row => row.verified && row.provider_entity_id);
+    if (saved) {
+      const row = (dateMatches.matches || []).find(item => String(item?.id ?? item?.match_id ?? '') === String(saved.provider_entity_id));
+      if (row) {
+        const rescored = statsApiFixtureMatchScore(fixture, row);
+        if (rescored >= 0.78) { matched = { row, score: Math.max(rescored, Number(saved.mapping_confidence || 0)) }; mappingSource = 'VERIFIED_IDENTITY_REGISTRY'; }
+      }
+    }
+  } catch (_) {}
+  if (!matched) matched = matchStatsApiFixture(fixture, dateMatches.matches);
+  if (!matched) return { configured: true, mapped: false, fixtureId: fixture?.id || null, home: null, away: null, mappingSource: null };
   const homeId = sideId(matched.row, 'home'), awayId = sideId(matched.row, 'away');
+  const cutoff = fixture?.kickoff || `${date}T23:59:59Z`;
   const [homeHistory, awayHistory] = await Promise.all([
-    getStatsApiTeamHistory(homeId, sideName(matched.row, 'home')),
-    getStatsApiTeamHistory(awayId, sideName(matched.row, 'away'))
+    getStatsApiTeamHistory(homeId, sideName(matched.row, 'home'), cutoff),
+    getStatsApiTeamHistory(awayId, sideName(matched.row, 'away'), cutoff)
   ]);
+  const statsMatchId = matched.row?.id ?? matched.row?.match_id ?? null;
+  const verified = matched.score >= 0.90;
+  const mappingRows = [
+    providerFixtureIdentityRow({ fixture, provider: 'STATS_API', providerFixtureId: statsMatchId, confidence: matched.score, verified, metadata: { date, league: rowLeague(matched.row), country: rowCountry(matched.row) } }),
+    ...providerTeamIdentityRows({ fixture, provider: 'STATS_API', homeProviderId: homeId, awayProviderId: awayId, confidence: matched.score, verified, metadata: { date } })
+  ];
+  upsertProviderIdentityMappings(mappingRows).catch(() => null);
   return {
-    configured: true, mapped: true, mappingConfidence: matched.score,
-    statsMatchId: matched.row?.id ?? matched.row?.match_id ?? null,
+    configured: true, mapped: true, mappingConfidence: matched.score, mappingSource,
+    statsMatchId,
     homeId, awayId,
     home: homeHistory.profile,
     away: awayHistory.profile,
     _homeHistory: homeHistory,
-    _awayHistory: awayHistory
+    _awayHistory: awayHistory,
+    asOf: cutoff
   };
 }
 

@@ -223,10 +223,37 @@ function buildEvidence(selection, stats, statsEvidence, fixture = {}) {
   return { rows, sample, family:info.family, guards };
 }
 
-export function validateSelectionByData(selection, fixture = {}, stats = null, statsEvidence = null) {
+const PRIMARY_VALIDATION_SOURCES = Object.freeze({
+  MARKET_ROUTE: new Set(['MARKET_STRUCTURE']),
+  PPG_ROUTE: new Set(['VENUE_HISTORY']),
+  APEX_INTELLIGENCE: new Set(['VENUE_HISTORY','STATS_API_XG','STATS_API_SOT']),
+  CONVERGENCE_ROUTE: new Set(['VENUE_HISTORY']),
+  MOMENTUM_STREAK: new Set(['VENUE_HISTORY','STATS_API_STREAKS']),
+  STREAK_VALUE: new Set(['STATS_API','STATS_API_STREAKS','STATS_API_XG','STATS_API_SOT']),
+  HTFT_MOMENTUM: new Set(['HTFT_HISTORY','HT_HISTORY'])
+});
+
+function validationDiversity(rows = [], engine = null) {
+  const support = rows.filter(row => row.state === 'SUPPORT');
+  const sources = [...new Set(support.map(row => String(row.source || 'MATCH_DATA')))];
+  const primary = PRIMARY_VALIDATION_SOURCES[String(engine || '').toUpperCase()] || new Set();
+  const orthogonal = support.filter(row => !primary.has(String(row.source || 'MATCH_DATA')));
+  const orthogonalSources = [...new Set(orthogonal.map(row => String(row.source || 'MATCH_DATA')))];
+  return {
+    sourceFamilies: sources,
+    sourceDiversity: sources.length,
+    orthogonalSupportCount: orthogonal.length,
+    orthogonalSources,
+    independentlyCorroborated: !engine || primary.size === 0 || orthogonal.length > 0,
+    enginePrimarySources: [...primary]
+  };
+}
+
+export function validateSelectionByData(selection, fixture = {}, stats = null, statsEvidence = null, options = {}) {
   if (!selection?.market) return { status:'NOT_APPLICABLE', backed:false, score:null, market:null, supporting:[], opposing:[], neutral:[], explanation:'No proposed market is available for statistical validation.' };
   const { rows, sample, family, guards } = buildEvidence(selection, stats, statsEvidence, fixture);
   const supporting=rows.filter(x=>x.state==='SUPPORT'), opposing=rows.filter(x=>x.state==='OPPOSE'), neutral=rows.filter(x=>x.state==='NEUTRAL');
+  const diversity=validationDiversity(rows, options.engine);
   const supportWeight=supporting.reduce((s,x)=>s+x.weight,0), opposeWeight=opposing.reduce((s,x)=>s+x.weight,0);
   const decisive=supportWeight+opposeWeight;
   const score=decisive?round(supportWeight/decisive*100,1):null;
@@ -245,7 +272,10 @@ export function validateSelectionByData(selection, fixture = {}, stats = null, s
     : status==='REJECTED_BY_DATA'
       ? `${marketLabel} was rejected because the match data materially contradict the proposed direction.`
       : `${marketLabel} is waiting for enough relevant match data to independently confirm the route.`;
-  return { status, backed:status==='BACKED_BY_DATA', score, market:selection.market, family, sample, guards, supporting, opposing, neutral, evidenceCount:rows.length, explanation, checkedAt:new Date().toISOString() };
+  const diversityNote = status==='BACKED_BY_DATA' && options.engine && !diversity.independentlyCorroborated
+    ? ' Validation relies mainly on the same evidence family as the proposing engine, so Zeus/Consensus should treat it as correlated support rather than a new independent confirmation.'
+    : '';
+  return { status, backed:status==='BACKED_BY_DATA', score, market:selection.market, family, sample, guards, supporting, opposing, neutral, evidenceCount:rows.length, ...diversity, explanation:`${explanation}${diversityNote}`, checkedAt:new Date().toISOString() };
 }
 
 export function applyDataBackedValidation(engineResult = {}, fixture = {}, stats = null, statsEvidence = null) {
@@ -253,7 +283,7 @@ export function applyDataBackedValidation(engineResult = {}, fixture = {}, stats
   if (!engineResult.selection) return { ...engineResult, dataValidation: engineResult.dataValidation || null };
   if (engineResult.dataValidation?.status === 'BACKED_BY_DATA' && String(engineResult.dataValidation?.market || '').toUpperCase() === String(engineResult.selection?.market || '').toUpperCase()) return engineResult;
   const proposed={...engineResult.selection};
-  const validation=validateSelectionByData(proposed,fixture,stats,statsEvidence);
+  const validation=validateSelectionByData(proposed,fixture,stats,statsEvidence,{engine:engineResult.engine});
   if (validation.backed) {
     const selection={...proposed,dataBacked:true,dataValidation:validation,reasons:[...(proposed.reasons||[]),validation.explanation]};
     return {...engineResult,selection,dataValidation:validation,dataBacked:true,explanation:`${engineResult.explanation||''} ${validation.explanation}`.trim()};
@@ -266,5 +296,6 @@ export const DATA_BACKED_POLICY = Object.freeze({
   minimumVenueSample:3,
   minimumStatsApiSample:5,
   minimumSupportScore:65,
+  reportsOrthogonalCorroboration:true,
   statuses:['BACKED_BY_DATA','INSUFFICIENT_DATA','REJECTED_BY_DATA']
 });

@@ -1,22 +1,20 @@
-const CACHE = 'betynz-v5-0-20';
+const CACHE = 'betynz-v5-1-0';
 const SHELL = [
-  '/', '/styles.css?v=5.0.20', '/motion.js?v=5.0.20', '/app.js?v=5.0.20',
-  '/picks.html', '/picks.js?v=5.0.20',
-  '/market-route.html', '/market-route.js?v=5.0.20',
-  '/ppg-route.html', '/ppg-route.js?v=5.0.20',
-  '/apex-intelligence.html', '/apex-intelligence.js?v=5.0.20',
-  '/convergence.html', '/convergence.js?v=5.0.20',
-  '/momentum-streak.html', '/momentum-streak.js?v=5.0.20',
-  '/streak-value.html', '/streak-value.js?v=5.0.20',
-  '/htft-momentum.html', '/htft-momentum.js?v=5.0.20',
-  '/zeus.html', '/zeus.js?v=5.0.20',
-  '/proof.html', '/proof.js?v=5.0.20',
-  '/performance.html', '/performance.js?v=5.0.20',
-  '/live.html', '/live.js?v=5.0.20',
-  '/odds-movement.html', '/odds-movement.js?v=5.0.20',
-  '/leagues.html', '/leagues.js?v=5.0.20',
-  '/admin-engine-audit.html', '/admin-engine-audit.js?v=5.0.20',
-  '/admin-calibration.html', '/admin-calibration.js?v=5.0.20',
+  '/', '/styles.css?v=5.1.0', '/motion.js?v=5.1.0', '/app.js?v=5.1.0', '/api-client.js',
+  '/picks.html', '/picks.js?v=5.1.0', '/engine-lab.html',
+  '/market-route.html', '/market-route.js?v=5.1.0',
+  '/ppg-route.html', '/ppg-route.js?v=5.1.0',
+  '/apex-intelligence.html', '/apex-intelligence.js?v=5.1.0',
+  '/convergence.html', '/convergence.js?v=5.1.0',
+  '/momentum-streak.html', '/momentum-streak.js?v=5.1.0',
+  '/streak-value.html', '/streak-value.js?v=5.1.0',
+  '/htft-momentum.html', '/htft-momentum.js?v=5.1.0',
+  '/zeus.html', '/zeus.js?v=5.1.0',
+  '/proof.html', '/proof.js?v=5.1.0',
+  '/performance.html', '/performance.js?v=5.1.0',
+  '/live.html', '/live.js?v=5.1.0',
+  '/odds-movement.html', '/odds-movement.js?v=5.1.0',
+  '/leagues.html', '/leagues.js?v=5.1.0',
   '/manifest.webmanifest', '/favicon.ico', '/assets/favicon-16x16.png', '/assets/favicon-32x32.png', '/assets/apple-touch-icon.png', '/assets/icon-192.png', '/assets/icon-512.png', '/assets/maskable-192.png', '/assets/maskable-512.png', '/assets/betynz-mark.png', '/assets/betynz-logo.png', '/assets/pwa-splash-portrait.png', '/assets/pwa-splash-landscape.png'
 ];
 self.addEventListener('install', event => event.waitUntil(

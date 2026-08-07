@@ -1,6 +1,6 @@
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-const SPLASH_KEY = 'betynz:pwa-splash:5.0.20';
+const SPLASH_KEY = 'betynz:pwa-splash:5.1.0';
 
 function splashAlreadySeen() {
   try { return sessionStorage.getItem(SPLASH_KEY) === '1'; } catch { return false; }

@@ -1,4 +1,5 @@
 import { dataBackedButton } from './data-backed-ui.js';
+import { fetchJson } from './api-client.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -83,7 +84,7 @@ function consensusCard(row, compact = false) {
     <h3>${esc(row.home?.name)} <i>vs</i> ${esc(row.away?.name)}</h3>
     ${row.final ? `<div class="official-tip"><span>OFFICIAL TIP</span><strong>${esc(row.final.label || row.final.market)}</strong><b>${odd(row.final.odds)}</b></div>` : ''}
     ${row.final ? dataBackedButton(consensusValidation(row), 'Statistically backed') : ''}
-    <div class="agreement-meter"><span style="--agreement:${Math.max(1, Number(row.agreementCount || 0))}"></span><b>${Number(row.agreementCount || 0)}/7 engines agree</b><em>${row.zeusVerdict ? `⚡ Zeus ${esc(row.zeusVerdict)}` : `${Number(row.score || 0).toFixed(0)} agreement score`}</em></div>
+    <div class="agreement-meter"><span style="--agreement:${Math.max(1, Number(row.agreementCount || 0))}"></span><b>${Number(row.agreementCount || 0)}/7 engines agree</b><em>${row.zeusVerdict ? `⚡ Zeus ${esc(row.zeusVerdict)}` : `${Number(row.score || 0).toFixed(0)} agreement score`}</em></div>${Number(row.effectiveEvidence||0)>0?`<div class="independence-meta"><span>${Number(row.effectiveEvidence).toFixed(2)} effective evidence units</span><span>${Number(row.correlationAdjustedConfidence||0).toFixed(0)}% adjusted confidence</span><span>${Number((row.evidenceFamilies||[]).length)} evidence families</span></div>`:''}
     <div class="engine-proof-row">${engineChips(row)}</div>
     ${compact ? '' : `<ul>${(row.reasons || []).slice(0, 3).map(reason => `<li>${esc(reason)}</li>`).join('')}</ul>`}
   </article>`;
@@ -158,24 +159,13 @@ function render() {
   const failedEmpty = title => empty(title, payload.error || 'Refresh analysis to try again.');
   const chooseEmpty = (finishedTitle, finishedText, loadingTitle) => payload.failed ? failedEmpty('Analysis could not be completed') : processing ? processingEmpty(loadingTitle) : empty(finishedTitle, finishedText);
 
-  $('#eliteGrid').innerHTML = elite.length ? elite.map(row => consensusCard(row)).join('') : chooseEmpty('No Elite Banker matches this filter', 'All seven independent engines must support the same safe direction.', 'Checking 7/7 engine agreement…');
-  $('#consensusGrid').innerHTML = consensus.length ? consensus.map(row => consensusCard(row)).join('') : chooseEmpty('No Consensus Banker matches this filter', 'Five or six independent engines must agree before banker status appears.', 'Checking 5–6/7 engine agreement…');
+  $('#eliteGrid').innerHTML = elite.length ? elite.map(row => consensusCard(row)).join('') : chooseEmpty('No Elite Banker matches this filter', 'All seven specialist engines must support the same safe direction.', 'Checking 7/7 engine agreement…');
+  $('#consensusGrid').innerHTML = consensus.length ? consensus.map(row => consensusCard(row)).join('') : chooseEmpty('No Consensus Banker matches this filter', 'Five or six specialist engines must agree before banker status appears.', 'Checking 5–6/7 engine agreement…');
   $('#qualifiedList').innerHTML = qualified.length ? qualified.map(row => consensusCard(row, true)).join('') : chooseEmpty('No shared or single-engine qualified picks', 'Complete routes will appear here without being promoted to banker status.', 'Checking complete engine routes…');
   $('#saferList').innerHTML = safer.length ? safer.map(row => consensusCard(row, true)).join('') : chooseEmpty('No safer picks', 'Approved downgrade markets appear here.', 'Checking safer downgrade routes…');
   $('#conflictList').innerHTML = conflicts.length ? conflicts.map(conflictCard).join('') : chooseEmpty('No engine conflicts or Zeus holds', 'No opposing directions or Zeus statistical holds are visible under this filter.', 'Checking opposing directions and Zeus supervision…');
   setBoardAwareVisibility({ processing, elite, consensus, qualified, safer, conflicts });
   window.dispatchEvent(new CustomEvent('betynz:content-rendered'));
-}
-
-async function fetchJson(url, timeoutMs = 20000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || data.error || `HTTP ${response.status}`);
-    return data;
-  } finally { clearTimeout(timer); }
 }
 
 function schedulePoll(from, days, version) {

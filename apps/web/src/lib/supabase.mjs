@@ -171,3 +171,29 @@ export function getPendingConsensusSnapshots(date, limit = 1000) {
 export function updateConsensusSettlement(id, payload) {
   return patchRows('consensus_snapshots', { id: `eq.${id}` }, payload);
 }
+
+export function logPredictionLineage(rows) {
+  return upsert('prediction_lineage', rows, 'fixture_id,engine,fixture_date');
+}
+
+export function upsertFeatureSnapshots(rows) {
+  return upsert('feature_snapshots', rows, 'fixture_id,fixture_date');
+}
+
+export function upsertProviderIdentityMappings(rows) {
+  return upsert('provider_identity_map', rows, 'canonical_key,provider');
+}
+
+export function getProviderIdentityMappings({ provider, canonicalKey, limit = 5000 } = {}) {
+  const filters = {};
+  if (provider) filters.provider = `eq.${provider}`;
+  if (canonicalKey) filters.canonical_key = `eq.${canonicalKey}`;
+  return selectRows('provider_identity_map', { filters, order: 'verified.desc,updated_at.desc', limit });
+}
+
+export function getFeatureSnapshots({ date, fixtureId, limit = 1000 } = {}) {
+  const filters = {};
+  if (date) filters.fixture_date = `eq.${date}`;
+  if (fixtureId) filters.fixture_id = `eq.${fixtureId}`;
+  return selectRows('feature_snapshots', { filters, order: 'updated_at.desc', limit });
+}

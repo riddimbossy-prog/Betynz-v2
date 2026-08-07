@@ -1,4 +1,5 @@
 import { dataBackedButton } from './data-backed-ui.js';
+import { fetchJson } from './api-client.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -20,19 +21,6 @@ function kickoff(value) {
 
 function formChips(form = []) {
   return form.map(value => `<span class="form-${String(value).toLowerCase()}">${esc(value)}</span>`).join('') || '<span>—</span>';
-}
-
-async function fetchJson(url, timeoutMs = 20000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) { const error = new Error(data.message || `HTTP ${response.status}`); error.status = response.status; error.transient = [502,503,504].includes(response.status); throw error; }
-    return data;
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 function schedulePoll(date, version) {

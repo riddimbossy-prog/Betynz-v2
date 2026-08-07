@@ -1,19 +1,37 @@
-# Betynz v5.0.20 — Start Here
+# Betynz v5.1.0 — Start Here
 
-This is a complete single-Render replacement build.
+This is a complete replacement build for the existing single-Render Betynz deployment.
 
-## Upgrade from v5.0.19
+## 1. Supabase first
 
-No new Supabase migration is required if SQL `016_zeus_statistical_supervisor.sql` is already installed.
+If you are upgrading an existing Betynz database that already has SQL `016_zeus_statistical_supervisor.sql`, run:
 
-1. Extract this package.
-2. Replace the repository contents while keeping your existing `.git` folder.
-3. Commit and push through GitHub Desktop.
-4. In Render choose **Manual Deploy → Clear build cache & deploy**.
-5. After the service is healthy, hard-refresh the site once with `Ctrl + Shift + R`.
+```text
+apps/web/sql/017_foundation_intelligence.sql
+```
 
-## What changed
+A brand-new Supabase project should use `apps/web/sql/001_market_route_fresh.sql` instead; it already contains the v5.1.0 foundation tables.
 
-The final validation layer now performs match-specific recovery instead of a fixed safer-market fallback. Every recovered market must still pass the universal 1.20–2.00 gate and its own statistical validation.
+## 2. Replace repository files
 
-Check `/api/health` after deployment. It should report version `5.0.20` and include `adaptiveRecoveryPolicy`.
+Keep your existing hidden `.git` folder, replace the repository contents with this build, commit and push through GitHub Desktop.
+
+## 3. Render
+
+Use **Manual Deploy → Clear build cache & deploy**.
+
+Existing secrets stay the same:
+
+```text
+API_FOOTBALL_KEY
+STATS_API_KEY
+SUPABASE_URL
+SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+```
+
+## 4. Verify
+
+After deployment open `/api/health`. It should report version `5.1.0`, the provider queues, feature-store state, request-guard state and runtime/event-loop telemetry.
+
+Hard-refresh the browser once with `Ctrl + Shift + R`.

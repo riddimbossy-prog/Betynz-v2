@@ -121,3 +121,18 @@ export async function getAdminSession(req) {
     refreshed
   };
 }
+
+export function sameOriginRequest(req) {
+  const method = String(req?.method || 'GET').toUpperCase();
+  if (!['POST','PUT','PATCH','DELETE'].includes(method)) return true;
+  const site = String(req?.headers?.['sec-fetch-site'] || '').toLowerCase();
+  if (site && !['same-origin','same-site','none'].includes(site)) return false;
+  const origin = String(req?.headers?.origin || '').trim();
+  if (!origin) return true; // server-to-server/tests; SameSite=Strict still protects browser cookies
+  const host = String(req?.headers?.host || '').trim().toLowerCase();
+  try {
+    return new URL(origin).host.toLowerCase() === host;
+  } catch {
+    return false;
+  }
+}

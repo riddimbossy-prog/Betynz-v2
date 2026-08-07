@@ -1,4 +1,5 @@
 import { dataBackedButton } from './data-backed-ui.js';
+import { fetchJson } from './api-client.js';
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const odd=v=>Number(v)>1?Number(v).toFixed(2):'—';
@@ -13,7 +14,6 @@ $('#atlasDecisionFilter').addEventListener('change',render);
 $('#atlasMarketFilter').addEventListener('change',render);
 
 function kickoff(v){const d=new Date(v);return Number.isNaN(d.getTime())?'Kickoff TBA':d.toLocaleString([],{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}
-async function fetchJson(url,timeoutMs=12000){const c=new AbortController(),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{cache:'no-store',signal:c.signal});const d=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(d.message||`HTTP ${r.status}`);e.status=r.status;e.transient=[502,503,504].includes(r.status);throw e;}return d}finally{clearTimeout(t)}}
 function schedulePoll(date,version,delay=null){clearTimeout(pollTimer);pollTimer=setTimeout(()=>{if(version===requestVersion&&($('#atlasDate').value||today)===date)load({silent:true})},delay??(payload?.providerQueue?.coolingDown?5000:(pollCount++<20?1500:4000)));}
 
 async function load({silent=false}={}){

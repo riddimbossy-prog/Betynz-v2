@@ -224,17 +224,26 @@ export function recoverSelectionByMatchReasoning(engineResult={}, rawEngine={}, 
   const original=engineResult?.proposedSelection || engineResult?.selection || rawEngine?.selection || null;
   if (!original?.market) return engineResult;
   const ctx=contextFor(fixture,stats,statsEvidence), odds=fixture?.odds||{};
-  const candidates=[];
-  for(const market of candidateMarkets(ctx, original.market)) {
-    if (market===String(engineResult?.proposedSelection?.market||'').toUpperCase() && engineResult?.dataValidation?.status==='REJECTED_BY_DATA') continue;
+  const pool=candidateMarkets(ctx, original.market);
+  // Searching many possible replacements creates a multiple-comparisons risk.
+  // Penalize broad searches and preserve an audit row for every candidate tested.
+  const searchPenalty=round(Math.min(8, Math.max(0,pool.length-1)*0.6),1);
+  const candidates=[], evaluatedCandidates=[];
+  for(const market of pool) {
+    if (market===String(engineResult?.proposedSelection?.market||'').toUpperCase() && engineResult?.dataValidation?.status==='REJECTED_BY_DATA') {
+      evaluatedCandidates.push({market,status:'SKIPPED_ORIGINAL_REJECTED'}); continue;
+    }
     const selection=selectionFor(odds,market);
-    if(!selection) continue;
+    if(!selection) { evaluatedCandidates.push({market,status:'NO_PUBLISHABLE_PRICE',odds:price(odds,market)}); continue; }
     const logic=logicFor(market,ctx,original.market);
-    if(!logic.allowed) continue;
+    if(!logic.allowed) { evaluatedCandidates.push({market,status:'LOGIC_NOT_RELEVANT',odds:selection.odds}); continue; }
     const validation=validateSelectionByData(selection,fixture,stats,statsEvidence);
-    if(validation.status!=='BACKED_BY_DATA') continue;
+    if(validation.status!=='BACKED_BY_DATA') {
+      evaluatedCandidates.push({market,status:validation.status,odds:selection.odds,validationScore:validation.score||0,reason:validation.explanation||null}); continue;
+    }
     const originalAffinity=direction(market)===direction(original.market)?6:0;
-    const score=round((Number(validation.score)||65)+logic.boost+originalAffinity,1);
+    const score=round((Number(validation.score)||65)+logic.boost+originalAffinity-searchPenalty,1);
+    evaluatedCandidates.push({market,status:'BACKED_BY_DATA',odds:selection.odds,validationScore:validation.score||0,recoveryScore:score,searchPenalty});
     candidates.push({market,selection,validation,logic,score});
   }
   candidates.sort((a,b)=>b.score-a.score || Number(a.selection.odds)-Number(b.selection.odds));
@@ -242,14 +251,14 @@ export function recoverSelectionByMatchReasoning(engineResult={}, rawEngine={}, 
   if(!best) {
     return {
       ...engineResult,
-      adaptiveRecovery:{attempted:true,recovered:false,originalMarket:original.market,marketContext:ctx.shape.balance,candidatesChecked:candidateMarkets(ctx,original.market).length,reason:'No alternative market inside 1.20–2.00 was both logically relevant and independently backed by the match data.'},
+      adaptiveRecovery:{attempted:true,recovered:false,originalMarket:original.market,marketContext:ctx.shape.balance,candidatesChecked:pool.length,searchPenalty,evaluatedCandidates:evaluatedCandidates.slice(0,20),reason:'No alternative market inside 1.20–2.00 was both logically relevant and independently backed by the match data.'},
       explanation:`${engineResult.explanation||''} Betynz re-opened this fixture after the failed route, but no alternative market was strong enough to publish.`.trim()
     };
   }
   if(second && opposed(best.market,second.market) && Math.abs(best.score-second.score)<5) {
     return {
       ...engineResult,
-      adaptiveRecovery:{attempted:true,recovered:false,conflict:true,originalMarket:original.market,reason:`Competing data-backed alternatives (${best.selection.label} and ${second.selection.label}) were too close.`},
+      adaptiveRecovery:{attempted:true,recovered:false,conflict:true,originalMarket:original.market,searchPenalty,evaluatedCandidates:evaluatedCandidates.slice(0,20),reason:`Competing data-backed alternatives (${best.selection.label} and ${second.selection.label}) were too close.`},
       decision:'WAITING_DATA',selection:null,
       explanation:`${engineResult.explanation||''} Match-specific recovery found competing statistical directions, so Betynz withheld the tip rather than forcing a fallback.`.trim()
     };
@@ -271,7 +280,7 @@ export function recoverSelectionByMatchReasoning(engineResult={}, rawEngine={}, 
     proposedSelection:original,
     dataValidation:validation,
     dataBacked:true,
-    adaptiveRecovery:{attempted:true,recovered:true,originalMarket:original.market,selectedMarket:best.market,score:best.score,reasoning:best.logic.reasons,candidates:candidates.slice(0,5).map(x=>({market:x.market,label:x.selection.label,odds:x.selection.odds,validationScore:x.validation.score,recoveryScore:x.score}))},
+    adaptiveRecovery:{attempted:true,recovered:true,originalMarket:original.market,selectedMarket:best.market,score:best.score,searchPenalty,evaluatedCandidates:evaluatedCandidates.slice(0,20),reasoning:best.logic.reasons,candidates:candidates.slice(0,5).map(x=>({market:x.market,label:x.selection.label,odds:x.selection.odds,validationScore:x.validation.score,recoveryScore:x.score}))},
     explanation:`${rawEngine?.engine||engineResult?.engine||'Engine'} originally pointed to ${original.label||original.market}, but that route did not survive the final checks. Betynz re-analysed this match on its own evidence and selected ${best.selection.label} at ${best.selection.odds.toFixed(2)} because ${best.logic.reasons.join(' ')} ${validation.explanation}`.trim()
   };
 }
@@ -282,5 +291,7 @@ export const ADAPTIVE_RECOVERY_POLICY=Object.freeze({
   favouriteTwoGoalGateMax:1.55,
   decentPpgMin:1.50,
   conflictMargin:5,
+  multipleComparisonPenaltyPerCandidate:0.6,
+  maximumSearchPenalty:8,
   rule:'No fixed fallback ladder: each alternative must be market-available, inside 1.20–2.00, logically relevant to this match, and independently BACKED_BY_DATA.'
 });
