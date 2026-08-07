@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,9 +19,10 @@ import { buildPredictionLineage } from './engines/predictionLineage.mjs';
 import { buildConsensusForFixture, buildConsensusWindow, consensusSummary } from './engines/consensus.mjs';
 import { extractVenueStats, matchFixture } from './lib/venueStats.mjs';
 import { statsApiConfigured, statsApiRateState, buildStatsApiFixtureEvidence, addGoalEvidence } from './lib/statsApi.mjs';
-import { cacheGet, cacheSet, cacheStats, cachePrune } from './lib/cache.mjs';
+import { cacheGet, cacheSet, cacheStats, cachePrune, cacheDelete } from './lib/cache.mjs';
 import { safeDate, normalizeName } from './lib/utils.mjs';
 import { rememberFeatureSnapshot, persistFeatureSnapshots, loadFeatureSnapshot, featureStoreStats } from './lib/featureStore.mjs';
+import { PREPARED_VIEW_KEYS, rememberPreparedView, getPreparedView, persistPreparedViews, hydratePreparedViews, preparedFixtureCounts, preparedViewStats } from './lib/preparedViews.mjs';
 import { consumeRateLimit, publicAnalysisDateState, requestGuardStats } from './lib/requestGuard.mjs';
 import { recordHttpRequest, recordRuntimeError, telemetrySnapshot } from './lib/telemetry.mjs';
 import {
@@ -62,7 +64,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.1.0';
+const APP_VERSION = '5.1.1';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const APEX_INTELLIGENCE_CODE = 'APEX_INTELLIGENCE';
@@ -76,6 +78,26 @@ const ENGINE_CODES = [...BASE_ENGINE_CODES, ZEUS_SUPERVISOR_CODE];
 const CONSENSUS_SYSTEM_CODE = 'CONSENSUS_SYSTEM';
 const root = fileURLToPath(new URL('../public', import.meta.url));
 const port = Number(process.env.PORT || 10000);
+
+const weeklyPrecomputeDates = new Set();
+const preparedReadContext = new AsyncLocalStorage();
+
+function preparedPayload(viewKey, date) {
+  if (preparedReadContext.getStore()?.bypassPrepared) return null;
+  const record = getPreparedView(viewKey, date);
+  if (!record?.payload) return null;
+  return {
+    ...record.payload,
+    prepared: true,
+    preparedAt: record.generatedAt,
+    cache: 'PRECOMPUTED'
+  };
+}
+
+function sleepMs(ms) {
+  return new Promise(resolve => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+}
+
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -188,7 +210,7 @@ async function loadApiFootballMedia(kind, id) {
       const keyValue = String(process.env.API_FOOTBALL_KEY || '');
       const headers = {
         accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'user-agent': 'Betynz-Media-Proxy/5.1.0'
+        'user-agent': 'Betynz-Media-Proxy/5.1.1'
       };
       if (keyValue) headers[keyHeader] = keyValue;
       const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
@@ -425,6 +447,8 @@ async function getWinCarousel(days = 14, limit = 24) {
 const dashboardFixtureInflight = new Map();
 
 async function getDashboardFixtureBoard(date) {
+  const prepared = preparedPayload(PREPARED_VIEW_KEYS.FIXTURE_BOARD, date);
+  if (prepared) return prepared;
   const key = `dashboard-fixtures:${date}`;
   const cached = cacheGet(key);
   if (cached) return { ...cached, cache: 'HIT' };
@@ -462,6 +486,8 @@ async function getDashboardFixtureBoard(date) {
 const fixtureBoardInflight = new Map();
 
 async function getFastFixtureBoard(date) {
+  const prepared = preparedPayload(PREPARED_VIEW_KEYS.FIXTURE_BOARD, date);
+  if (prepared) return prepared;
   const key = `single-engine-fixtures:${date}`;
   const cached = cacheGet(key);
   if (cached) return { ...cached, cache: 'HIT' };
@@ -709,6 +735,8 @@ async function enrichPrimaryStatsAndVisuals(date, fixtures = [], options = {}) {
 const marketBoardInflight = new Map();
 
 async function getMarketRouteBoard(date) {
+  const prepared = preparedPayload(PREPARED_VIEW_KEYS.MARKET_ROUTE, date);
+  if (prepared) return prepared;
   const key = `market-route-board:${date}`;
   const cached = cacheGet(key);
   if (cached) return { ...cached, cache: 'HIT' };
@@ -835,6 +863,8 @@ function progressiveEngineResponse({ date, engine, items, processed, total, comp
 }
 
 async function getStatsRouteBoards(date) {
+  const prepared = preparedPayload(PREPARED_VIEW_KEYS.STATS_BUNDLE, date);
+  if (prepared) return prepared;
   const key = `stats-route-boards:${date}`;
   const cached = cacheGet(key);
   if (cached) return cached;
@@ -989,6 +1019,8 @@ function waitingStatsResponse(date, engine, fixtures = [], analyser, oddsPending
 }
 
 async function ensureStatsRouteView(date) {
+  const prepared = preparedPayload(PREPARED_VIEW_KEYS.STATS_BUNDLE, date);
+  if (prepared) return prepared;
   const existing = statsRouteViewSnapshots.get(date);
   if (existing?.ppg?.complete && existing?.apex?.complete && existing?.convergence?.complete && existing?.momentum?.complete && existing?.htft?.complete
       && !existing?.ppg?.oddsPending && !existing?.apex?.oddsPending && !existing?.convergence?.oddsPending && !existing?.momentum?.oddsPending && !existing?.htft?.oddsPending) return existing;
@@ -1142,6 +1174,8 @@ function goalCandidate(engine = null) {
 }
 
 async function getStreakValueBoard(date) {
+  const prepared = preparedPayload(PREPARED_VIEW_KEYS.STREAK_VALUE, date);
+  if (prepared) return prepared;
   const key = `streak-value-board:${date}`;
   const cached = cacheGet(key);
   if (cached) return cached;
@@ -1220,6 +1254,8 @@ async function getStreakValueBoard(date) {
 }
 
 async function ensureStreakValueView(date) {
+  const prepared = preparedPayload(PREPARED_VIEW_KEYS.STREAK_VALUE, date);
+  if (prepared) return prepared;
   let snapshot = streakValueViewSnapshots.get(date);
   if (!snapshot) {
     const board = cacheGet(`single-engine-fixtures:${date}`) || cacheGet(`dashboard-fixtures:${date}`) || { fixtures: [], oddsPending: true };
@@ -1293,6 +1329,8 @@ function composeZeusBoard(date, board, marketBoard, statsSnapshot, streakSnapsho
 const zeusViewSnapshots = new Map();
 
 async function getZeusBoard(date) {
+  const prepared = preparedPayload(PREPARED_VIEW_KEYS.ZEUS, date);
+  if (prepared) return prepared;
   const key = `zeus-board:${date}`;
   const cached = cacheGet(key);
   if (cached) return cached;
@@ -1603,8 +1641,70 @@ function partialConsensusResponse(from, days, marketBoard, statsSnapshot, streak
   };
 }
 
+
+function combinePreparedConsensusWindow(from, days = 7) {
+  if (preparedReadContext.getStore()?.bypassPrepared) return null;
+  const safeDays = Math.max(1, Math.min(7, Number(days) || 7));
+  const dates = Array.from({ length: safeDays }, (_, index) => addDays(from, index));
+  const daily = dates.map(date => getPreparedView(PREPARED_VIEW_KEYS.CONSENSUS_DAY, date));
+  if (daily.some(record => !record?.complete || !record?.payload)) return null;
+  const payloads = daily.map(record => record.payload);
+  const flatten = key => payloads.flatMap(payload => Array.isArray(payload?.[key]) ? payload[key] : []);
+  const enginePicks = flatten('enginePicks');
+  const elite = flatten('elite');
+  const consensusBankers = flatten('consensusBankers');
+  const singleQualified = flatten('singleQualified');
+  const safer = flatten('safer');
+  const conflicts = flatten('conflicts');
+  const holds = flatten('holds');
+  const consensusRows = payloads.flatMap(payload => Array.isArray(payload?.consensus?.all) ? payload.consensus.all : []);
+  const publishable = [...elite, ...consensusBankers, ...singleQualified, ...safer]
+    .sort((a,b) => new Date(a.kickoff) - new Date(b.kickoff) || Number(b.agreementCount || 0) - Number(a.agreementCount || 0) || Number(b.score || 0) - Number(a.score || 0));
+  const bankers = [...elite, ...consensusBankers]
+    .sort((a,b) => new Date(a.kickoff) - new Date(b.kickoff) || Number(b.agreementCount || 0) - Number(a.agreementCount || 0));
+  const generatedAt = daily.map(record => record.generatedAt).sort().at(-1) || new Date().toISOString();
+  return {
+    from,
+    to: dates.at(-1),
+    days: safeDays,
+    bankers,
+    qualified: enginePicks,
+    enginePicks,
+    consensusPicks: publishable,
+    elite,
+    consensusBankers,
+    singleQualified,
+    safer,
+    conflicts,
+    holds,
+    byDate: dates.map((date,index) => {
+      const payload = payloads[index] || {};
+      return {
+        date,
+        elite: payload.elite || [],
+        consensus: payload.consensusBankers || [],
+        qualified: payload.singleQualified || [],
+        safer: payload.safer || [],
+        conflicts: payload.conflicts || [],
+        enginePicks: payload.enginePicks || []
+      };
+    }),
+    consensus: { elite, bankers: consensusBankers, qualified: singleQualified, safer, conflicts, holds, all: consensusRows },
+    summary: { ...consensusSummary(consensusRows), bankers: bankers.length, engineQualified: enginePicks.length, publishable: publishable.length },
+    progress: { stage: 'PRECOMPUTED_COMPLETE', processed: safeDays, total: safeDays, percent: 100 },
+    complete: true,
+    failed: false,
+    prepared: true,
+    preparedAt: generatedAt,
+    generatedAt,
+    cache: 'PRECOMPUTED'
+  };
+}
+
 async function getQualifiedPicksWindowView(from, days = 7) {
   const safeDays = Math.max(1, Math.min(7, Number(days) || 7));
+  const preparedWindow = combinePreparedConsensusWindow(from, safeDays);
+  if (preparedWindow) return preparedWindow;
   const key = `${from}:${safeDays}`;
   const finalCached = cacheGet(`qualified-picks-v36:${from}:${safeDays}`);
   if (finalCached) return { ...finalCached, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: safeDays, total: safeDays, percent: 100 }, cache: 'HIT' };
@@ -1828,6 +1928,8 @@ async function apiRoute(req, res, url) {
     runtime: runtimeMemory(),
     runtimeCaches: pruneRuntimeCaches(),
     featureStore: featureStoreStats(),
+    preparedViews: preparedViewStats(),
+    weeklyPrecompute: { ...weeklyPrecomputeStatus, dates: Object.fromEntries(Object.entries(weeklyPrecomputeStatus.dates).slice(-14)) },
     requestGuards: requestGuardStats(),
     telemetry: { uptimeSeconds: Math.round(process.uptime()), eventLoopLagMs: telemetrySnapshot().eventLoopLagMs },
     sourceRoles: { fixtures: 'API_FOOTBALL', odds: 'API_FOOTBALL', live: 'API_FOOTBALL', results: 'API_FOOTBALL', coreStatistics: 'API_FOOTBALL', streakIntelligence: 'STATS_API', xg: 'STATS_API', visuals: 'API_FOOTBALL', supervisor: 'ZEUS_COMPOSITE' },
@@ -1835,6 +1937,16 @@ async function apiRoute(req, res, url) {
     oddsGate: UNIVERSAL_ODDS_GATE,
     dataBackedPolicy: DATA_BACKED_POLICY,
     adaptiveRecoveryPolicy: ADAPTIVE_RECOVERY_POLICY,
+    precompute: { enabled: String(process.env.WEEKLY_PRECOMPUTE_ENABLED || 'true').toLowerCase() === 'true', days: Math.max(7, Math.min(14, Number(process.env.WEEKLY_PRECOMPUTE_DAYS || 7))), selectedDayRefreshMinutes: Math.max(60, Number(process.env.PRECOMPUTE_SELECTED_DAY_REFRESH_MINUTES || 120)), sundayHourUtc: Math.max(0, Math.min(23, Number(process.env.WEEKLY_PRECOMPUTE_SUNDAY_HOUR_UTC || 0))) },
+    time: new Date().toISOString()
+  });
+
+  if (url.pathname === '/api/precompute-status') return json(res, 200, {
+    version: APP_VERSION,
+    preparedViews: preparedViewStats(),
+    weeklyPrecompute: { ...weeklyPrecomputeStatus, dates: Object.fromEntries(Object.entries(weeklyPrecomputeStatus.dates).slice(-14)) },
+    today: utcDateOffset(0),
+    visibleWeekReady: Array.from({ length: 7 }, (_, index) => addDays(utcDateOffset(0), index)).every(preparedDateComplete),
     time: new Date().toISOString()
   });
 
@@ -1849,6 +1961,7 @@ async function apiRoute(req, res, url) {
     oddsGate: UNIVERSAL_ODDS_GATE,
     dataBackedPolicy: DATA_BACKED_POLICY,
     adaptiveRecoveryPolicy: ADAPTIVE_RECOVERY_POLICY,
+    weeklyPrecompute: { enabled: String(process.env.WEEKLY_PRECOMPUTE_ENABLED || 'true').toLowerCase() === 'true', horizonDays: Math.max(7, Math.min(14, Number(process.env.WEEKLY_PRECOMPUTE_DAYS || 7))), persistence: 'SUPABASE_PREPARED_VIEWS', nextWeekPrebuild: 'SUNDAY_UTC' },
     responsiblePlay: 'Predictions are informational, not guarantees. Adults only.'
   });
 
@@ -1934,6 +2047,18 @@ async function apiRoute(req, res, url) {
     });
   }
 
+  if (url.pathname === '/api/admin/precompute-week') {
+    const session = await requireAdmin(req, res);
+    if (!session) return;
+    if (req.method !== 'POST') return json(res, 405, { error: 'POST required' });
+    if (!sameOriginRequest(req)) return json(res, 403, { error: 'Same-origin request required.' });
+    const body = await readJsonBody(req).catch(() => ({}));
+    const from = safeDate(body?.from) ? body.from : utcDateOffset(0);
+    const force = Boolean(body?.force);
+    if (!weeklyPrecomputeJob) queueMicrotask(() => precomputeWeek(from, { force, reason: 'ADMIN_PREBUILD' }).catch(() => null));
+    return json(res, 202, { accepted: true, from, force, running: Boolean(weeklyPrecomputeJob), status: weeklyPrecomputeStatus });
+  }
+
   if (url.pathname === '/api/admin/telemetry') {
     if (!await requireAdmin(req, res)) return;
     return json(res, 200, { version: APP_VERSION, telemetry: telemetrySnapshot(), featureStore: featureStoreStats(), requestGuards: requestGuardStats(), providerQueue: apiFootballRateState(), statsProviderQueue: statsApiRateState(), runtime: runtimeMemory() });
@@ -1949,6 +2074,8 @@ async function apiRoute(req, res, url) {
   if (url.pathname === '/api/fixture-count') {
     const date = url.searchParams.get('date') || utcDateOffset(0);
     if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    const prepared = getPreparedView(PREPARED_VIEW_KEYS.FIXTURE_BOARD, date);
+    if (prepared?.payload?.fixtures) return jsonCached(res, 200, { date, count: prepared.payload.fixtures.length, prepared: true, generatedAt: prepared.generatedAt }, 300);
     try {
       const result = await getApiFootballFixtureCount(date);
       return jsonCached(res, 200, result, 120);
@@ -1961,6 +2088,8 @@ async function apiRoute(req, res, url) {
     const from = url.searchParams.get('from') || utcDateOffset(0);
     const days = Math.max(1, Math.min(14, Number(url.searchParams.get('days') || 7)));
     if (!safeDate(from)) return json(res, 400, { error: 'from must be YYYY-MM-DD' });
+    const preparedCounts = preparedFixtureCounts(from, days, addDays);
+    if (preparedCounts) return jsonCached(res, 200, preparedCounts, 300);
     try {
       const result = await getApiFootballFixtureCounts(from, days);
       return jsonCached(res, 200, result, 120);
@@ -2402,20 +2531,257 @@ async function staticRoute(req, res, url) {
   }
 }
 
-async function precomputeToday() {
-  const date = utcDateOffset(0);
+const weeklyPrecomputeStatus = {
+  running: false,
+  phase: 'IDLE',
+  from: null,
+  to: null,
+  processed: 0,
+  total: 0,
+  currentDate: null,
+  lastStartedAt: null,
+  lastCompletedAt: null,
+  lastError: null,
+  dates: {}
+};
+let weeklyPrecomputeJob = null;
+
+function preparedDateComplete(date) {
+  return [
+    PREPARED_VIEW_KEYS.FIXTURE_BOARD,
+    PREPARED_VIEW_KEYS.MARKET_ROUTE,
+    PREPARED_VIEW_KEYS.STATS_BUNDLE,
+    PREPARED_VIEW_KEYS.STREAK_VALUE,
+    PREPARED_VIEW_KEYS.ZEUS,
+    PREPARED_VIEW_KEYS.CONSENSUS_DAY
+  ].every(viewKey => Boolean(getPreparedView(viewKey, date)));
+}
+
+function preparedDateAgeHours(date) {
+  const record = getPreparedView(PREPARED_VIEW_KEYS.CONSENSUS_DAY, date);
+  const ms = Date.parse(record?.generatedAt || '');
+  return Number.isFinite(ms) ? Math.max(0, (Date.now() - ms) / 3_600_000) : Infinity;
+}
+
+function invalidatePreparedRuntimeDate(date) {
+  for (const key of [
+    `dashboard-fixtures:${date}`,
+    `single-engine-fixtures:${date}`,
+    `market-route-board:${date}`,
+    `stats-route-boards:${date}`,
+    `streak-value-board:${date}`,
+    `zeus-board:${date}`,
+    `qualified-picks-v36:${date}:1`
+  ]) cacheDelete(key);
+  statsRouteViewSnapshots.delete(date);
+  streakValueViewSnapshots.delete(date);
+  zeusViewSnapshots.delete(date);
+  for (const key of [...consensusViewSnapshots.keys()]) if (String(key).startsWith(`${date}:`)) consensusViewSnapshots.delete(key);
+}
+
+function primePreparedRuntimeRecord(record) {
+  if (!record?.payload || !record?.fixtureDate) return;
+  const { viewKey, fixtureDate: date, payload } = record;
+  const ttl = Math.max(1800, Number(process.env.PREPARED_VIEW_MEMORY_TTL_SECONDS || 86400));
+  if (viewKey === PREPARED_VIEW_KEYS.FIXTURE_BOARD) {
+    cacheSet(`dashboard-fixtures:${date}`, payload, ttl);
+    cacheSet(`single-engine-fixtures:${date}`, payload, ttl);
+  } else if (viewKey === PREPARED_VIEW_KEYS.MARKET_ROUTE) {
+    cacheSet(`market-route-board:${date}`, payload, ttl);
+  } else if (viewKey === PREPARED_VIEW_KEYS.STATS_BUNDLE) {
+    boundedMapSet(statsRouteViewSnapshots, date, payload, Number(process.env.ANALYSIS_SNAPSHOT_MAX_DATES || 14));
+    cacheSet(`stats-route-boards:${date}`, payload, ttl);
+  } else if (viewKey === PREPARED_VIEW_KEYS.STREAK_VALUE) {
+    boundedMapSet(streakValueViewSnapshots, date, payload, Number(process.env.ANALYSIS_SNAPSHOT_MAX_DATES || 14));
+    cacheSet(`streak-value-board:${date}`, payload, ttl);
+  } else if (viewKey === PREPARED_VIEW_KEYS.ZEUS) {
+    boundedMapSet(zeusViewSnapshots, date, payload, Number(process.env.ANALYSIS_SNAPSHOT_MAX_DATES || 14));
+    cacheSet(`zeus-board:${date}`, payload, ttl);
+  } else if (viewKey === PREPARED_VIEW_KEYS.CONSENSUS_DAY) {
+    boundedMapSet(consensusViewSnapshots, `${date}:1`, payload, Number(process.env.CONSENSUS_SNAPSHOT_MAX_WINDOWS || 16));
+    cacheSet(`qualified-picks-v36:${date}:1`, payload, ttl);
+  }
+}
+
+async function hydratePreparedHorizon(from = utcDateOffset(0), days = 14) {
+  const safeDays = Math.max(7, Math.min(21, Number(days) || 14));
+  const to = addDays(from, safeDays - 1);
+  const hydrated = await hydratePreparedViews({ from, to, limit: safeDays * 8 }).catch(error => ({ loaded: 0, error: error?.message || 'hydrate_failed' }));
+  for (const viewKey of Object.values(PREPARED_VIEW_KEYS)) {
+    for (let offset = 0; offset < safeDays; offset += 1) {
+      const date = addDays(from, offset);
+      const record = getPreparedView(viewKey, date);
+      if (record) primePreparedRuntimeRecord(record);
+    }
+  }
+  return hydrated;
+}
+
+async function buildFullPreparedFixtureBoard(date) {
+  const started = Date.now();
+  const feed = await getApiFootballFixtureBoard(date);
+  const fixtures = (feed.fixtures || [])
+    .filter(item => !isSrlFixture(item))
+    .map(item => ({ ...publicFixture(item), boardStatus: fixtureStatusForDate(item) }))
+    .filter(Boolean);
+  captureBoardOdds(fixtures);
+  const response = {
+    date,
+    fixtures,
+    source: 'API_FOOTBALL',
+    warning: feed.warning || null,
+    oddsPending: false,
+    oddsPages: Number(feed.oddsPages || 0),
+    generatedAt: new Date().toISOString(),
+    loadMs: Date.now() - started,
+    complete: true,
+    failed: false,
+    cache: 'PRECOMPUTE'
+  };
+  const ttl = Math.max(1800, Number(process.env.PREPARED_VIEW_MEMORY_TTL_SECONDS || 86400));
+  cacheSet(`dashboard-fixtures:${date}`, response, ttl);
+  cacheSet(`single-engine-fixtures:${date}`, response, ttl);
+  return response;
+}
+
+function statsBundleComplete(bundle) {
+  return Boolean(bundle?.ppg?.complete && bundle?.apex?.complete && bundle?.convergence?.complete && bundle?.momentum?.complete && bundle?.htft?.complete);
+}
+
+async function buildCompleteStatsBundle(date) {
+  const maxMinutes = Math.max(15, Math.min(360, Number(process.env.WEEKLY_PRECOMPUTE_DAY_TIMEOUT_MINUTES || 180)));
+  const deadline = Date.now() + maxMinutes * 60_000;
+  let bundle = null;
+  do {
+    cacheDelete(`stats-route-boards:${date}`);
+    bundle = await getStatsRouteBoards(date);
+    if (statsBundleComplete(bundle)) return bundle;
+    const queue = bundle?.apex?.providerQueue || bundle?.apex?.progress?.providerQueue || apiFootballRateState();
+    const retryMs = Math.max(5_000, Math.min(70_000, Number(queue?.retryInMs || 10_000) + 750));
+    await sleepMs(retryMs);
+  } while (Date.now() < deadline);
+  return bundle;
+}
+
+async function precomputePreparedDate(date, { force = false } = {}) {
+  const refreshHours = Math.max(1, Number(process.env.WEEKLY_PRECOMPUTE_REFRESH_HOURS || 24));
+  if (!force && preparedDateComplete(date) && preparedDateAgeHours(date) < refreshHours) {
+    weeklyPrecomputeStatus.dates[date] = { state: 'READY', skipped: true, preparedAgeHours: Number(preparedDateAgeHours(date).toFixed(2)) };
+    return { date, skipped: true, complete: true };
+  }
+
+  weeklyPrecomputeDates.add(date);
+  weeklyPrecomputeStatus.currentDate = date;
+  weeklyPrecomputeStatus.dates[date] = { state: 'RUNNING', startedAt: new Date().toISOString() };
+  invalidatePreparedRuntimeDate(date);
   const started = Date.now();
   try {
-    await getFastFixtureBoard(date);
-    await getMarketRouteBoard(date);
-    await ensureStatsRouteView(date);
-    await ensureStreakValueView(date);
-    await getZeusBoard(date);
-    await getQualifiedPicksWindowView(date, 1);
-    console.log(JSON.stringify({ event: 'precompute_complete', date, ms: Date.now() - started }));
+    const fixtureBoard = await buildFullPreparedFixtureBoard(date);
+    const marketInitial = await preparedReadContext.run({ bypassPrepared: true }, () => getMarketRouteBoard(date));
+    const statsBundle = await preparedReadContext.run({ bypassPrepared: true }, () => buildCompleteStatsBundle(date));
+    const atlas = await preparedReadContext.run({ bypassPrepared: true }, () => getStreakValueBoard(date));
+    const marketFinal = cacheGet(`market-route-board:${date}`) || marketInitial;
+    const zeus = composeZeusBoard(date, fixtureBoard, marketFinal, statsBundle || {}, atlas || {});
+    boundedMapSet(zeusViewSnapshots, date, zeus, Number(process.env.ANALYSIS_SNAPSHOT_MAX_DATES || 14));
+    if (zeus.complete) {
+      cacheSet(`zeus-board:${date}`, zeus, Math.max(1800, Number(process.env.PREPARED_VIEW_MEMORY_TTL_SECONDS || 86400)));
+      await storePredictions(date, zeus.all || [], ZEUS_SUPERVISOR_CODE).catch(() => null);
+    }
+    const consensusDay = await preparedReadContext.run({ bypassPrepared: true }, () => getQualifiedPicksWindow(date, 1));
+    const consensusComplete = { ...consensusDay, complete: true, failed: false, progress: { stage: 'PRECOMPUTED_COMPLETE', processed: 1, total: 1, percent: 100 } };
+
+    const generatedAt = new Date().toISOString();
+    const records = [
+      rememberPreparedView(PREPARED_VIEW_KEYS.FIXTURE_BOARD, date, fixtureBoard, { complete: true, generatedAt }),
+      rememberPreparedView(PREPARED_VIEW_KEYS.MARKET_ROUTE, date, marketFinal, { complete: Boolean(marketFinal?.complete), generatedAt }),
+      rememberPreparedView(PREPARED_VIEW_KEYS.STATS_BUNDLE, date, statsBundle, { complete: statsBundleComplete(statsBundle), generatedAt }),
+      rememberPreparedView(PREPARED_VIEW_KEYS.STREAK_VALUE, date, atlas, { complete: Boolean(atlas?.complete), generatedAt }),
+      rememberPreparedView(PREPARED_VIEW_KEYS.ZEUS, date, zeus, { complete: Boolean(zeus?.complete), generatedAt }),
+      rememberPreparedView(PREPARED_VIEW_KEYS.CONSENSUS_DAY, date, consensusComplete, { complete: true, generatedAt })
+    ].filter(Boolean);
+
+    await persistPreparedViews(records).catch(error => {
+      recordRuntimeError('weekly_precompute_persist', error);
+      return null;
+    });
+    for (const record of records) primePreparedRuntimeRecord(record);
+    const complete = records.every(record => record.complete);
+    weeklyPrecomputeStatus.dates[date] = {
+      state: complete ? 'READY' : 'PARTIAL',
+      complete,
+      fixtures: fixtureBoard.fixtures?.length || 0,
+      enginePicks: consensusComplete.enginePicks?.length || 0,
+      consensusPicks: consensusComplete.consensusPicks?.length || 0,
+      generatedAt,
+      ms: Date.now() - started
+    };
+    return { date, complete, fixtures: fixtureBoard.fixtures?.length || 0, generatedAt };
   } catch (error) {
-    recordRuntimeError('precompute', error);
-    console.error('Background precompute failed:', error?.message || error);
+    weeklyPrecomputeStatus.dates[date] = { state: 'ERROR', error: error?.message || 'precompute_failed', at: new Date().toISOString() };
+    recordRuntimeError('weekly_precompute_date', error);
+    throw error;
+  } finally {
+    weeklyPrecomputeDates.delete(date);
+    weeklyPrecomputeStatus.currentDate = null;
+  }
+}
+
+async function precomputeWeek(from = utcDateOffset(0), { force = false, reason = 'ROLLING_HORIZON' } = {}) {
+  const days = Math.max(7, Math.min(14, Number(process.env.WEEKLY_PRECOMPUTE_DAYS || 7)));
+  if (weeklyPrecomputeJob) return weeklyPrecomputeJob;
+  const task = (async () => {
+    weeklyPrecomputeStatus.running = true;
+    weeklyPrecomputeStatus.phase = reason;
+    weeklyPrecomputeStatus.from = from;
+    weeklyPrecomputeStatus.to = addDays(from, days - 1);
+    weeklyPrecomputeStatus.processed = 0;
+    weeklyPrecomputeStatus.total = days;
+    weeklyPrecomputeStatus.lastStartedAt = new Date().toISOString();
+    weeklyPrecomputeStatus.lastError = null;
+    for (let offset = 0; offset < days; offset += 1) {
+      const date = addDays(from, offset);
+      try { await precomputePreparedDate(date, { force }); }
+      catch (error) { weeklyPrecomputeStatus.lastError = error?.message || 'precompute_failed'; }
+      weeklyPrecomputeStatus.processed = offset + 1;
+      pruneRuntimeCaches();
+    }
+    weeklyPrecomputeStatus.phase = 'READY';
+    weeklyPrecomputeStatus.lastCompletedAt = new Date().toISOString();
+    console.log(JSON.stringify({ event: 'weekly_precompute_complete', from, to: weeklyPrecomputeStatus.to, days, prepared: preparedViewStats() }));
+    return { ...weeklyPrecomputeStatus };
+  })().finally(() => {
+    weeklyPrecomputeStatus.running = false;
+    weeklyPrecomputeJob = null;
+  });
+  weeklyPrecomputeJob = task;
+  return task;
+}
+
+function nextMondayFrom(date = new Date()) {
+  const day = date.getUTCDay();
+  const add = (8 - day) % 7 || 7;
+  const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + add));
+  return monday.toISOString().slice(0, 10);
+}
+
+function weeklySchedulerTick() {
+  if (String(process.env.WEEKLY_PRECOMPUTE_ENABLED || 'true').toLowerCase() !== 'true') return;
+  if (weeklyPrecomputeJob) return;
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const rollingRefreshHours = Math.max(6, Number(process.env.WEEKLY_PRECOMPUTE_ROLLING_INTERVAL_HOURS || 24));
+  const last = Date.parse(weeklyPrecomputeStatus.lastCompletedAt || '');
+  if (!Number.isFinite(last) || Date.now() - last >= rollingRefreshHours * 3_600_000) {
+    precomputeWeek(today, { reason: 'ROLLING_HORIZON' }).catch(() => null);
+    return;
+  }
+  // Sunday prebuild starts early enough to finish the next Monday-Sunday week
+  // under a conservative provider request allowance.
+  const sundayHour = Math.max(0, Math.min(23, Number(process.env.WEEKLY_PRECOMPUTE_SUNDAY_HOUR_UTC || 0)));
+  if (now.getUTCDay() === 0 && now.getUTCHours() >= sundayHour) {
+    const nextMonday = nextMondayFrom(now);
+    const alreadyReady = Array.from({ length: 7 }, (_, i) => addDays(nextMonday, i)).every(preparedDateComplete);
+    if (!alreadyReady) precomputeWeek(nextMonday, { reason: 'NEXT_WEEK_PREBUILD' }).catch(() => null);
   }
 }
 
@@ -2442,13 +2808,26 @@ server.on('error', error => { recordRuntimeError('http_server', error); console.
 process.on('unhandledRejection', reason => { recordRuntimeError('unhandled_rejection', reason); console.error('Unhandled promise rejection:', reason?.message || reason); });
 process.on('uncaughtExceptionMonitor', error => { recordRuntimeError('uncaught_exception', error); console.error('Uncaught exception:', error?.message || error); });
 
+await hydratePreparedHorizon(utcDateOffset(0), Math.max(14, Number(process.env.WEEKLY_PRECOMPUTE_HYDRATE_DAYS || 14))).catch(error => {
+  recordRuntimeError('prepared_view_hydration', error);
+  return null;
+});
+
 server.listen(port, () => {
   console.log(`Betynz ${APP_VERSION} listening on ${port}`);
-  if (String(process.env.PRECOMPUTE_ENABLED || 'true').toLowerCase() === 'true') {
-    const delay = Math.max(10, Number(process.env.PRECOMPUTE_START_DELAY_SECONDS || 20)) * 1000;
-    const interval = Math.max(30, Number(process.env.PRECOMPUTE_INTERVAL_MINUTES || 60)) * 60_000;
-    setTimeout(() => precomputeToday().catch(() => null), delay).unref?.();
-    setInterval(() => precomputeToday().catch(() => null), interval).unref?.();
+  if (String(process.env.WEEKLY_PRECOMPUTE_ENABLED || process.env.PRECOMPUTE_ENABLED || 'true').toLowerCase() === 'true') {
+    const delay = Math.max(10, Number(process.env.WEEKLY_PRECOMPUTE_START_DELAY_SECONDS || process.env.PRECOMPUTE_START_DELAY_SECONDS || 20)) * 1000;
+    const schedulerInterval = Math.max(5, Number(process.env.WEEKLY_PRECOMPUTE_SCHEDULER_MINUTES || 15)) * 60_000;
+    setTimeout(() => weeklySchedulerTick(), delay).unref?.();
+    setInterval(() => weeklySchedulerTick(), schedulerInterval).unref?.();
+
+    // Refresh today's fully prepared engines periodically so odds/status changes
+    // are folded into the already-fast precomputed view without making users wait.
+    const selectedDayMinutes = Math.max(60, Number(process.env.PRECOMPUTE_SELECTED_DAY_REFRESH_MINUTES || 120));
+    setInterval(() => {
+      if (weeklyPrecomputeJob) return;
+      precomputePreparedDate(utcDateOffset(0), { force: true }).catch(error => recordRuntimeError('selected_day_precompute', error));
+    }, selectedDayMinutes * 60_000).unref?.();
   }
 });
 

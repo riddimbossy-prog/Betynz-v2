@@ -505,6 +505,27 @@ async function hydrateVisuals(date) {
   renderList();
 }
 
+async function loadPrecomputeStatus() {
+  const el = $('#weekPrecomputeState');
+  if (!el) return;
+  try {
+    const payload = await fetchJson('/api/precompute-status', { cache: 'no-store', timeoutMs: 8000 });
+    const state = payload.weeklyPrecompute || {};
+    const ready = Boolean(payload.visibleWeekReady);
+    const preparedDates = Number(payload.preparedViews?.dates?.length || 0);
+    el.classList.toggle('ready', ready);
+    el.classList.toggle('working', !ready && Boolean(state.running));
+    const text = ready
+      ? `Prepared: all 7 visible days · engines + Consensus + Zeus ready`
+      : state.running
+        ? `Preparing ${state.currentDate || state.from || 'visible week'} · ${Number(state.processed || 0)}/${Number(state.total || 7)} days complete`
+        : `${preparedDates} prepared day${preparedDates === 1 ? '' : 's'} cached · background prebuild will continue`;
+    el.querySelector('span:last-child').textContent = text;
+  } catch {
+    el.querySelector('span:last-child').textContent = 'Prepared-week status unavailable; normal cached analysis remains active.';
+  }
+}
+
 async function loadRemainingWeekCounts(selectedDate) {
   const token = ++state.weekCountToken;
   try {
@@ -1121,6 +1142,8 @@ function setupEvents() {
 buildWeekStrip();
 setupEvents();
 loadWinCarousel().catch(() => {});
+loadPrecomputeStatus().catch(() => {});
+setInterval(() => loadPrecomputeStatus().catch(() => {}), 30000);
 loadDate(state.selectedDate);
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});

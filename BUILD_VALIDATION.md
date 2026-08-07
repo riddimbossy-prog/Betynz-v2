@@ -1,51 +1,43 @@
-# Betynz v5.1.0 — Build Validation
+# Betynz v5.1.1 — Build Validation
 
-Validated on 2026-08-07 against the same conservative API-Football queue settings used by the Render deployment.
+Validation target: weekly precomputed intelligence on the existing one-Render architecture.
 
-## Final result
+## Result
 
-- Engine/platform tests: **137/137 passed**
-- Foundation Intelligence tests: **10/10 passed**
-- Syntax validation: **passed**
-- Release verification: **passed**
-- Single-Render verification: **passed**
-- One-service integration smoke test: **passed**
-- Production-style API-Football 8-RPM build: **passed**
+- Engine/platform regression suite: **142/142 passed**
+- Weekly precompute tests: **5/5 passed**
+- Syntax checks: passed
+- Correlation-aware Consensus: passed
+- Universal 1.20–2.00 publication gate: passed
+- Data-backed validation: passed
+- Match-specific adaptive recovery: passed
+- Zeus supervision: passed
+- Historical-integrity guard: passed
+- Runtime stability and bounded caches: passed
 
-## Foundation checks
+## Weekly-precompute coverage
 
-- Correlation-aware Consensus discounts overlapping evidence families while preserving the public 1–7 raw agreement count.
-- Calibration reports Brier score, log loss, market baseline, calibration gap, closing-line value where available, Wilson intervals and pairwise engine error correlation.
-- Prediction lineage records original selection, odds-gate action, data validation, adaptive candidates considered, search penalty, Zeus/final publication state.
-- Adaptive recovery records all evaluated alternatives and applies a multiple-comparison penalty instead of freely searching markets until one appears attractive.
-- Stats API fixture/team matching uses orientation, team identity, league/country and kickoff proximity with a persistent identity registry and hardened mapping threshold.
-- Stats API histories are cutoff before the target kickoff.
-- Public historical deep analysis is locked; official past predictions must come from frozen Proof records.
-- Feature-store snapshots support precomputation and are bounded in memory/persistable in Supabase.
-- Public and deep-analysis APIs are rate limited; admin login is throttled; state-changing admin settlement requests require same-origin browser context.
-- Runtime telemetry covers request latency/status, 5xx errors, event-loop lag, memory/cache/provider state and error classes.
-- Automatic settlement prefers exact provider fixture IDs and uses a strict fuzzy fallback only at high identity confidence.
-- Public navigation is simplified and the specialist pages are collected under Engine Lab; admin pages are no longer linked publicly.
-- The browser engine pages share one transient-safe API client instead of duplicating fetch/retry code.
-- Universal 1.20–2.00 odds gate, exact-market data validation, match-specific adaptive reasoning and Zeus supervision remain active.
+Validated behaviors:
 
-## Deployment shape
+- Seven prepared fixture counts can be returned without new provider calls.
+- Complete prepared engine views can be stored/retrieved by date.
+- Full precompute explicitly waits for the full odds book before engine execution.
+- Shared Stats Bundle includes PPG, Apex, Convergence, Momentum and Chronos.
+- Atlas, Zeus and day-level Consensus are prepared after the shared stats work.
+- Prepared views are persisted in Supabase.
+- The fresh schema and migration both include `prepared_intelligence_views`.
+- Dashboard exposes prepared-week readiness.
+- Render declares the weekly scheduler/prebuild controls.
+- Sunday next-week prebuild is wired.
 
-- **One GitHub repository**
-- **One `render.yaml`**
-- **One Render web service**
-- API-Football remains the core football provider.
-- Stats API remains additive enrichment.
-- No new API secret is required by v5.1.0.
+## Important production expectation
 
-## Database
+The provider subscription is intentionally protected by a conservative request queue. A first-ever full seven-day build can therefore take substantial background time on very large fixture weeks. Once prepared views have been written to Supabase, normal page loads and service restarts use those stored results immediately rather than repeating the same deep work on the request path.
 
-Existing databases that already include SQL 016 must run:
+## Final production-style validation
 
-`apps/web/sql/017_foundation_intelligence.sql`
-
-This creates `prediction_lineage`, `provider_identity_map` and `feature_snapshots` with indexes and RLS protections.
-
-## Scope note
-
-The build uses mocked/local provider contracts for integration and regression tests; private live provider credentials were not called during packaging. Production provider latency, coverage and future calibration quality must be measured from forward-settled live data.
+- Production-style API-Football queue (8 RPM / 1 worker / 750ms spacing / 65s cooldown): passed
+- One Render service verification: passed
+- Single-service integration smoke test: passed
+- Integration contract: version 5.1.1, all specialist engines plus Zeus present, fixtures/live/results/events passed
+- Provider credentials were not used against the live production APIs during packaging; integration uses the repository's deterministic provider contract mocks.

@@ -1,6 +1,6 @@
-# Betynz v5.1.0 — Foundation Intelligence
+# Betynz v5.1.1 — Foundation Intelligence
 
-Betynz is a football-intelligence platform built around seven specialist engines and Zeus statistical supervision. v5.1.0 is a foundation release: it keeps the existing football rules, the universal 1.20–2.00 publication gate, exact-market data validation and match-specific adaptive recovery, while strengthening how evidence is measured, stored, calibrated, mapped and served.
+Betynz is a football-intelligence platform built around seven specialist engines and Zeus statistical supervision. v5.1.1 is a foundation release: it keeps the existing football rules, the universal 1.20–2.00 publication gate, exact-market data validation and match-specific adaptive recovery, while strengthening how evidence is measured, stored, calibrated, mapped and served.
 
 ## Decision pipeline
 
@@ -15,7 +15,7 @@ API-Football core data + Stats API enrichment
   → freeze → Proof → settlement → calibration
 ```
 
-## v5.1.0 foundation upgrades
+## v5.1.1 foundation upgrades
 
 - Correlation-aware Consensus with effective independent-evidence units.
 - Brier score, log loss, market-implied baseline, calibration gap, Wilson intervals and CLV tracking.
@@ -33,4 +33,4 @@ API-Football core data + Stats API enrichment
 
 ## Deployment
 
-One repository, one `render.yaml`, one Render web service. Run SQL `017_foundation_intelligence.sql` on an existing Supabase project before deploying v5.1.0.
+One repository, one `render.yaml`, one Render web service. Run SQL `017_foundation_intelligence.sql` on an existing Supabase project before deploying v5.1.1.

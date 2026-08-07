@@ -1,4 +1,4 @@
-# Betynz web — v5.1.0
+# Betynz web — v5.1.1
 
 The web application contains the public/PWA interface, server API, provider adapters, seven specialist engines, Consensus, Zeus, settlement, calibration, identity mapping, feature caching and Supabase persistence.
 

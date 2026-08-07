@@ -45,3 +45,19 @@ export function cacheStats() {
   prune();
   return { entries: store.size, maxEntries: maxEntries() };
 }
+
+
+export function cacheDelete(key) {
+  return store.delete(key);
+}
+
+export function cacheDeletePrefix(prefix) {
+  let deleted = 0;
+  for (const key of [...store.keys()]) {
+    if (String(key).startsWith(String(prefix))) {
+      store.delete(key);
+      deleted += 1;
+    }
+  }
+  return deleted;
+}

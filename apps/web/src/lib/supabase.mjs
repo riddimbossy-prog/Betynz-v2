@@ -197,3 +197,18 @@ export function getFeatureSnapshots({ date, fixtureId, limit = 1000 } = {}) {
   if (fixtureId) filters.fixture_id = `eq.${fixtureId}`;
   return selectRows('feature_snapshots', { filters, order: 'updated_at.desc', limit });
 }
+
+
+export function upsertPreparedIntelligenceViews(rows) {
+  return upsert('prepared_intelligence_views', rows, 'view_key,fixture_date');
+}
+
+export function getPreparedIntelligenceViews({ from, to, viewKey, date, limit = 200 } = {}) {
+  const filters = {};
+  if (from && to) filters.and = `(fixture_date.gte.${from},fixture_date.lte.${to})`;
+  else if (from) filters.fixture_date = `gte.${from}`;
+  else if (to) filters.fixture_date = `lte.${to}`;
+  if (date) filters.fixture_date = `eq.${date}`;
+  if (viewKey) filters.view_key = `eq.${viewKey}`;
+  return selectRows('prepared_intelligence_views', { filters, order: 'fixture_date.asc,view_key.asc', limit });
+}

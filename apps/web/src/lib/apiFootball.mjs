@@ -287,7 +287,7 @@ function requestHeaders(current) {
   const headers = {
     [current.headerName]: current.key,
     accept: 'application/json',
-    'user-agent': 'Betynz-API-Football-Core/5.1.0'
+    'user-agent': 'Betynz-API-Football-Core/5.1.1'
   };
   if (current.rapidApiHost) headers['x-rapidapi-host'] = current.rapidApiHost;
   return headers;

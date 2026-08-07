@@ -1,4 +1,4 @@
-# Betynz v5.1.0 Architecture
+# Betynz v5.1.1 Architecture
 
 ## Provider authority
 
@@ -45,4 +45,9 @@ The service preserves bounded caches, provider queue deduplication, progressive 
 
 ## Persistence
 
-Supabase stores frozen predictions, consensus snapshots, results, prediction lineage, provider identity mappings and precomputed feature snapshots. New v5.1.0 tables are created by `sql/017_foundation_intelligence.sql`.
+Supabase stores frozen predictions, consensus snapshots, results, prediction lineage, provider identity mappings and precomputed feature snapshots. New v5.1.1 tables are created by `sql/017_foundation_intelligence.sql`.
+
+
+## Weekly prepared intelligence
+
+v5.1.1 persists complete `FIXTURE_BOARD`, `MARKET_ROUTE`, `STATS_BUNDLE`, `STREAK_VALUE`, `ZEUS` and `CONSENSUS_DAY` views in `prepared_intelligence_views`. The current seven-day horizon is hydrated at startup and rebuilt sequentially in the background; Sunday UTC also prebuilds the next Monday-Sunday calendar week.

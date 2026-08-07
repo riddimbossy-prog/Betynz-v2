@@ -108,9 +108,9 @@ services:
       - key: STATS_API_CACHE_MAX_ENTRIES
         value: "500"
       - key: ANALYSIS_SNAPSHOT_MAX_DATES
-        value: "8"
+        value: "14"
       - key: CONSENSUS_SNAPSHOT_MAX_WINDOWS
-        value: "8"
+        value: "16"
       - key: FEATURE_STORE_MAX_ENTRIES
         value: "1200"
       - key: PRECOMPUTE_ENABLED
@@ -119,6 +119,30 @@ services:
         value: "20"
       - key: PRECOMPUTE_INTERVAL_MINUTES
         value: "60"
+      - key: PREPARED_VIEW_MAX_ENTRIES
+        value: "128"
+      - key: PREPARED_VIEW_MEMORY_TTL_SECONDS
+        value: "86400"
+      - key: WEEKLY_PRECOMPUTE_ENABLED
+        value: "true"
+      - key: WEEKLY_PRECOMPUTE_DAYS
+        value: "7"
+      - key: WEEKLY_PRECOMPUTE_HYDRATE_DAYS
+        value: "14"
+      - key: WEEKLY_PRECOMPUTE_START_DELAY_SECONDS
+        value: "20"
+      - key: WEEKLY_PRECOMPUTE_SCHEDULER_MINUTES
+        value: "15"
+      - key: WEEKLY_PRECOMPUTE_ROLLING_INTERVAL_HOURS
+        value: "24"
+      - key: WEEKLY_PRECOMPUTE_REFRESH_HOURS
+        value: "24"
+      - key: WEEKLY_PRECOMPUTE_SUNDAY_HOUR_UTC
+        value: "0"
+      - key: WEEKLY_PRECOMPUTE_DAY_TIMEOUT_MINUTES
+        value: "180"
+      - key: PRECOMPUTE_SELECTED_DAY_REFRESH_MINUTES
+        value: "120"
       - key: PUBLIC_API_REQUESTS_PER_MINUTE
         value: "180"
       - key: PUBLIC_DEEP_ANALYSIS_REQUESTS_PER_MINUTE

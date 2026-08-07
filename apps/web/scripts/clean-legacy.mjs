@@ -35,7 +35,8 @@ const allowedTests = new Set([
   'runtime-stability.test.mjs',
   'data-backed-validation.test.mjs',
   'adaptive-market-recovery.test.mjs',
-  'foundation-intelligence.test.mjs'
+  'foundation-intelligence.test.mjs',
+  'weekly-precompute.test.mjs'
 ]);
 
 try {
