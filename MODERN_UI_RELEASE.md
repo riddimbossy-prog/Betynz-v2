@@ -1,3 +1,3 @@
-# Betynz v5.0.13 modern UI
+# Betynz v5.0.14 UI
 
-The five-engine black, silver, white and orange logo palette remains unchanged. Fixture-board motion stays minimal. Engine progress and newly published predictions use only subtle orange status motion with reduced-motion support.
+All seven engines use the Betynz black, charcoal, silver, white and orange logo palette. Fixture-board animation remains minimal. Engine processing uses only subtle orange pulses and quick pick-card reveals, with reduced-motion support.

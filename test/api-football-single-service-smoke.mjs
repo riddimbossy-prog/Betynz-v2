@@ -108,13 +108,15 @@ try {
   web.stderr.on('data', chunk => { stderr += chunk; process.stderr.write(`[single-service] ${chunk}`); });
 
   const health = await waitJson(`http://127.0.0.1:${webPort}/api/health`);
-  assert.equal(health.body.version, '5.0.13');
+  assert.equal(health.body.version, '5.0.14');
   assert.equal(health.body.configured.apiFootball, true);
-  assert.deepEqual(health.body.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'APEX_INTELLIGENCE', 'CONVERGENCE_ROUTE', 'MOMENTUM_STREAK']);
-  assert.deepEqual(new Set(Object.values(health.body.sourceRoles)), new Set(['API_FOOTBALL']));
+  assert.deepEqual(health.body.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'APEX_INTELLIGENCE', 'CONVERGENCE_ROUTE', 'MOMENTUM_STREAK', 'STREAK_VALUE', 'HTFT_MOMENTUM']);
+  assert.equal(health.body.sourceRoles.fixtures, 'API_FOOTBALL');
+  assert.equal(health.body.sourceRoles.streakIntelligence, 'STATS_API');
 
   const config = await waitJson(`http://127.0.0.1:${webPort}/api/config`);
-  assert.deepEqual(new Set(Object.values(config.body.dataSources)), new Set(['API-Football']));
+  assert.equal(config.body.dataSources.fixtures, 'API-Football');
+  assert.equal(config.body.dataSources.streaksAndXg, 'Stats API');
   assert.equal(config.body.fixtureCoverage.applicationCap, null);
 
   const fixtures = await waitJson(`http://127.0.0.1:${webPort}/api/fixtures?date=${day}`);

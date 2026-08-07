@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Betynz Football Intelligence",
   "short_name": "Betynz",
-  "description": "Seven-day football intelligence with five independent engines, consensus bankers, official proof, automatic settlement and performance learning.",
+  "description": "Seven-day football intelligence with seven independent engines, consensus bankers, official proof, automatic settlement and performance learning.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",

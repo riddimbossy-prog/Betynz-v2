@@ -27,7 +27,7 @@ async function fetchJson(url, timeoutMs = 20000) {
   try {
     const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || `HTTP ${response.status}`);
+    if (!response.ok) { const error = new Error(data.message || `HTTP ${response.status}`); error.status = response.status; error.transient = [502,503,504].includes(response.status); throw error; }
     return data;
   } finally {
     clearTimeout(timer);
@@ -61,6 +61,12 @@ async function load({ silent = false } = {}) {
     if (!payload.complete && !payload.failed) schedulePoll(date, version);
   } catch (error) {
     if (version !== requestVersion) return;
+    if (error?.transient || error?.name === 'AbortError') {
+      const grid = document.querySelector('[id$="Grid"]');
+      if (grid) grid.innerHTML = '<div class="route-empty apex-soft-pulse"><span class="apex-loader-dot" aria-hidden="true"></span><h3>Analysis service is recovering…</h3><p>A temporary gateway delay was detected. Your analysis will retry automatically without losing completed picks.</p></div>';
+      schedulePoll(date, version);
+      return;
+    }
     payload = null;
     const message = error?.name === 'AbortError' ? 'The server did not respond in time.' : (error.message || 'Check the match-data connection and try again.');
     $('#ppgGrid').innerHTML = `<div class="route-empty"><h3>PPG analysis could not be completed</h3><p>${esc(message)}</p></div>`;

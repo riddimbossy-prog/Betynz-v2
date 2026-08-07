@@ -8,8 +8,11 @@ import { analyzePpgRoute, ppgRouteSummary } from './engines/ppgRoute.mjs';
 import { analyzeApexIntelligence, apexIntelligenceSummary } from './engines/apexIntelligence.mjs';
 import { analyzeConvergence, convergenceSummary } from './engines/convergence.mjs';
 import { analyzeMomentumStreak, momentumStreakSummary } from './engines/momentumStreak.mjs';
+import { analyzeStreakValue, streakValueSummary } from './engines/streakValue.mjs';
+import { analyzeHtftMomentum, htftMomentumSummary } from './engines/htftMomentum.mjs';
 import { buildConsensusForFixture, buildConsensusWindow, consensusSummary } from './engines/consensus.mjs';
 import { extractVenueStats, matchFixture } from './lib/venueStats.mjs';
+import { statsApiConfigured, statsApiRateState, buildStatsApiFixtureEvidence, addGoalEvidence } from './lib/statsApi.mjs';
 import { cacheGet, cacheSet, cacheStats } from './lib/cache.mjs';
 import { safeDate, normalizeName } from './lib/utils.mjs';
 import {
@@ -50,13 +53,15 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.13';
+const APP_VERSION = '5.0.14';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const APEX_INTELLIGENCE_CODE = 'APEX_INTELLIGENCE';
 const CONVERGENCE_ROUTE_CODE = 'CONVERGENCE_ROUTE';
 const MOMENTUM_STREAK_CODE = 'MOMENTUM_STREAK';
-const ENGINE_CODES = [MARKET_ROUTE_CODE, PPG_ROUTE_CODE, APEX_INTELLIGENCE_CODE, CONVERGENCE_ROUTE_CODE, MOMENTUM_STREAK_CODE];
+const STREAK_VALUE_CODE = 'STREAK_VALUE';
+const HTFT_MOMENTUM_CODE = 'HTFT_MOMENTUM';
+const ENGINE_CODES = [MARKET_ROUTE_CODE, PPG_ROUTE_CODE, APEX_INTELLIGENCE_CODE, CONVERGENCE_ROUTE_CODE, MOMENTUM_STREAK_CODE, STREAK_VALUE_CODE, HTFT_MOMENTUM_CODE];
 const CONSENSUS_SYSTEM_CODE = 'CONSENSUS_SYSTEM';
 const root = fileURLToPath(new URL('../public', import.meta.url));
 const port = Number(process.env.PORT || 10000);
@@ -123,7 +128,7 @@ async function loadApiFootballMedia(kind, id) {
       const keyValue = String(process.env.API_FOOTBALL_KEY || '');
       const headers = {
         accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'user-agent': 'Betynz-Media-Proxy/5.0.13'
+        'user-agent': 'Betynz-Media-Proxy/5.0.14'
       };
       if (keyValue) headers[keyHeader] = keyValue;
       const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
@@ -447,6 +452,8 @@ function engineName(engineCode) {
   if (engineCode === APEX_INTELLIGENCE_CODE) return 'Apex Intelligence Engine';
   if (engineCode === CONVERGENCE_ROUTE_CODE) return 'Convergence Engine';
   if (engineCode === MOMENTUM_STREAK_CODE) return 'Momentum & Streak Engine';
+  if (engineCode === STREAK_VALUE_CODE) return 'Atlas Streak Value Engine';
+  if (engineCode === HTFT_MOMENTUM_CODE) return 'Chronos HT/FT Momentum Engine';
   if (engineCode === CONSENSUS_SYSTEM_CODE) return 'Consensus System';
   return 'Market Route Engine';
 }
@@ -456,6 +463,8 @@ function engineSummary(engineCode, result) {
   if (engineCode === APEX_INTELLIGENCE_CODE) return apexIntelligenceSummary(result);
   if (engineCode === CONVERGENCE_ROUTE_CODE) return convergenceSummary(result);
   if (engineCode === MOMENTUM_STREAK_CODE) return momentumStreakSummary(result);
+  if (engineCode === STREAK_VALUE_CODE) return streakValueSummary(result);
+  if (engineCode === HTFT_MOMENTUM_CODE) return htftMomentumSummary(result);
   return marketRouteSummary(result);
 }
 
@@ -724,6 +733,7 @@ async function getStatsRouteBoards(date) {
     const apexMap = new Map();
     const convergenceMap = new Map();
     const momentumMap = new Map();
+    const htftMap = new Map();
     for (const fixture of fixtures) {
       const id = String(fixture.id);
       marketMap.set(id, routeItem(fixture, null, analyzeMarketRoute));
@@ -731,6 +741,7 @@ async function getStatsRouteBoards(date) {
       apexMap.set(id, routeItem(fixture, null, analyzeApexIntelligence));
       convergenceMap.set(id, routeItem(fixture, null, analyzeConvergence));
       momentumMap.set(id, routeItem(fixture, null, analyzeMomentumStreak));
+      htftMap.set(id, routeItem(fixture, null, analyzeHtftMomentum));
     }
 
     const publish = ({ complete = false, failed = false, warning = null, enrichmentSource = 'API_FOOTBALL_VENUE_HISTORY' } = {}) => {
@@ -740,7 +751,8 @@ async function getStatsRouteBoards(date) {
         ppg: progressiveEngineResponse({ date, engine: 'PPG Route Engine', items: ppgMap, processed, total, complete, failed, warning, enrichmentSource }),
         apex: progressiveEngineResponse({ date, engine: 'Apex Intelligence Engine', items: apexMap, processed, total, complete, failed, warning, enrichmentSource }),
         convergence: progressiveEngineResponse({ date, engine: 'Convergence Engine', items: convergenceMap, processed, total, complete, failed, warning, enrichmentSource }),
-        momentum: progressiveEngineResponse({ date, engine: 'Momentum & Streak Engine', items: momentumMap, processed, total, complete, failed, warning, enrichmentSource })
+        momentum: progressiveEngineResponse({ date, engine: 'Momentum & Streak Engine', items: momentumMap, processed, total, complete, failed, warning, enrichmentSource }),
+        htft: progressiveEngineResponse({ date, engine: 'Chronos HT/FT Momentum Engine', items: htftMap, processed, total, complete, failed, warning, enrichmentSource })
       };
       for (const response of Object.values(snapshot)) response.oddsPending = Boolean(board.oddsPending);
       statsRouteViewSnapshots.set(date, snapshot);
@@ -766,6 +778,7 @@ async function getStatsRouteBoards(date) {
             apexMap.set(id, routeItem(result, stats, analyzeApexIntelligence));
             convergenceMap.set(id, routeItem(result, stats, analyzeConvergence));
             momentumMap.set(id, routeItem(result, stats, analyzeMomentumStreak));
+            htftMap.set(id, routeItem(result, stats, analyzeHtftMomentum));
           }
           if (!deferred) processed += 1;
           publish({
@@ -794,7 +807,8 @@ async function getStatsRouteBoards(date) {
       storePredictions(date, [...ppgMap.values()].filter(Boolean), PPG_ROUTE_CODE),
       storePredictions(date, [...apexMap.values()].filter(Boolean), APEX_INTELLIGENCE_CODE),
       storePredictions(date, [...convergenceMap.values()].filter(Boolean), CONVERGENCE_ROUTE_CODE),
-      storePredictions(date, [...momentumMap.values()].filter(Boolean), MOMENTUM_STREAK_CODE)
+      storePredictions(date, [...momentumMap.values()].filter(Boolean), MOMENTUM_STREAK_CODE),
+      storePredictions(date, [...htftMap.values()].filter(Boolean), HTFT_MOMENTUM_CODE)
     ]).catch(() => null);
     return result;
   })();
@@ -821,6 +835,11 @@ async function getConvergenceRouteBoard(date) {
 async function getMomentumRouteBoard(date) {
   const bundle = await getStatsRouteBoards(date);
   return bundle.momentum;
+}
+
+async function getHtftMomentumBoard(date) {
+  const bundle = await getStatsRouteBoards(date);
+  return bundle.htft;
 }
 
 const statsRouteViewSnapshots = new Map();
@@ -853,15 +872,19 @@ function waitingStatsResponse(date, engine, fixtures = [], analyser, oddsPending
 
 async function ensureStatsRouteView(date) {
   const existing = statsRouteViewSnapshots.get(date);
-  if (existing?.ppg?.complete && existing?.apex?.complete && existing?.convergence?.complete && existing?.momentum?.complete
-      && !existing?.ppg?.oddsPending && !existing?.apex?.oddsPending && !existing?.convergence?.oddsPending && !existing?.momentum?.oddsPending) return existing;
+  if (existing?.ppg?.complete && existing?.apex?.complete && existing?.convergence?.complete && existing?.momentum?.complete && existing?.htft?.complete
+      && !existing?.ppg?.oddsPending && !existing?.apex?.oddsPending && !existing?.convergence?.oddsPending && !existing?.momentum?.oddsPending && !existing?.htft?.oddsPending) return existing;
   if (!existing) {
-    const board = await getFastFixtureBoard(date);
+    // Engine HTTP routes must never wait on an upstream provider. Reuse the
+    // already-loaded board when available; otherwise publish an empty STARTING
+    // snapshot immediately and let the shared analysis job populate it.
+    const board = cacheGet(`single-engine-fixtures:${date}`) || cacheGet(`dashboard-fixtures:${date}`) || { fixtures: [], oddsPending: true };
     statsRouteViewSnapshots.set(date, {
       ppg: waitingStatsResponse(date, 'PPG Route Engine', board.fixtures || [], analyzePpgRoute, board.oddsPending),
       apex: waitingStatsResponse(date, 'Apex Intelligence Engine', board.fixtures || [], analyzeApexIntelligence, board.oddsPending),
       convergence: waitingStatsResponse(date, 'Convergence Engine', board.fixtures || [], analyzeConvergence, board.oddsPending),
-      momentum: waitingStatsResponse(date, 'Momentum & Streak Engine', board.fixtures || [], analyzeMomentumStreak, board.oddsPending)
+      momentum: waitingStatsResponse(date, 'Momentum & Streak Engine', board.fixtures || [], analyzeMomentumStreak, board.oddsPending),
+      htft: waitingStatsResponse(date, 'Chronos HT/FT Momentum Engine', board.fixtures || [], analyzeHtftMomentum, board.oddsPending)
     });
   }
   if (!statsRouteViewJobs.has(date)) {
@@ -870,10 +893,11 @@ async function ensureStatsRouteView(date) {
         ppg: { ...bundle.ppg, failed: false },
         apex: { ...bundle.apex, failed: false },
         convergence: { ...bundle.convergence, failed: false },
-        momentum: { ...bundle.momentum, failed: false }
+        momentum: { ...bundle.momentum, failed: false },
+        htft: { ...bundle.htft, failed: false }
       };
       statsRouteViewSnapshots.set(date, complete);
-      const allComplete = Boolean(complete.ppg.complete && complete.apex.complete && complete.convergence.complete && complete.momentum.complete);
+      const allComplete = Boolean(complete.ppg.complete && complete.apex.complete && complete.convergence.complete && complete.momentum.complete && complete.htft.complete);
       if (!allComplete) {
         const queue = complete.apex?.providerQueue || complete.apex?.progress?.providerQueue || apiFootballRateState();
         const retryMs = Math.max(5000, Math.min(70000, Number(queue.retryInMs || 10000) + 500));
@@ -883,14 +907,21 @@ async function ensureStatsRouteView(date) {
       return complete;
     }).catch(error => {
       const current = statsRouteViewSnapshots.get(date) || {};
-      const failed = {
-        ppg: { ...(current.ppg || {}), complete: true, failed: true, error: error.message || 'PPG analysis failed', progress: { stage: 'FAILED', processed: 0, total: current.ppg?.summary?.fixtures || 0, percent: 0 } },
-        apex: { ...(current.apex || {}), complete: true, failed: true, error: error.message || 'Apex analysis failed', progress: { stage: 'FAILED', processed: 0, total: current.apex?.summary?.fixtures || 0, percent: 0 } },
-        convergence: { ...(current.convergence || {}), complete: true, failed: true, error: error.message || 'Convergence analysis failed', progress: { stage: 'FAILED', processed: 0, total: current.convergence?.summary?.fixtures || 0, percent: 0 } },
-        momentum: { ...(current.momentum || {}), complete: true, failed: true, error: error.message || 'Momentum analysis failed', progress: { stage: 'FAILED', processed: 0, total: current.momentum?.summary?.fixtures || 0, percent: 0 } }
-      };
-      statsRouteViewSnapshots.set(date, failed);
-      return failed;
+      const message = error.message || 'Provider analysis is temporarily unavailable.';
+      const retrying = Object.fromEntries([
+        ['ppg','PPG Route Engine'],['apex','Apex Intelligence Engine'],['convergence','Convergence Engine'],['momentum','Momentum & Streak Engine'],['htft','Chronos HT/FT Momentum Engine']
+      ].map(([key,name]) => [key, {
+        ...(current[key] || {}),
+        engine: current[key]?.engine || name,
+        complete: false,
+        failed: false,
+        warning: message,
+        progress: { ...(current[key]?.progress || {}), stage: 'RETRYING', providerQueue: apiFootballRateState() }
+      }]));
+      statsRouteViewSnapshots.set(date, retrying);
+      const retry = setTimeout(() => ensureStatsRouteView(date).catch(() => null), 5000);
+      retry.unref?.();
+      return retrying;
     }).finally(() => statsRouteViewJobs.delete(date));
     statsRouteViewJobs.set(date, task);
   }
@@ -915,6 +946,171 @@ async function getConvergenceRouteView(date) {
 async function getMomentumRouteView(date) {
   const snapshot = await ensureStatsRouteView(date);
   return snapshot.momentum;
+}
+
+async function getHtftMomentumView(date) {
+  const snapshot = await ensureStatsRouteView(date);
+  return snapshot.htft;
+}
+
+
+const streakValueViewSnapshots = new Map();
+const streakValueViewJobs = new Map();
+
+function publicStatsValueEvidence(evidence = null) {
+  if (!evidence || typeof evidence !== 'object') return null;
+  const team = profile => profile ? {
+    played: profile.played || 0,
+    form: profile.form || [],
+    wins: profile.wins || 0,
+    draws: profile.draws || 0,
+    losses: profile.losses || 0,
+    ppg: profile.ppg ?? null,
+    goalsForAvg: profile.goalsForAvg ?? null,
+    goalsAgainstAvg: profile.goalsAgainstAvg ?? null,
+    winRate: profile.winRate ?? null,
+    lossRate: profile.lossRate ?? null,
+    xgFor: profile.xgFor ?? null,
+    xgAgainst: profile.xgAgainst ?? null,
+    strengthScore: profile.strengthScore ?? null,
+    classification: profile.classification || null,
+    streaks: profile.streaks || {}
+  } : null;
+  return {
+    mapped: Boolean(evidence.mapped),
+    mappingConfidence: Number(evidence.mappingConfidence || 0),
+    home: team(evidence.home),
+    away: team(evidence.away),
+    homeGoal: evidence.homeGoal || null,
+    awayGoal: evidence.awayGoal || null
+  };
+}
+
+function streakValueItem(fixture, evidence = null) {
+  const safeFixture = publicFixture(fixture);
+  if (!safeFixture) return null;
+  return { fixture: safeFixture, engine: analyzeStreakValue(fixture, evidence), statsEvidence: publicStatsValueEvidence(evidence) };
+}
+
+function waitingStreakValueResponse(date, fixtures = [], oddsPending = false) {
+  const ordered = predictionPriority(fixtures || []);
+  const items = new Map();
+  for (const fixture of ordered) items.set(String(fixture.id), streakValueItem(fixture, null));
+  const eligible = ordered.filter(isUpcomingPredictionFixture).length;
+  const providerQueue = statsApiRateState();
+  return {
+    date,
+    engine: 'Atlas Streak Value Engine',
+    source: 'STATS_API',
+    enrichmentSource: 'STATS_API_STREAKS_XG_SOT',
+    warning: !statsApiConfigured() ? 'STATS_API_KEY is not configured.' : null,
+    providerQueue,
+    qualified: [...items.values()].filter(item => item?.engine?.selection),
+    all: [...items.values()].filter(Boolean),
+    summary: responseSummary([...items.values()].filter(Boolean), eligible, 0),
+    progress: { stage: !statsApiConfigured() ? 'WAITING_KEY' : 'STREAK_DISCOVERY', processed: 0, total: eligible, percent: 0, providerQueue },
+    oddsPending: Boolean(oddsPending),
+    complete: false,
+    failed: false,
+    generatedAt: new Date().toISOString(),
+    cache: 'MISS'
+  };
+}
+
+function goalCandidate(engine = null) {
+  const goalDirections = new Set(['GOALS_OVER','GOALS_UNDER','HOME_GOALS','AWAY_GOALS','HOME_GOALS_UNDER','AWAY_GOALS_UNDER']);
+  return (engine?.candidates || []).some(candidate => goalDirections.has(candidate.direction) && Number(candidate.score || 0) >= 64);
+}
+
+async function getStreakValueBoard(date) {
+  const key = `streak-value-board:${date}`;
+  const cached = cacheGet(key);
+  if (cached) return cached;
+  if (streakValueViewJobs.has(key)) return streakValueViewJobs.get(key);
+  const task = (async () => {
+    const board = await getFastFixtureBoard(date);
+    const fixtures = predictionPriority((board.fixtures || []).filter(Boolean));
+    const eligible = fixtures.filter(isUpcomingPredictionFixture);
+    const items = new Map(fixtures.map(fixture => [String(fixture.id), streakValueItem(fixture, null)]));
+    let processed = 0;
+    let warning = !statsApiConfigured() ? 'STATS_API_KEY is not configured. Atlas cannot analyse streaks yet.' : null;
+
+    const publish = (complete = false, failed = false) => {
+      const all = [...items.values()].filter(Boolean).sort((a,b)=>new Date(a.fixture?.kickoff||0)-new Date(b.fixture?.kickoff||0));
+      const providerQueue = statsApiRateState();
+      const response = {
+        date,
+        engine: 'Atlas Streak Value Engine',
+        source: 'STATS_API',
+        enrichmentSource: 'STATS_API_STREAKS_XG_SOT',
+        warning: warning || (providerQueue.coolingDown ? 'Stats API cooldown active. Completed streak picks remain visible while the queue resumes automatically.' : null),
+        providerQueue,
+        qualified: all.filter(item=>item?.engine?.selection),
+        all,
+        summary: responseSummary(all, eligible.length, processed),
+        progress: { stage: failed ? 'FAILED' : complete ? 'COMPLETE' : providerQueue.coolingDown ? 'RATE_LIMIT_COOLDOWN' : 'STREAK_XG_SOT', processed, total: eligible.length, percent: eligible.length ? Math.round(processed/eligible.length*100) : 100, providerQueue },
+        oddsPending: Boolean(board.oddsPending),
+        complete,
+        failed,
+        generatedAt: new Date().toISOString(),
+        cache: 'MISS'
+      };
+      streakValueViewSnapshots.set(date, response);
+      if (complete) cacheSet(key, response, Number(process.env.STATS_VALUE_CACHE_TTL_SECONDS || 1800));
+      return response;
+    };
+
+    publish(false, false);
+    if (!statsApiConfigured()) return publish(true, false);
+
+    const queue = [...eligible];
+    const workers = Math.max(1, Math.min(3, Number(process.env.STATS_VALUE_CONCURRENCY || 2)));
+    async function worker() {
+      while (queue.length) {
+        const fixture = queue.shift();
+        try {
+          let evidence = await buildStatsApiFixtureEvidence(date, fixture);
+          let analysed = analyzeStreakValue(fixture, evidence);
+          // Expensive match-stat calls are reserved for goal/team-total routes
+          // that already have meaningful streak + price support.
+          if (evidence?.mapped && goalCandidate(analysed)) {
+            evidence = await addGoalEvidence(evidence);
+            analysed = analyzeStreakValue(fixture, evidence);
+          }
+          items.set(String(fixture.id), { fixture: publicFixture(fixture), engine: analysed, statsEvidence: publicStatsValueEvidence(evidence) });
+        } catch (error) {
+          warning = error?.message || warning;
+        } finally {
+          processed += 1;
+          publish(false, false);
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: workers }, () => worker()));
+    const final = publish(true, false);
+    storePredictions(date, [...items.values()].filter(Boolean), STREAK_VALUE_CODE).catch(error => console.error('Atlas prediction storage failed:', error.message));
+    return final;
+  })().catch(error => {
+    const current = streakValueViewSnapshots.get(date) || waitingStreakValueResponse(date, [], true);
+    const failed = { ...current, complete: false, failed: false, warning: error.message || 'Stats API analysis is temporarily unavailable.', progress: { ...(current.progress || {}), stage: 'RETRYING' } };
+    streakValueViewSnapshots.set(date, failed);
+    return failed;
+  }).finally(() => streakValueViewJobs.delete(key));
+  streakValueViewJobs.set(key, task);
+  return task;
+}
+
+async function ensureStreakValueView(date) {
+  let snapshot = streakValueViewSnapshots.get(date);
+  if (!snapshot) {
+    const board = cacheGet(`single-engine-fixtures:${date}`) || cacheGet(`dashboard-fixtures:${date}`) || { fixtures: [], oddsPending: true };
+    snapshot = waitingStreakValueResponse(date, board.fixtures || [], board.oddsPending);
+    streakValueViewSnapshots.set(date, snapshot);
+  }
+  if (!snapshot.complete && !streakValueViewJobs.has(`streak-value-board:${date}`)) {
+    queueMicrotask(() => getStreakValueBoard(date).catch(error => console.error('Atlas background analysis failed:', error.message)));
+  }
+  return streakValueViewSnapshots.get(date) || snapshot;
 }
 
 function publicQualifiedPick(item, date, engineCode = MARKET_ROUTE_CODE) {
@@ -1049,6 +1245,9 @@ async function getQualifiedPicksWindow(from, days = 7) {
         statsPicks.push(...(bundle.apex.qualified || []).map(item => publicQualifiedPick(item, date, APEX_INTELLIGENCE_CODE)).filter(Boolean));
         statsPicks.push(...(bundle.convergence.qualified || []).map(item => publicQualifiedPick(item, date, CONVERGENCE_ROUTE_CODE)).filter(Boolean));
         statsPicks.push(...(bundle.momentum.qualified || []).map(item => publicQualifiedPick(item, date, MOMENTUM_STREAK_CODE)).filter(Boolean));
+        statsPicks.push(...(bundle.htft.qualified || []).map(item => publicQualifiedPick(item, date, HTFT_MOMENTUM_CODE)).filter(Boolean));
+        const atlas = await getStreakValueBoard(date).catch(() => ({ qualified: [] }));
+        statsPicks.push(...(atlas.qualified || []).map(item => publicQualifiedPick(item, date, STREAK_VALUE_CODE)).filter(Boolean));
       } catch {}
     }
   }
@@ -1115,7 +1314,7 @@ async function getQualifiedPicksWindow(from, days = 7) {
 const consensusViewSnapshots = new Map();
 const consensusViewJobs = new Map();
 
-function partialConsensusResponse(from, days, marketBoard, statsSnapshot) {
+function partialConsensusResponse(from, days, marketBoard, statsSnapshot, streakSnapshot = null) {
   const safeDays = Math.max(1, Math.min(7, Number(days) || 7));
   const dates = Array.from({ length: safeDays }, (_, index) => addDays(from, index));
   const enginePicksInternal = [
@@ -1123,7 +1322,9 @@ function partialConsensusResponse(from, days, marketBoard, statsSnapshot) {
     ...(statsSnapshot?.ppg?.qualified || []).map(item => publicQualifiedPick(item, from, PPG_ROUTE_CODE)).filter(Boolean),
     ...(statsSnapshot?.apex?.qualified || []).map(item => publicQualifiedPick(item, from, APEX_INTELLIGENCE_CODE)).filter(Boolean),
     ...(statsSnapshot?.convergence?.qualified || []).map(item => publicQualifiedPick(item, from, CONVERGENCE_ROUTE_CODE)).filter(Boolean),
-    ...(statsSnapshot?.momentum?.qualified || []).map(item => publicQualifiedPick(item, from, MOMENTUM_STREAK_CODE)).filter(Boolean)
+    ...(statsSnapshot?.momentum?.qualified || []).map(item => publicQualifiedPick(item, from, MOMENTUM_STREAK_CODE)).filter(Boolean),
+    ...(statsSnapshot?.htft?.qualified || []).map(item => publicQualifiedPick(item, from, HTFT_MOMENTUM_CODE)).filter(Boolean),
+    ...(streakSnapshot?.qualified || []).map(item => publicQualifiedPick(item, from, STREAK_VALUE_CODE)).filter(Boolean)
   ];
   const unique = new Map();
   for (const pick of enginePicksInternal) unique.set(`${pick.fixtureId}:${pick.engine}:${pick.market}`, pick);
@@ -1138,7 +1339,7 @@ function partialConsensusResponse(from, days, marketBoard, statsSnapshot) {
   const holds = consensusRows.filter(item => item.classification === 'HOLD_MISSING_SHARED_PRICE');
   const publishable = [...elite, ...consensusBankers, ...singleQualified, ...saferConsensus];
   const bankers = [...elite, ...consensusBankers];
-  const statsComplete = Boolean(statsSnapshot?.ppg?.complete && statsSnapshot?.apex?.complete && statsSnapshot?.convergence?.complete && statsSnapshot?.momentum?.complete);
+  const statsComplete = Boolean(statsSnapshot?.ppg?.complete && statsSnapshot?.apex?.complete && statsSnapshot?.convergence?.complete && statsSnapshot?.momentum?.complete && statsSnapshot?.htft?.complete && streakSnapshot?.complete);
   const fixtureTotal = Number(statsSnapshot?.ppg?.summary?.fixtures || statsSnapshot?.apex?.summary?.fixtures || marketBoard?.summary?.fixtures || 0);
   const fixtureProcessed = statsComplete ? fixtureTotal : Number(statsSnapshot?.ppg?.progress?.processed || statsSnapshot?.apex?.progress?.processed || statsSnapshot?.apex?.summary?.analysed || 0);
   const total = safeDays === 1 ? fixtureTotal : safeDays;
@@ -1184,7 +1385,8 @@ async function getQualifiedPicksWindowView(from, days = 7) {
 
   const marketBoard = await getMarketRouteBoard(from);
   const statsSnapshot = await ensureStatsRouteView(from);
-  const partial = partialConsensusResponse(from, safeDays, marketBoard, statsSnapshot);
+  const streakSnapshot = await ensureStreakValueView(from);
+  const partial = partialConsensusResponse(from, safeDays, marketBoard, statsSnapshot, streakSnapshot);
   consensusViewSnapshots.set(key, partial);
 
   if (!consensusViewJobs.has(key)) {
@@ -1233,7 +1435,7 @@ async function getEngineAudit(date) {
   const key = `engine-audit-v35:${date}`;
   const cached = cacheGet(key);
   if (cached) return { ...cached, cache: 'HIT' };
-  const [market, stats] = await Promise.all([getMarketRouteBoard(date), getStatsRouteBoards(date)]);
+  const [market, stats, atlas] = await Promise.all([getMarketRouteBoard(date), getStatsRouteBoards(date), getStreakValueBoard(date).catch(() => ({ all: [] }))]);
   const groups = new Map();
   function add(items, code) {
     for (const item of items || []) {
@@ -1248,6 +1450,8 @@ async function getEngineAudit(date) {
   add(stats.apex.all, APEX_INTELLIGENCE_CODE);
   add(stats.convergence.all, CONVERGENCE_ROUTE_CODE);
   add(stats.momentum.all, MOMENTUM_STREAK_CODE);
+  add(stats.htft.all, HTFT_MOMENTUM_CODE);
+  add(atlas.all, STREAK_VALUE_CODE);
 
   const rows = [];
   for (const [fixtureId, group] of groups.entries()) {
@@ -1357,9 +1561,10 @@ async function apiRoute(req, res, url) {
     version: APP_VERSION,
     engines: ENGINE_CODES,
     systems: ['CONSENSUS_BANKERS', 'AUTOMATIC_CALIBRATION'],
-    configured: { apiFootball: apiFootballConfigured(), supabase: supabaseConfigured() },
+    configured: { apiFootball: apiFootballConfigured(), statsApi: statsApiConfigured(), supabase: supabaseConfigured() },
     providerQueue: apiFootballRateState(),
-    sourceRoles: { fixtures: 'API_FOOTBALL', odds: 'API_FOOTBALL', live: 'API_FOOTBALL', results: 'API_FOOTBALL', statistics: 'API_FOOTBALL', visuals: 'API_FOOTBALL' },
+    statsProviderQueue: statsApiRateState(),
+    sourceRoles: { fixtures: 'API_FOOTBALL', odds: 'API_FOOTBALL', live: 'API_FOOTBALL', results: 'API_FOOTBALL', coreStatistics: 'API_FOOTBALL', streakIntelligence: 'STATS_API', xg: 'STATS_API', visuals: 'API_FOOTBALL' },
     fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null },
     time: new Date().toISOString()
   });
@@ -1367,10 +1572,10 @@ async function apiRoute(req, res, url) {
   if (url.pathname === '/api/config') return json(res, 200, {
     appName: process.env.APP_NAME || 'Betynz',
     version: APP_VERSION,
-    engines: ['Market Route Engine', 'PPG Route Engine', 'Apex Intelligence Engine', 'Convergence Engine', 'Momentum & Streak Engine'],
+    engines: ['Market Route Engine', 'PPG Route Engine', 'Apex Intelligence Engine', 'Convergence Engine', 'Momentum & Streak Engine', 'Atlas Streak Value Engine', 'Chronos HT/FT Momentum Engine'],
     systems: ['Consensus Bankers', 'Settlement Calibration'],
     consensusFreezeMinutes: Math.max(5, Number(process.env.CONSENSUS_FREEZE_MINUTES || 30)),
-    dataSources: { fixtures: 'API-Football', odds: 'API-Football', statistics: 'API-Football', visuals: 'API-Football', live: 'API-Football', results: 'API-Football' },
+    dataSources: { fixtures: 'API-Football', odds: 'API-Football', primaryStatistics: 'API-Football', streaksAndXg: 'Stats API', visuals: 'API-Football', live: 'API-Football', results: 'API-Football' },
     fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null },
     responsiblePlay: 'Predictions are informational, not guarantees. Adults only.'
   });
@@ -1560,6 +1765,18 @@ async function apiRoute(req, res, url) {
     return jsonCached(res, 200, await getMomentumRouteView(date), 5);
   }
 
+  if (url.pathname === '/api/streak-value-board') {
+    const date = url.searchParams.get('date') || utcDateOffset(0);
+    if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    return jsonCached(res, 200, await ensureStreakValueView(date), 5);
+  }
+
+  if (url.pathname === '/api/htft-momentum-board') {
+    const date = url.searchParams.get('date') || utcDateOffset(0);
+    if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    return jsonCached(res, 200, await getHtftMomentumView(date), 5);
+  }
+
   if (url.pathname === '/api/qualified-picks' || url.pathname === '/api/consensus-picks') {
     const from = url.searchParams.get('from') || utcDateOffset(0);
     const days = Number(url.searchParams.get('days') || 7);
@@ -1601,12 +1818,18 @@ async function apiRoute(req, res, url) {
       const apexEngine = analyzeApexIntelligence(fixture, stats);
       const convergenceEngine = analyzeConvergence(fixture, stats);
       const momentumEngine = analyzeMomentumStreak(fixture, stats);
+      const htftEngine = analyzeHtftMomentum(fixture, stats);
+      const atlasSnapshot = await ensureStreakValueView(date);
+      const atlasItem = (atlasSnapshot?.all || []).find(item => String(item?.fixture?.id || '') === String(fixture.id || ''));
+      const streakValueEngine = atlasItem?.engine || analyzeStreakValue(fixture, null);
       const selectedPicks = [
         publicQualifiedPick({ fixture, engine }, date, MARKET_ROUTE_CODE),
         publicQualifiedPick({ fixture, engine: ppgEngine }, date, PPG_ROUTE_CODE),
         publicQualifiedPick({ fixture, engine: apexEngine }, date, APEX_INTELLIGENCE_CODE),
         publicQualifiedPick({ fixture, engine: convergenceEngine }, date, CONVERGENCE_ROUTE_CODE),
-        publicQualifiedPick({ fixture, engine: momentumEngine }, date, MOMENTUM_STREAK_CODE)
+        publicQualifiedPick({ fixture, engine: momentumEngine }, date, MOMENTUM_STREAK_CODE),
+        publicQualifiedPick({ fixture, engine: streakValueEngine }, date, STREAK_VALUE_CODE),
+        publicQualifiedPick({ fixture, engine: htftEngine }, date, HTFT_MOMENTUM_CODE)
       ].filter(Boolean);
       const consensusEngine = consensusLifecycle(buildConsensusForFixture({
         fixture: {
@@ -1627,6 +1850,8 @@ async function apiRoute(req, res, url) {
         storePredictions(date, [{ fixture, engine: apexEngine }], APEX_INTELLIGENCE_CODE),
         storePredictions(date, [{ fixture, engine: convergenceEngine }], CONVERGENCE_ROUTE_CODE),
         storePredictions(date, [{ fixture, engine: momentumEngine }], MOMENTUM_STREAK_CODE),
+        storePredictions(date, [{ fixture, engine: streakValueEngine }], STREAK_VALUE_CODE),
+        storePredictions(date, [{ fixture, engine: htftEngine }], HTFT_MOMENTUM_CODE),
         storeConsensusRows([consensusEngine])
       ]);
       const response = {
@@ -1637,6 +1862,8 @@ async function apiRoute(req, res, url) {
         apexEngine,
         convergenceEngine,
         momentumEngine,
+        streakValueEngine,
+        htftEngine,
         consensusEngine,
         venueForm: publicVenueForm(stats),
         statisticsAvailable: Boolean(stats?.homeSplit || stats?.awaySplit),

@@ -1,5 +1,3 @@
-# Deploy Betynz v5.0.13 on one Render service
+# Deploy Betynz v5.0.14 on one Render service
 
-Use the root `render.yaml`. Keep `API_FOOTBALL_KEY` private in Render. Deploy with **Clear build cache & deploy**, then confirm `/api/health` reports version `5.0.13`.
-
-Recommended subscription-safe values remain in the Blueprint. The application prioritizes current fixtures, first-page odds and engine history before future-date counts and later odds pages.
+Use the root `render.yaml`. Keep `API_FOOTBALL_KEY` and `STATS_API_KEY` private in Render. For an existing Supabase database run `apps/web/sql/015_seven_engine_stats_htft.sql` once. Deploy with **Clear build cache & deploy**, then confirm `/api/health` reports `5.0.14`.

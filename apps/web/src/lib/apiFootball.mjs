@@ -287,7 +287,7 @@ function requestHeaders(current) {
   const headers = {
     [current.headerName]: current.key,
     accept: 'application/json',
-    'user-agent': 'Betynz-API-Football-Only/5.0.13'
+    'user-agent': 'Betynz-API-Football-Core/5.0.14'
   };
   if (current.rapidApiHost) headers['x-rapidapi-host'] = current.rapidApiHost;
   return headers;
@@ -548,6 +548,18 @@ function normalizeOddsBookmaker(bookmaker, fixture = null) {
       if (/both teams.*score|btts/.test(market)) {
         if (/^yes$|both/.test(choice)) setOdd(odds, 'bttsYes', odd);
         else if (/^no$|not both/.test(choice)) setOdd(odds, 'bttsNo', odd);
+        continue;
+      }
+
+      if (/half.?time.*full.?time|ht\/?ft|half time\/full time/.test(market)) {
+        const compact = choice.replace(/\s+/g, '').replace(/-/g, '/').replace(/home/g, '1').replace(/draw/g, 'x').replace(/away/g, '2');
+        const map = {
+          '1/1':'htftHomeHome','x/1':'htftDrawHome','2/1':'htftAwayHome',
+          '1/x':'htftHomeDraw','x/x':'htftDrawDraw','2/x':'htftAwayDraw',
+          '1/2':'htftHomeAway','x/2':'htftDrawAway','2/2':'htftAwayAway'
+        };
+        const key = map[compact];
+        if (key) setOdd(odds, key, odd);
         continue;
       }
 

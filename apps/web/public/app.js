@@ -25,6 +25,8 @@ const state = {
   apexByFixture: new Map(),
   convergenceByFixture: new Map(),
   momentumByFixture: new Map(),
+  streakValueByFixture: new Map(),
+  htftByFixture: new Map(),
   consensusByFixture: new Map(),
   visualByFixture: new Map(),
   requestToken: 0,
@@ -137,6 +139,8 @@ async function loadDate(date, force = false) {
   state.apexByFixture = new Map();
   state.convergenceByFixture = new Map();
   state.momentumByFixture = new Map();
+  state.streakValueByFixture = new Map();
+  state.htftByFixture = new Map();
   state.consensusByFixture = new Map();
   state.visualByFixture = new Map();
   state.selected = null;
@@ -402,7 +406,7 @@ function homeConsensusCard(row, tone = '') {
     <small>${esc(row.country || 'International')} · ${esc(row.league || 'League')} · ${esc(kickoffTime(row.kickoff))}</small>
     <h3>${esc(row.home?.name || 'Home')} <i>vs</i> ${esc(row.away?.name || 'Away')}</h3>
     <div class="home-official-tip"><span>OFFICIAL TIP</span><strong>${esc(final.label || final.market || 'Qualified direction')}</strong><b>${odd(final.odds)}</b></div>
-    <p>${Number(row.agreementCount || 0)}/5 engines agree · ${row.status === 'FROZEN' ? 'Frozen' : 'Early provisional'}</p>
+    <p>${Number(row.agreementCount || 0)}/7 engines agree · ${row.status === 'FROZEN' ? 'Frozen' : 'Early provisional'}</p>
   </a>`;
 }
 
@@ -428,9 +432,9 @@ function renderHomeBankers(payload) {
   const progress = payload?.progress || {};
   const progressText = `${Number(progress.processed || 0)} of ${Number(progress.total || 0)} processed`;
   eliteGrid.innerHTML = elite.length ? elite.map(row => homeConsensusCard(row, 'elite')).join('') : processing
-    ? `<div class="spotlight-empty"><b>Checking 5/5 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
+    ? `<div class="spotlight-empty"><b>Checking 7/7 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
   consensusGrid.innerHTML = consensus.length ? consensus.map(row => homeConsensusCard(row, 'consensus')).join('') : processing
-    ? `<div class="spotlight-empty"><b>Checking 4/5 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
+    ? `<div class="spotlight-empty"><b>Checking 5–6/7 agreement…</b><span>${esc(progressText)}. This updates automatically.</span></div>` : '';
   earlyGrid.innerHTML = early.length ? early.map(row => homeConsensusCard(row, 'early')).join('') : processing
     ? '<div class="spotlight-empty"><b>Preparing early picks…</b><span>The selected date finishes before future dates are scanned.</span></div>' : '';
 
@@ -559,6 +563,8 @@ function openMatch(id) {
   renderApexEngine(state.apexByFixture.get(String(fixture.id)) || null);
   renderConvergenceEngine(state.convergenceByFixture.get(String(fixture.id)) || null);
   renderMomentumEngine(state.momentumByFixture.get(String(fixture.id)) || null);
+  renderStreakValueEngine(state.streakValueByFixture.get(String(fixture.id)) || null);
+  renderHtftEngine(state.htftByFixture.get(String(fixture.id)) || null);
   renderConsensusEngine(state.consensusByFixture.get(String(fixture.id)) || null);
   renderVenueForm(null);
   $('#matchIntelDialog').showModal();
@@ -585,12 +591,16 @@ async function loadIntelligence(fixture) {
   state.apexByFixture.set(String(fixture.id), payload.apexEngine || null);
   state.convergenceByFixture.set(String(fixture.id), payload.convergenceEngine || null);
   state.momentumByFixture.set(String(fixture.id), payload.momentumEngine || null);
+  state.streakValueByFixture.set(String(fixture.id), payload.streakValueEngine || null);
+  state.htftByFixture.set(String(fixture.id), payload.htftEngine || null);
   state.consensusByFixture.set(String(fixture.id), payload.consensusEngine || null);
   renderEngine(payload.engine);
   renderPpgEngine(payload.ppgEngine);
   renderApexEngine(payload.apexEngine);
   renderConvergenceEngine(payload.convergenceEngine);
   renderMomentumEngine(payload.momentumEngine);
+  renderStreakValueEngine(payload.streakValueEngine);
+  renderHtftEngine(payload.htftEngine);
   renderConsensusEngine(payload.consensusEngine);
   renderVenueForm(payload.venueForm);
   renderList();
@@ -606,6 +616,8 @@ function renderEngineError() {
   renderApexEngineError();
   renderConvergenceEngineError();
   renderMomentumEngineError();
+  renderStreakValueEngineError();
+  renderHtftEngineError();
   renderConsensusEngineError();
 }
 
@@ -824,14 +836,81 @@ function renderMomentumEngine(engine) {
   $('#momentumReasons').innerHTML = (selection?.reasons || candidate?.reasons || [engine.explanation]).filter(Boolean).slice(0, 8).map(reason => `<li>${esc(reason)}</li>`).join('');
 }
 
+
+function renderStreakValueEngineError() {
+  $('#atlasSelection').textContent = 'Atlas is recovering';
+  $('#atlasExplanation').textContent = 'The Stats API enrichment lane is temporarily unavailable. Cached evidence will be reused and the analysis will retry automatically.';
+  $('#atlasDecision').textContent = 'RETRYING';
+  $('#atlasScore').textContent = '—';
+  $('#atlasRouteName').textContent = 'Waiting for streak evidence';
+  $('#atlasPrice').textContent = 'Odds —';
+  $('#atlasChecks').innerHTML = '<div class="loading">Retrying Stats API evidence…</div>';
+}
+
+function renderStreakValueEngine(engine) {
+  if (!engine) {
+    $('#atlasSelection').textContent = 'Checking Stats API streak value…';
+    $('#atlasExplanation').textContent = 'Best/worst form and streaks must meet the 1.20–1.55 market gate; xG and SOT confirm goal routes.';
+    $('#atlasDecision').textContent = 'WAITING';
+    $('#atlasScore').textContent = '—';
+    $('#atlasRouteName').textContent = 'No Atlas route yet';
+    $('#atlasPrice').textContent = 'Odds —';
+    $('#atlasChecks').innerHTML = '<div class="loading">Loading streak and value evidence…</div>';
+    return;
+  }
+  const selection = engine.selection;
+  const candidate = selection ? (engine.candidates || []).find(item => item.id === selection.routeId) : [...(engine.candidates || [])].sort((a,b)=>Number(b.score||0)-Number(a.score||0))[0];
+  $('#atlasSelection').textContent = selection?.label || (engine.decision === 'WAITING' ? 'Waiting for Stats API samples' : engine.decision === 'CONFLICT' ? 'No pick — streak conflict' : 'No qualifying Atlas route');
+  $('#atlasExplanation').textContent = engine.explanation || 'No streak-value route qualified.';
+  $('#atlasDecision').textContent = selection?.decision || engine.decision || 'NO SIGNAL';
+  $('#atlasScore').textContent = selection?.score ? `${Number(selection.score).toFixed(0)}%` : candidate?.score ? `${Number(candidate.score).toFixed(0)}%` : '—';
+  $('#atlasRouteName').textContent = selection?.routeName || candidate?.name || 'No Atlas route';
+  $('#atlasPrice').textContent = selection?.odds ? `Odds ${odd(selection.odds)}` : 'Odds —';
+  $('#atlasResultCard').className = `route-result-card atlas-result-card ${String(selection?.decision || engine.decision || '').toLowerCase()}`;
+  $('#atlasChecks').innerHTML = (candidate?.checks || []).map(item => `<div class="route-check ${item.pass ? 'pass' : 'fail'}"><span>${item.pass ? '✓' : '×'}</span><div><b>${esc(item.label)}</b><small>${esc(item.actual)} · required ${esc(item.rule)}</small></div></div>`).join('') || '<div class="empty-state">No Atlas checks available.</div>';
+}
+
+function renderHtftEngineError() {
+  $('#htftSelection').textContent = 'Chronos is recovering';
+  $('#htftExplanation').textContent = 'HT/FT history is temporarily unavailable. The shared history job will retry without blocking the match page.';
+  $('#htftDecision').textContent = 'RETRYING';
+  $('#htftScore').textContent = '—';
+  $('#htftRouteName').textContent = 'Waiting for transition history';
+  $('#htftPrice').textContent = 'Odds —';
+  $('#htftChecks').innerHTML = '<div class="loading">Retrying HT/FT history…</div>';
+}
+
+function renderHtftEngine(engine) {
+  if (!engine) {
+    $('#htftSelection').textContent = 'Checking HT/FT transitions…';
+    $('#htftExplanation').textContent = 'Lead-hold, draw-to-win, comeback and early-event patterns are checked against current momentum.';
+    $('#htftDecision').textContent = 'WAITING';
+    $('#htftScore').textContent = '—';
+    $('#htftRouteName').textContent = 'No HT/FT route yet';
+    $('#htftPrice').textContent = 'Odds —';
+    $('#htftChecks').innerHTML = '<div class="loading">Loading transition evidence…</div>';
+    return;
+  }
+  const selection = engine.selection;
+  const candidate = selection ? (engine.candidates || []).find(item => item.id === selection.routeId) : [...(engine.candidates || [])].sort((a,b)=>Number(b.score||0)-Number(a.score||0))[0];
+  $('#htftSelection').textContent = selection?.label || (engine.decision === 'WAITING' ? 'Waiting for HT/FT samples' : engine.decision === 'CONFLICT' ? 'No pick — transition conflict' : 'No qualifying HT/FT route');
+  $('#htftExplanation').textContent = engine.explanation || 'No HT/FT transition route qualified.';
+  $('#htftDecision').textContent = selection?.decision || engine.decision || 'NO SIGNAL';
+  $('#htftScore').textContent = selection?.score ? `${Number(selection.score).toFixed(0)}%` : candidate?.score ? `${Number(candidate.score).toFixed(0)}%` : '—';
+  $('#htftRouteName').textContent = selection?.routeName || candidate?.name || 'No HT/FT route';
+  $('#htftPrice').textContent = selection?.odds ? `Odds ${odd(selection.odds)}` : 'Odds —';
+  $('#htftResultCard').className = `route-result-card htft-result-card ${String(selection?.decision || engine.decision || '').toLowerCase()}`;
+  $('#htftChecks').innerHTML = (candidate?.checks || []).map(item => `<div class="route-check ${item.pass ? 'pass' : 'fail'}"><span>${item.pass ? '✓' : '×'}</span><div><b>${esc(item.label)}</b><small>${esc(item.actual)} · required ${esc(item.rule)}</small></div></div>`).join('') || '<div class="empty-state">No HT/FT checks available.</div>';
+}
+
 function renderConsensusEngineError() {
   $('#consensusSelection').textContent = 'Consensus unavailable';
-  $('#consensusExplanation').textContent = 'The five engine decisions could not be compared for this match.';
+  $('#consensusExplanation').textContent = 'The seven engine decisions could not be compared for this match.';
   $('#consensusDecision').textContent = 'UNAVAILABLE';
   $('#consensusScore').textContent = '—';
   $('#consensusMarket').textContent = 'No shared market';
   $('#consensusPrice').textContent = '—';
-  $('#consensusAgreement').textContent = '0/5 engines agree';
+  $('#consensusAgreement').textContent = '0/7 engines agree';
   $('#consensusFreeze').textContent = 'Unavailable';
   $('#consensusMeter').style.width = '0%';
   $('#consensusEnginePicks').innerHTML = '';
@@ -846,7 +925,7 @@ function renderConsensusEngine(engine) {
     $('#consensusScore').textContent = '—';
     $('#consensusMarket').textContent = 'No shared market yet';
     $('#consensusPrice').textContent = '—';
-    $('#consensusAgreement').textContent = '0/5 engines agree';
+    $('#consensusAgreement').textContent = '0/7 engines agree';
     $('#consensusFreeze').textContent = 'Provisional';
     $('#consensusMeter').style.width = '0%';
     $('#consensusEnginePicks').innerHTML = '<span class="engine-proof-chip"><b>Waiting</b><small>Engine routes are still loading</small></span>';
@@ -861,9 +940,9 @@ function renderConsensusEngine(engine) {
   $('#consensusScore').textContent = Number(engine.score || 0) ? `${Number(engine.score).toFixed(0)}%` : '—';
   $('#consensusMarket').textContent = final?.label || 'No shared market';
   $('#consensusPrice').textContent = final?.odds ? odd(final.odds) : '—';
-  $('#consensusAgreement').textContent = `${Number(engine.agreementCount || 0)}/5 engines agree`;
+  $('#consensusAgreement').textContent = `${Number(engine.agreementCount || 0)}/7 engines agree`;
   $('#consensusFreeze').textContent = engine.status === 'FROZEN' ? 'Frozen before kickoff' : `Provisional · freezes ${engine.freezeMinutes || 30} min before kickoff`;
-  $('#consensusMeter').style.width = `${Math.max(0, Math.min(100, Number(engine.agreementCount || 0) / 5 * 100))}%`;
+  $('#consensusMeter').style.width = `${Math.max(0, Math.min(100, Number(engine.agreementCount || 0) / 7 * 100))}%`;
   $('#consensusResultCard').className = `route-result-card consensus-result-card ${classification.toLowerCase().replaceAll('_', '-')}`;
   $('#consensusEnginePicks').innerHTML = (engine.enginePicks || []).map(item => `<span class="engine-proof-chip ${item.decision === 'FIRE' ? 'fire' : 'safer'}"><b>${esc(item.engineName || item.engine)}</b><small>${esc(item.label || item.market)} · ${esc(item.decision || '')}</small></span>`).join('') || '<span class="engine-proof-chip"><b>No qualified engines</b><small>Waiting for a complete route</small></span>';
   $('#consensusConflicts').innerHTML = (engine.conflictReasons || []).map(reason => `<p>× ${esc(reason)}</p>`).join('');

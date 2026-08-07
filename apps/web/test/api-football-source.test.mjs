@@ -5,7 +5,7 @@ import { readFile, access, readdir } from 'node:fs/promises';
 const read = path => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 const readRoot = path => readFile(new URL(`../../../${path}`, import.meta.url), 'utf8');
 
-test('API-Football is the only configured football provider', async () => {
+test('API-Football owns core football data while Stats API is additive enrichment', async () => {
   const [server, module, env, render, rootPackage] = await Promise.all([
     read('src/server.mjs'),
     read('src/lib/apiFootball.mjs'),
@@ -14,11 +14,12 @@ test('API-Football is the only configured football provider', async () => {
     readRoot('package.json')
   ]);
   for (const text of [server, module, env, render]) assert.match(text, /API_FOOTBALL/);
+  assert.match(server,/STATS_API/); assert.match(env,/STATS_API_KEY/); assert.match(render,/STATS_API_KEY/);
   assert.match(rootPackage, /API-Football/);
   const apps = (await readdir(new URL('../../../apps/', import.meta.url), { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name);
   assert.deepEqual(apps, ['web']);
-  const providerModules = (await readdir(new URL('../src/lib/', import.meta.url))).filter(name => /football/i.test(name));
-  assert.deepEqual(providerModules, ['apiFootball.mjs']);
+  const providerModules = (await readdir(new URL('../src/lib/', import.meta.url))).filter(name => /apiFootball|statsApi/i.test(name)).sort();
+  assert.deepEqual(providerModules, ['apiFootball.mjs','statsApi.mjs']);
 });
 
 test('all football responsibilities are wired to the single provider module', async () => {

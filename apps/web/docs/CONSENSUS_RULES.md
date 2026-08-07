@@ -15,8 +15,8 @@ Only FIRE or SAFER decisions can enter consensus comparison.
 ## Classifications
 
 ```text
-ELITE_BANKER       = five engines support one compatible direction
-CONSENSUS_BANKER   = four engines support one compatible direction
+ELITE_BANKER       = seven engines support one compatible direction
+CONSENSUS_BANKER   = five or six engines support one compatible direction
 QUALIFIED_PICK     = two or three engines support a complete compatible direction
 SAFER_PICK         = one engine produces an approved SAFER decision
 CONFLICT           = qualified engines oppose each other

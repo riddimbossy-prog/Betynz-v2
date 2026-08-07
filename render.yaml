@@ -69,6 +69,36 @@ services:
         value: "UTC"
       - key: API_FOOTBALL_MAX_ODDS_PAGES
         value: "0"
+      - key: STATS_API_KEY
+        sync: false
+      - key: STATS_API_BASE_URL
+        value: "https://api.thestatsapi.com/api"
+      - key: STATS_API_TIMEOUT_MS
+        value: "15000"
+      - key: STATS_API_CONCURRENCY
+        value: "2"
+      - key: STATS_API_MIN_INTERVAL_MS
+        value: "300"
+      - key: STATS_API_REQUESTS_PER_MINUTE
+        value: "40"
+      - key: STATS_API_RETRIES
+        value: "3"
+      - key: STATS_API_RATE_LIMIT_COOLDOWN_MS
+        value: "30000"
+      - key: STATS_API_HISTORY_LAST
+        value: "10"
+      - key: STATS_API_CACHE_TTL_SECONDS
+        value: "1800"
+      - key: STATS_API_TEAM_CACHE_TTL_SECONDS
+        value: "43200"
+      - key: STATS_API_MAPPING_THRESHOLD
+        value: "0.72"
+      - key: STATS_API_GOAL_STATS_LOOKBACK
+        value: "4"
+      - key: STATS_VALUE_CONCURRENCY
+        value: "2"
+      - key: STATS_VALUE_CACHE_TTL_SECONDS
+        value: "1800"
       - key: CACHE_TTL_SECONDS
         value: "120"
       - key: FIXTURE_BOARD_CACHE_TTL_SECONDS

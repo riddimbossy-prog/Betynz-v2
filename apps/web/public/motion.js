@@ -1,6 +1,6 @@
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-const SPLASH_KEY = 'betynz:pwa-splash:5.0.13';
+const SPLASH_KEY = 'betynz:pwa-splash:5.0.14';
 
 function splashAlreadySeen() {
   try { return sessionStorage.getItem(SPLASH_KEY) === '1'; } catch { return false; }
@@ -17,7 +17,7 @@ function showLaunchSplash() {
   const splash = document.createElement('div');
   splash.className = 'pwa-launch-splash is-visible';
   splash.setAttribute('aria-hidden', 'true');
-  splash.innerHTML = `<div class="pwa-splash-bolt"></div><div class="pwa-splash-core"><img src="/assets/betynz-mark.png" alt=""><strong>BETYNZ<span>.com</span></strong><small>FIVE ENGINES · ONE SHARED DIRECTION</small><i></i></div>`;
+  splash.innerHTML = `<div class="pwa-splash-bolt"></div><div class="pwa-splash-core"><img src="/assets/betynz-mark.png" alt=""><strong>BETYNZ<span>.com</span></strong><small>SEVEN ENGINES · ONE SHARED DIRECTION</small><i></i></div>`;
   document.body.appendChild(splash);
   const dismiss = () => {
     splash.classList.add('is-leaving');

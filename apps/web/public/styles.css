@@ -333,7 +333,7 @@ a{color:inherit;text-decoration:none}
 .minimal-board-motion .pulse{animation-duration:2.8s}
 
 
-/* Betynz v5.0.13 — five-engine unified logo palette */
+/* Betynz v5.0.14 — five-engine unified logo palette */
 :root{
   --brand-black:#07090b;
   --brand-charcoal:#111419;
@@ -404,7 +404,7 @@ a{color:inherit;text-decoration:none}
   .engine-chip-row .single-engine-chip b{font-size:8px!important}
 }
 
-/* v5.0.13 PPG + Apex five-engine edition */
+/* v5.0.14 PPG + Apex five-engine edition */
 .apex-chip,.route-badge.apex,.apex-result-card,.apex-pick-card{border-color:rgba(255,152,0,.34)!important;background:linear-gradient(145deg,rgba(255,152,0,.09),rgba(255,255,255,.018))!important;color:var(--brand-silver)!important}
 .apex-hero{background:radial-gradient(circle at 88% 0,rgba(255,152,0,.18),transparent 40%),linear-gradient(145deg,#121417,#08090b)!important}
 .apex-rules-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0 18px}.apex-rules-strip article{padding:15px;border:1px solid rgba(255,152,0,.18);border-radius:14px;background:linear-gradient(145deg,#111419,#0b0d10)}.apex-rules-strip b,.apex-rules-strip span{display:block}.apex-rules-strip b{color:var(--brand-white)}.apex-rules-strip span{margin-top:5px;color:#9da5ae;font-size:11px}
@@ -413,7 +413,7 @@ a{color:inherit;text-decoration:none}
 @media(max-width:900px){.apex-rules-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.apex-rules-strip,.apex-score-row,.apex-split-grid{grid-template-columns:1fr}}
 
-/* Betynz v5.0.13 — five-engine logo palette */
+/* Betynz v5.0.14 — five-engine logo palette */
 .engine-chip-row{grid-template-columns:repeat(5,minmax(108px,1fr))!important}
 .engine-chip-row .single-engine-chip,
 .engine-chip-row .ppg-chip,
@@ -454,7 +454,7 @@ a{color:inherit;text-decoration:none}
 .ppg-versus small,.ppg-card-values small{color:#9da5ae;font-size:10px;font-weight:900}.ppg-versus strong,.ppg-card-values strong{margin:4px 0;color:var(--brand-orange-2)!important;font-size:32px}.ppg-versus span,.ppg-card-values span{color:#9da5ae;font-size:11px}.ppg-versus>b{color:var(--brand-silver)}
 .apex-quality-grid strong,.apex-score-row b,.convergence-block strong,.momentum-rules-strip b,.momentum-team-grid>article>small{color:var(--brand-orange-2)!important}
 .momentum-family-row span{border-color:rgba(255,152,0,.25)!important;background:rgba(255,152,0,.08)!important;color:#ffc15a!important}
-.agreement-meter>span{width:calc(var(--agreement,0)*20%)!important;background:linear-gradient(90deg,var(--brand-orange),var(--brand-silver))!important;box-shadow:0 0 14px rgba(255,152,0,.32)!important}
+.agreement-meter>span{width:calc(var(--agreement,0)*14.2857%)!important;background:linear-gradient(90deg,var(--brand-orange),var(--brand-silver))!important;box-shadow:0 0 14px rgba(255,152,0,.32)!important}
 .audit-engine-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
 
 @media(max-width:1320px){.engine-chip-row{grid-template-columns:repeat(5,minmax(0,1fr))!important}.audit-engine-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -462,7 +462,7 @@ a{color:inherit;text-decoration:none}
 @media(max-width:760px){.engine-chip-row{grid-template-columns:repeat(5,minmax(0,1fr))!important}}
 @media(max-width:560px){.ppg-rules-strip,.apex-rules-strip,.convergence-rules-strip,.momentum-rules-strip{grid-template-columns:1fr}.ppg-versus,.ppg-card-values{grid-template-columns:1fr 34px 1fr;gap:7px;padding:12px}.ppg-versus strong,.ppg-card-values strong{font-size:25px}}
 
-/* v5.0.13 · light engine motion only. The long fixture board remains minimal. */
+/* v5.0.14 · light engine motion only. The long fixture board remains minimal. */
 .apex-soft-pulse{position:relative;overflow:hidden}
 .apex-soft-pulse::after{content:"";position:absolute;inset:auto 12% 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,152,0,.78),transparent);transform:translateX(-110%);animation:apexSoftSweep 2.4s ease-in-out infinite}
 .apex-loader-dot{display:inline-block;width:9px;height:9px;margin-bottom:12px;border-radius:50%;background:var(--brand-orange-2,#ff9800);box-shadow:0 0 0 0 rgba(255,152,0,.35);animation:apexDotPulse 1.55s ease-out infinite}
@@ -473,3 +473,20 @@ a{color:inherit;text-decoration:none}
 @keyframes apexProgressGlow{0%,100%{background-position:0 50%}50%{background-position:100% 50%}}
 @keyframes apexSoftReveal{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.apex-soft-pulse::after,.apex-loader-dot,.apex-progress-glow,.apex-soft-reveal{animation:none!important}}
+
+/* Betynz v5.0.14 — seven-engine Stats/HTFT edition */
+:root{--betynz-orange:#ffa000;--betynz-orange-soft:#ffb62e;--betynz-silver:#aeb6c2;--betynz-white:#f6f7f9;--betynz-black:#050708}
+.engine-chip-row{grid-template-columns:repeat(7,minmax(112px,1fr));gap:8px}
+.single-engine-chip,.atlas-result-card,.htft-result-card{border-color:rgba(255,160,0,.28);background:linear-gradient(145deg,rgba(255,160,0,.055),rgba(255,255,255,.018) 48%,rgba(0,0,0,.18));box-shadow:none}
+.single-engine-chip .pulse,.atlas-chip .pulse,.htft-chip .pulse{background:var(--betynz-orange);box-shadow:0 0 0 3px rgba(255,160,0,.10)}
+.atlas-advanced-row,.atlas-team-evidence,.htft-transition-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.atlas-advanced-row>*,.atlas-team-evidence>*,.htft-transition-grid>*{border:1px solid rgba(174,182,194,.16);background:rgba(255,255,255,.025);border-radius:12px;padding:11px}
+.apex-soft-pulse,.engine-soft-pulse{position:relative}
+.apex-loader-dot,.engine-loader-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--betynz-orange);box-shadow:0 0 0 0 rgba(255,160,0,.35);animation:betynzEnginePulse 1.8s ease-out infinite}
+.route-pick-card,.consensus-card{animation:betynzPickReveal .22s ease-out both}
+@keyframes betynzEnginePulse{0%{box-shadow:0 0 0 0 rgba(255,160,0,.36)}70%{box-shadow:0 0 0 8px rgba(255,160,0,0)}100%{box-shadow:0 0 0 0 rgba(255,160,0,0)}}
+@keyframes betynzPickReveal{from{opacity:.3;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media(max-width:1450px){.engine-chip-row{grid-template-columns:repeat(4,minmax(145px,1fr))}}
+@media(max-width:900px){.engine-chip-row{grid-template-columns:repeat(2,minmax(0,1fr))}.atlas-advanced-row,.atlas-team-evidence,.htft-transition-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:460px){.engine-chip-row,.atlas-advanced-row,.atlas-team-evidence,.htft-transition-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.apex-loader-dot,.engine-loader-dot,.route-pick-card,.consensus-card{animation:none!important}}

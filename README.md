@@ -1,23 +1,7 @@
-# Betynz v5.0.13 — Fast Engine and Consensus Lane
+# Betynz v5.0.14 — Seven-Engine Stats + HT/FT Edition
 
-Betynz is a five-engine football analysis application powered only by API-Football. It renders the full daily fixture board immediately, streams odds in the background, and gives selected-date engine history priority over future-date and later odds-page work.
+Betynz uses API-Football for core fixtures, odds, live scores, results, visuals and venue history. TheStatsAPI is an additive enrichment lane for Atlas Streak Value, including best/worst classification, streak discovery and xG/SOT evidence.
 
-## Active engines
+Active engines: Market Route, PPG Route, Apex Intelligence, Convergence, Momentum & Streak, Atlas Streak Value, Chronos HT/FT Momentum.
 
-- Market Route
-- PPG Route
-- Apex Intelligence
-- Convergence
-- Momentum & Streak
-
-## Performance design
-
-- Fixtures first
-- First odds page next
-- Priced/upcoming engine candidates next
-- Shared league-history batch
-- Team fallback only when needed
-- Later odds pages and future-date counts last
-- Progressive Consensus publishing
-
-The repository deploys as one Render web service from one root `render.yaml`.
+One repository, one Render service, one root render.yaml.

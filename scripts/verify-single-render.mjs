@@ -19,9 +19,9 @@ const render = await readFile(join(root, 'render.yaml'), 'utf8');
 const packageText = await readFile(join(root, 'package.json'), 'utf8');
 const serviceCount = (render.match(/^\s*-\s+type:\s+web\s*$/gm) || []).length;
 if (serviceCount !== 1) throw new Error(`Expected one Render web service, found ${serviceCount}.`);
-for (const required of ['API_FOOTBALL_KEY', 'API_FOOTBALL_BASE_URL', 'API_FOOTBALL_KEY_HEADER']) {
+for (const required of ['API_FOOTBALL_KEY', 'API_FOOTBALL_BASE_URL', 'API_FOOTBALL_KEY_HEADER', 'STATS_API_KEY', 'STATS_API_BASE_URL']) {
   if (!render.includes(required)) throw new Error(`Root Render configuration is missing ${required}.`);
 }
 const apps = (await readdir(join(root, 'apps'), { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
 if (JSON.stringify(apps) !== JSON.stringify(['web'])) throw new Error(`Expected only apps/web; found: ${apps.join(', ')}`);
-console.log('Single-Render verification passed: one service, one render.yaml and one API-Football data layer.');
+console.log('Single-Render verification passed: one service, one render.yaml, API-Football core data and Stats API enrichment.');

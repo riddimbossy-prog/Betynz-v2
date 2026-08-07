@@ -1,4 +1,4 @@
--- Betynz v5.0.13 fresh database schema with five engines, consensus and calibration.
+-- Betynz v5.0.14 fresh database schema with seven engines, consensus and calibration.
 -- Use this only for a new Supabase project.
 
 create extension if not exists pgcrypto;
@@ -34,7 +34,7 @@ create table if not exists public.engine_predictions (
   league_name text,
   home_team text not null,
   away_team text not null,
-  engine text not null check (engine in ('MARKET_ROUTE','PPG_ROUTE','APEX_INTELLIGENCE','CONVERGENCE_ROUTE','MOMENTUM_STREAK')),
+  engine text not null check (engine in ('MARKET_ROUTE','PPG_ROUTE','APEX_INTELLIGENCE','CONVERGENCE_ROUTE','MOMENTUM_STREAK','STREAK_VALUE','HTFT_MOMENTUM')),
   market text not null,
   odds numeric(8,3),
   engine_score numeric(5,2),
@@ -57,7 +57,7 @@ create table if not exists public.prediction_snapshots (
   league_name text,
   home_team text not null,
   away_team text not null,
-  engine text not null check (engine in ('MARKET_ROUTE','PPG_ROUTE','APEX_INTELLIGENCE','CONVERGENCE_ROUTE','MOMENTUM_STREAK')),
+  engine text not null check (engine in ('MARKET_ROUTE','PPG_ROUTE','APEX_INTELLIGENCE','CONVERGENCE_ROUTE','MOMENTUM_STREAK','STREAK_VALUE','HTFT_MOMENTUM')),
   market text not null,
   selection_label text,
   odds numeric(8,3),
@@ -141,7 +141,7 @@ create table if not exists public.consensus_candidates (
   home_team text not null,
   away_team text not null,
   classification text not null check (classification in ('ELITE_BANKER','CONSENSUS_BANKER','QUALIFIED_PICK','SAFER_PICK')),
-  agreement_count integer not null check (agreement_count between 1 and 5),
+  agreement_count integer not null check (agreement_count between 1 and 7),
   agreement_direction text,
   market text not null,
   selection_label text,
@@ -168,7 +168,7 @@ create table if not exists public.consensus_snapshots (
   home_team text not null,
   away_team text not null,
   classification text not null check (classification in ('ELITE_BANKER','CONSENSUS_BANKER','QUALIFIED_PICK','SAFER_PICK')),
-  agreement_count integer not null check (agreement_count between 1 and 5),
+  agreement_count integer not null check (agreement_count between 1 and 7),
   agreement_direction text,
   market text not null,
   selection_label text,

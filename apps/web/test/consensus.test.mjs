@@ -8,16 +8,16 @@ const fixture = {
 };
 const pick = (engine, market, decision = 'FIRE', score = 82, odds = 1.5) => ({ engine, engineName: engine, market, label: market, decision, score, odds });
 
-test('five matching result engines create an Elite Banker', () => {
-  const result = buildConsensusForFixture({ fixture, picks: [pick('MARKET_ROUTE','HOME_WIN'), pick('PPG_ROUTE','HOME_WIN'), pick('APEX_INTELLIGENCE','HOME_WIN'), pick('CONVERGENCE_ROUTE','HOME_WIN'), pick('MOMENTUM_STREAK','HOME_WIN')], odds: { homeWin: 1.52 } });
+test('seven matching result engines create an Elite Banker', () => {
+  const result = buildConsensusForFixture({ fixture, picks: [pick('MARKET_ROUTE','HOME_WIN'), pick('PPG_ROUTE','HOME_WIN'), pick('APEX_INTELLIGENCE','HOME_WIN'), pick('CONVERGENCE_ROUTE','HOME_WIN'), pick('MOMENTUM_STREAK','HOME_WIN'), pick('STREAK_VALUE','HOME_WIN'), pick('HTFT_MOMENTUM','HOME_WIN')], odds: { homeWin: 1.52 } });
   assert.equal(result.classification, 'ELITE_BANKER');
-  assert.equal(result.agreementCount, 5);
+  assert.equal(result.agreementCount, 7);
   assert.equal(result.final.market, 'HOME_WIN');
   assert.equal(result.final.odds, 1.52);
 });
 
-test('four compatible result engines create a Consensus Banker on the safer 1X market', () => {
-  const result = buildConsensusForFixture({ fixture, picks: [pick('MARKET_ROUTE','HOME_WIN'), pick('PPG_ROUTE','HOME_WIN'), pick('APEX_INTELLIGENCE','DOUBLE_CHANCE_1X'), pick('MOMENTUM_STREAK','HOME_WIN')], odds: { doubleChance1X: 1.18 } });
+test('five compatible result engines create a Consensus Banker on the safer 1X market', () => {
+  const result = buildConsensusForFixture({ fixture, picks: [pick('MARKET_ROUTE','HOME_WIN'), pick('PPG_ROUTE','HOME_WIN'), pick('APEX_INTELLIGENCE','DOUBLE_CHANCE_1X'), pick('MOMENTUM_STREAK','HOME_WIN'), pick('STREAK_VALUE','HOME_WIN')], odds: { doubleChance1X: 1.18 } });
   assert.equal(result.classification, 'CONSENSUS_BANKER');
   assert.equal(result.final.market, 'DOUBLE_CHANCE_1X');
   assert.equal(result.final.odds, 1.18);
@@ -53,7 +53,9 @@ test('window groups one decision per engine and summary classifies rows', () => 
     { ...pick('PPG_ROUTE','HOME_WIN'), ...fixture, league:'League', _odds:{homeWin:1.5} },
     { ...pick('APEX_INTELLIGENCE','HOME_WIN'), ...fixture, league:'League', _odds:{homeWin:1.5} },
     { ...pick('CONVERGENCE_ROUTE','HOME_WIN'), ...fixture, league:'League', _odds:{homeWin:1.5} },
-    { ...pick('MOMENTUM_STREAK','HOME_WIN'), ...fixture, league:'League', _odds:{homeWin:1.5} }
+    { ...pick('MOMENTUM_STREAK','HOME_WIN'), ...fixture, league:'League', _odds:{homeWin:1.5} },
+    { ...pick('STREAK_VALUE','HOME_WIN'), ...fixture, league:'League', _odds:{homeWin:1.5} },
+    { ...pick('HTFT_MOMENTUM','HOME_WIN'), ...fixture, league:'League', _odds:{homeWin:1.5} }
   ]);
   assert.equal(rows.length, 1);
   assert.equal(consensusSummary(rows).elite, 1);
