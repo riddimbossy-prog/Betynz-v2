@@ -13,6 +13,9 @@ function engineName(code) {
   if (code === 'APEX_INTELLIGENCE') return 'Apex Intelligence';
   if (code === 'CONVERGENCE_ROUTE') return 'Convergence';
   if (code === 'MOMENTUM_STREAK') return 'Momentum & Streak';
+  if (code === 'STREAK_VALUE') return 'Atlas Streak Value';
+  if (code === 'HTFT_MOMENTUM') return 'Chronos HT/FT';
+  if (code === 'ZEUS_SUPERVISOR') return 'Zeus';
   return 'Market Route';
 }
 function dayLabel(dateString) {
@@ -28,7 +31,7 @@ function kickoffLabel(value) {
   return date.toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 function classificationLabel(code) {
-  return ({ ELITE_BANKER:'ELITE BANKER', CONSENSUS_BANKER:'CONSENSUS BANKER', QUALIFIED_PICK:'QUALIFIED PICK', SAFER_PICK:'SAFER PICK', CONFLICT:'ENGINE CONFLICT', HOLD_MISSING_SHARED_PRICE:'ON HOLD' })[code] || code;
+  return ({ ELITE_BANKER:'ELITE BANKER', CONSENSUS_BANKER:'CONSENSUS BANKER', QUALIFIED_PICK:'QUALIFIED PICK', SAFER_PICK:'SAFER PICK', CONFLICT:'ENGINE CONFLICT', HOLD_MISSING_SHARED_PRICE:'ON HOLD', ZEUS_HOLD:'ZEUS HOLD' })[code] || code;
 }
 function allRows() { return payload?.consensus?.all || []; }
 
@@ -72,18 +75,19 @@ function consensusCard(row, compact = false) {
     <small>${esc(row.country)} · ${esc(row.league)} · ${esc(dayLabel(row.date))} · ${esc(kickoffLabel(row.kickoff))}</small>
     <h3>${esc(row.home?.name)} <i>vs</i> ${esc(row.away?.name)}</h3>
     ${row.final ? `<div class="official-tip"><span>OFFICIAL TIP</span><strong>${esc(row.final.label || row.final.market)}</strong><b>${odd(row.final.odds)}</b></div>` : ''}
-    <div class="agreement-meter"><span style="--agreement:${Math.max(1, Number(row.agreementCount || 0))}"></span><b>${Number(row.agreementCount || 0)}/7 engines agree</b><em>${Number(row.score || 0).toFixed(0)} agreement score</em></div>
+    <div class="agreement-meter"><span style="--agreement:${Math.max(1, Number(row.agreementCount || 0))}"></span><b>${Number(row.agreementCount || 0)}/7 engines agree</b><em>${row.zeusVerdict ? `⚡ Zeus ${esc(row.zeusVerdict)}` : `${Number(row.score || 0).toFixed(0)} agreement score`}</em></div>
     <div class="engine-proof-row">${engineChips(row)}</div>
     ${compact ? '' : `<ul>${(row.reasons || []).slice(0, 3).map(reason => `<li>${esc(reason)}</li>`).join('')}</ul>`}
   </article>`;
 }
 
 function conflictCard(row) {
-  return `<article class="consensus-pick-card conflict compact">
-    <div class="consensus-card-top"><span class="consensus-tier">ENGINE CONFLICT</span><span class="freeze-state">NO BANKER</span></div>
+  const zeusHold = row.classification === 'ZEUS_HOLD';
+  return `<article class="consensus-pick-card conflict compact ${zeusHold ? 'zeus-hold' : ''}">
+    <div class="consensus-card-top"><span class="consensus-tier">${zeusHold ? 'ZEUS HOLD' : 'ENGINE CONFLICT'}</span><span class="freeze-state">${zeusHold ? 'STATISTICAL VETO' : 'NO BANKER'}</span></div>
     <small>${esc(row.country)} · ${esc(row.league)} · ${esc(kickoffLabel(row.kickoff))}</small>
     <h3>${esc(row.home?.name)} <i>vs</i> ${esc(row.away?.name)}</h3>
-    <div class="conflict-reasons">${(row.conflictReasons || ['Opposing directions qualified.']).map(reason => `<p>× ${esc(reason)}</p>`).join('')}</div>
+    <div class="conflict-reasons">${((zeusHold ? row.reasons : row.conflictReasons) || [zeusHold ? 'Zeus did not authorize this shared direction.' : 'Opposing directions qualified.']).map(reason => `<p>× ${esc(reason)}</p>`).join('')}</div>
     <div class="engine-proof-row">${engineChips(row)}</div>
   </article>`;
 }
@@ -131,7 +135,7 @@ function render() {
   const consensus = rows.filter(row => row.classification === 'CONSENSUS_BANKER');
   const qualified = rows.filter(row => row.classification === 'QUALIFIED_PICK');
   const safer = rows.filter(row => row.classification === 'SAFER_PICK');
-  const conflicts = rows.filter(row => row.classification === 'CONFLICT');
+  const conflicts = rows.filter(row => ['CONFLICT','ZEUS_HOLD'].includes(row.classification));
   const processing = !payload.complete && !payload.failed;
   const progress = payload.progress || {};
   const progressText = `${Number(progress.processed || 0)} of ${Number(progress.total || 0)} ${requestedDays === 1 ? 'fixtures' : 'days'} processed`;
@@ -150,7 +154,7 @@ function render() {
   $('#consensusGrid').innerHTML = consensus.length ? consensus.map(row => consensusCard(row)).join('') : chooseEmpty('No Consensus Banker matches this filter', 'Five or six independent engines must agree before banker status appears.', 'Checking 5–6/7 engine agreement…');
   $('#qualifiedList').innerHTML = qualified.length ? qualified.map(row => consensusCard(row, true)).join('') : chooseEmpty('No shared or single-engine qualified picks', 'Complete routes will appear here without being promoted to banker status.', 'Checking complete engine routes…');
   $('#saferList').innerHTML = safer.length ? safer.map(row => consensusCard(row, true)).join('') : chooseEmpty('No safer picks', 'Approved downgrade markets appear here.', 'Checking safer downgrade routes…');
-  $('#conflictList').innerHTML = conflicts.length ? conflicts.map(conflictCard).join('') : chooseEmpty('No engine conflicts', 'No opposing qualified directions are visible under this filter.', 'Checking opposing engine directions…');
+  $('#conflictList').innerHTML = conflicts.length ? conflicts.map(conflictCard).join('') : chooseEmpty('No engine conflicts or Zeus holds', 'No opposing directions or Zeus statistical holds are visible under this filter.', 'Checking opposing directions and Zeus supervision…');
   setBoardAwareVisibility({ processing, elite, consensus, qualified, safer, conflicts });
   window.dispatchEvent(new CustomEvent('betynz:content-rendered'));
 }

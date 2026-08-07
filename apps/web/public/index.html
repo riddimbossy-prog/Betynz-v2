@@ -15,12 +15,12 @@
   <link rel="apple-touch-startup-image" href="/assets/pwa-splash-portrait.png" media="(orientation: portrait)">
   <link rel="apple-touch-startup-image" href="/assets/pwa-splash-landscape.png" media="(orientation: landscape)">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/styles.css?v=5.0.16">
+  <link rel="stylesheet" href="/styles.css?v=5.0.18">
 </head>
 <body>
 <div class="app-shell">
   <aside class="sidebar" id="sidebar">
-    <a class="brand brand-logo" href="/" aria-label="Betynz home"><img src="/assets/betynz-logo.png" alt="Betynz.com"><small>Seven-engine football intelligence</small></a>
+    <a class="brand brand-logo" href="/" aria-label="Betynz home"><img src="/assets/betynz-logo.png" alt="Betynz.com"><small>Eight-engine football intelligence</small></a>
     <nav>
       <a class="active" href="/">⌂ <span>Dashboard</span></a>
       <a href="/picks.html">★ <span>Qualified Picks</span><em>LIVE</em></a>
@@ -30,7 +30,8 @@
       <a href="/convergence.html">◎ <span>Convergence</span><em>LIVE</em></a>
       <a href="/momentum-streak.html">↗ <span>Momentum & Streak</span><em>LIVE</em></a>
       <a href="/streak-value.html">◆ <span>Atlas Streak Value</span><em>NEW</em></a>
-      <a href="/htft-momentum.html">◫ <span>Chronos HT/FT</span><em>NEW</em></a>
+      <a href="/htft-momentum.html">◫ <span>Chronos HT/FT</span><em>LIVE</em></a>
+      <a href="/zeus.html">⚡ <span>Zeus Intelligence</span><em>SUPERVISOR</em></a>
       <a href="/live.html">◉ <span>Live Matches</span></a>
       <a href="/proof.html">✓ <span>Proof</span></a>
       <a href="/performance.html">▥ <span>Performance</span></a>
@@ -40,7 +41,7 @@
       <a href="/admin-calibration.html">◫ <span>Calibration Lab</span></a>
       <a href="/admin-learning.html">⚙ <span>Learning Centre</span></a>
     </nav>
-    <div class="sidebar-status"><span class="pulse"></span><div><b>Consensus system</b><small>7 engines + settlement calibration</small></div></div>
+    <div class="sidebar-status"><span class="pulse"></span><div><b>Consensus system</b><small>7 engines + Zeus supervisor</small></div></div>
   </aside>
 
   <main class="main-shell">
@@ -58,6 +59,7 @@
         <a class="single-engine-chip momentum-chip" href="/momentum-streak.html"><span class="pulse momentum-pulse"></span><div><b>Momentum</b><small>Ordered streaks</small></div></a>
         <a class="single-engine-chip atlas-chip" href="/streak-value.html"><span class="pulse"></span><div><b>Atlas Streak</b><small>Stats API value</small></div></a>
         <a class="single-engine-chip htft-chip" href="/htft-momentum.html"><span class="pulse"></span><div><b>Chronos HT/FT</b><small>Transition momentum</small></div></a>
+        <a class="single-engine-chip zeus-chip" href="/zeus.html"><span class="pulse"></span><div><b>Zeus</b><small>Statistical supervisor</small></div></a>
       </div>
       <button class="refresh-btn" id="refreshBtn">↻ Refresh</button>
     </header>
@@ -85,7 +87,7 @@
 
       <section class="home-picks-spotlight cinematic-spotlight" id="homePicksSpotlight">
         <div class="spotlight-head">
-          <div><small>SEVEN ENGINES · SHARED DIRECTION</small><h2>Consensus Command Centre</h2><p>Elite and consensus tips appear early, then freeze before kickoff without rewriting the official selection.</p></div>
+          <div><small>SEVEN ENGINES · ZEUS SUPERVISION</small><h2>Consensus Command Centre</h2><p>Elite and consensus tips appear early, then freeze before kickoff without rewriting the official selection.</p></div>
           <a href="/picks.html">Open all qualified picks →</a>
         </div>
         <div class="home-consensus-section" id="homeEliteSection" data-board-aware><div class="home-consensus-label"><b>Today’s Elite Bankers</b><span>7/7 agreement</span></div><div class="spotlight-grid elite-home-grid" id="homeEliteGrid"><div class="spotlight-empty">Checking elite agreement…</div></div></div>
@@ -138,6 +140,7 @@
         <button data-tab="momentum">Momentum</button>
         <button data-tab="atlas">Atlas Streak</button>
         <button data-tab="htft">Chronos HT/FT</button>
+        <button data-tab="zeus">Zeus</button>
         <button data-tab="consensus">Consensus</button>
         <button data-tab="statistics">Venue Form</button>
         <button data-tab="odds">All Odds</button>
@@ -203,6 +206,15 @@
         <article class="route-result-card htft-result-card" id="htftResultCard"><div class="route-result-head"><div><small>CHRONOS HT/FT MOMENTUM ENGINE</small><h2 id="htftSelection">Checking HT/FT transitions…</h2><p id="htftExplanation">Lead-hold, draw-to-win, comeback and early-event patterns are checked against current momentum.</p></div><div class="route-score"><strong id="htftScore">—</strong><span id="htftDecision">WAITING</span></div></div><div class="route-meta"><span id="htftRouteName">No HT/FT route yet</span><span id="htftPrice">Odds —</span></div><div class="route-checks" id="htftChecks"></div></article>
       </div>
 
+      <div class="tab-panel" data-tab-panel="zeus" hidden>
+        <article class="route-result-card zeus-result-card" id="zeusResultCard">
+          <div class="route-result-head"><div><small>ZEUS STATISTICAL INTELLIGENCE</small><h2 id="zeusSelection">Assembling the statistical picture…</h2><p id="zeusExplanation">Zeus supervises the seven independent engines using raw statistics, data quality and contradiction control.</p></div><div class="route-score"><strong id="zeusScore">—</strong><span id="zeusDecision">WAITING</span></div></div>
+          <div class="apex-quality-grid"><div><small>DATA QUALITY</small><strong id="zeusDataQuality">—</strong></div><div><small>DOMINANT DIRECTION</small><strong id="zeusDirection">—</strong></div></div>
+          <div class="route-meta"><span id="zeusRouteName">No Zeus direction yet</span><span id="zeusPrice">Odds —</span></div>
+          <div class="route-checks" id="zeusChecks"></div>
+        </article>
+      </div>
+
       <div class="tab-panel" data-tab-panel="consensus" hidden>
         <article class="route-result-card consensus-result-card" id="consensusResultCard">
           <div class="route-result-head"><div><small>CONSENSUS SYSTEM</small><h2 id="consensusSelection">Checking engine agreement…</h2><p id="consensusExplanation">The safest shared market is selected only after independent engine directions are compared.</p></div><div class="route-score"><strong id="consensusScore">—</strong><span id="consensusDecision">WAITING</span></div></div>
@@ -214,7 +226,7 @@
       </div>
 
       <div class="tab-panel" data-tab-panel="statistics" hidden>
-        <article class="full-intel-card"><h3>Last five venue matches</h3><p>Home uses the last five home games. Away uses the last five away games. These splits power PPG Route, Apex Intelligence, Convergence, Momentum & Streak and Chronos HT/FT. Atlas uses the separate Stats API streak/xG layer while Market Route keeps odds structure.</p><div class="venue-form-grid" id="venueFormGrid"><div class="loading">Loading venue form…</div></div></article>
+        <article class="full-intel-card"><h3>Last five venue matches</h3><p>Home uses the last five home games. Away uses the last five away games. These splits power PPG Route, Apex, Convergence, Momentum and Chronos. Atlas adds Stats API streak/xG evidence, and Zeus supervises the complete statistical picture plus all seven underlying engines.</p><div class="venue-form-grid" id="venueFormGrid"><div class="loading">Loading venue form…</div></div></article>
       </div>
 
       <div class="tab-panel" data-tab-panel="odds" hidden>
@@ -225,7 +237,7 @@
 </dialog>
 
 <nav class="mobile-bottom-nav" aria-label="Mobile navigation"><a class="active" href="/">⌂<span>Board</span></a><a href="/picks.html">★<span>Picks</span></a><a href="/market-route.html">◆<span>Route</span></a><a href="/live.html">◉<span>Live</span></a><a href="/proof.html">✓<span>Proof</span></a></nav>
-<script type="module" src="/motion.js?v=5.0.16"></script>
-<script type="module" src="/app.js?v=5.0.16"></script>
+<script type="module" src="/motion.js?v=5.0.18"></script>
+<script type="module" src="/app.js?v=5.0.18"></script>
 </body>
 </html>

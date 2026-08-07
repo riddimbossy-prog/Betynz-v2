@@ -1,4 +1,4 @@
-# Betynz v5.0.16 — Seven Engines + Universal Odds Gate
+# Betynz v5.0.18 — Seven Engines + Zeus Statistical Supervisor
 
 Single-Render football prediction platform using API-Football for fixtures, odds, live/results and core statistics, plus Stats API enrichment for Atlas.
 

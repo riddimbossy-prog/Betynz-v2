@@ -27,6 +27,7 @@ const state = {
   momentumByFixture: new Map(),
   streakValueByFixture: new Map(),
   htftByFixture: new Map(),
+  zeusByFixture: new Map(),
   consensusByFixture: new Map(),
   visualByFixture: new Map(),
   requestToken: 0,
@@ -141,6 +142,7 @@ async function loadDate(date, force = false) {
   state.momentumByFixture = new Map();
   state.streakValueByFixture = new Map();
   state.htftByFixture = new Map();
+  state.zeusByFixture = new Map();
   state.consensusByFixture = new Map();
   state.visualByFixture = new Map();
   state.selected = null;
@@ -565,6 +567,7 @@ function openMatch(id) {
   renderMomentumEngine(state.momentumByFixture.get(String(fixture.id)) || null);
   renderStreakValueEngine(state.streakValueByFixture.get(String(fixture.id)) || null);
   renderHtftEngine(state.htftByFixture.get(String(fixture.id)) || null);
+  renderZeusEngine(state.zeusByFixture.get(String(fixture.id)) || null);
   renderConsensusEngine(state.consensusByFixture.get(String(fixture.id)) || null);
   renderVenueForm(null);
   $('#matchIntelDialog').showModal();
@@ -593,6 +596,7 @@ async function loadIntelligence(fixture) {
   state.momentumByFixture.set(String(fixture.id), payload.momentumEngine || null);
   state.streakValueByFixture.set(String(fixture.id), payload.streakValueEngine || null);
   state.htftByFixture.set(String(fixture.id), payload.htftEngine || null);
+  state.zeusByFixture.set(String(fixture.id), payload.zeusEngine || null);
   state.consensusByFixture.set(String(fixture.id), payload.consensusEngine || null);
   renderEngine(payload.engine);
   renderPpgEngine(payload.ppgEngine);
@@ -601,6 +605,7 @@ async function loadIntelligence(fixture) {
   renderMomentumEngine(payload.momentumEngine);
   renderStreakValueEngine(payload.streakValueEngine);
   renderHtftEngine(payload.htftEngine);
+  renderZeusEngine(payload.zeusEngine);
   renderConsensusEngine(payload.consensusEngine);
   renderVenueForm(payload.venueForm);
   renderList();
@@ -618,6 +623,7 @@ function renderEngineError() {
   renderMomentumEngineError();
   renderStreakValueEngineError();
   renderHtftEngineError();
+  renderZeusEngineError();
   renderConsensusEngineError();
 }
 
@@ -903,9 +909,55 @@ function renderHtftEngine(engine) {
   $('#htftChecks').innerHTML = (candidate?.checks || []).map(item => `<div class="route-check ${item.pass ? 'pass' : 'fail'}"><span>${item.pass ? '✓' : '×'}</span><div><b>${esc(item.label)}</b><small>${esc(item.actual)} · required ${esc(item.rule)}</small></div></div>`).join('') || '<div class="empty-state">No HT/FT checks available.</div>';
 }
 
+function renderZeusEngineError() {
+  $('#zeusSelection').textContent = 'Zeus is recovering';
+  $('#zeusExplanation').textContent = 'The statistical supervisor is waiting for the shared evidence lanes to recover.';
+  $('#zeusDecision').textContent = 'RETRYING';
+  $('#zeusScore').textContent = '—';
+  $('#zeusDataQuality').textContent = '—';
+  $('#zeusDirection').textContent = '—';
+  $('#zeusRouteName').textContent = 'Waiting for statistical evidence';
+  $('#zeusPrice').textContent = 'Odds —';
+  $('#zeusChecks').innerHTML = '<div class="loading">Rebuilding Zeus evidence…</div>';
+}
+
+function renderZeusEngine(engine) {
+  if (!engine) {
+    $('#zeusSelection').textContent = 'Assembling the statistical picture…';
+    $('#zeusExplanation').textContent = 'Zeus supervises the seven independent engines using raw statistics, data quality and contradiction control.';
+    $('#zeusDecision').textContent = 'WAITING';
+    $('#zeusScore').textContent = '—';
+    $('#zeusDataQuality').textContent = '—';
+    $('#zeusDirection').textContent = '—';
+    $('#zeusRouteName').textContent = 'No Zeus direction yet';
+    $('#zeusPrice').textContent = 'Odds —';
+    $('#zeusChecks').innerHTML = '<div class="loading">Loading statistical evidence families…</div>';
+    return;
+  }
+  const selection = engine.selection || null;
+  const candidate = selection
+    ? (engine.candidates || []).find(item => item.id === selection.routeId)
+    : [...(engine.candidates || [])].sort((a,b)=>Number(b.confidence||0)-Number(a.confidence||0))[0];
+  const verdict = engine.supervisor?.verdict || 'HOLD';
+  $('#zeusSelection').textContent = selection?.label || (verdict === 'VETO' ? 'Zeus veto — statistical contradiction' : engine.decision === 'WAITING' ? 'Waiting for complete statistical evidence' : 'No Clear Statistical Edge');
+  $('#zeusExplanation').textContent = engine.explanation || engine.supervisor?.reason || 'Zeus did not authorize a direction.';
+  $('#zeusDecision').textContent = selection?.decision || verdict || engine.decision || 'HOLD';
+  $('#zeusScore').textContent = Number(engine.confidence || 0) ? `${Math.round(Number(engine.confidence))}%` : '—';
+  $('#zeusDataQuality').textContent = `${Math.round(Number(engine.dataQuality || 0))}/100`;
+  $('#zeusDirection').textContent = String(engine.dominantDirection || 'NO CLEAR EDGE').replaceAll('_',' ');
+  $('#zeusRouteName').textContent = selection?.routeName || candidate?.name || engine.supervisor?.reason || 'No Zeus route';
+  $('#zeusPrice').textContent = selection?.odds ? `Odds ${odd(selection.odds)}` : 'Odds —';
+  $('#zeusResultCard').className = `route-result-card zeus-result-card ${String(selection?.decision || verdict || '').toLowerCase()}`;
+  const evidence = (candidate?.evidence || []).filter(item => item.available).sort((a,b)=>Number(b.score||0)-Number(a.score||0)).slice(0,6);
+  const contradictions = (engine.contradictions || candidate?.contradictions || []).slice(0,3);
+  $('#zeusChecks').innerHTML = evidence.map(item => `<div class="route-check ${Number(item.score||0)>=62?'pass':'fail'}"><span>${Number(item.score||0)>=62?'✓':'·'}</span><div><b>${esc(item.label)}</b><small>${esc(item.detail)} · score ${Math.round(Number(item.score||0))}</small></div></div>`).join('')
+    + contradictions.map(item => `<div class="route-check fail"><span>!</span><div><b>${esc(item.level)} · ${esc(item.label)}</b><small>${esc(item.detail)}</small></div></div>`).join('')
+    || '<div class="empty-state">Zeus evidence is still building.</div>';
+}
+
 function renderConsensusEngineError() {
   $('#consensusSelection').textContent = 'Consensus unavailable';
-  $('#consensusExplanation').textContent = 'The seven engine decisions could not be compared for this match.';
+  $('#consensusExplanation').textContent = 'The seven independent engine decisions and Zeus supervision could not be completed for this match.';
   $('#consensusDecision').textContent = 'UNAVAILABLE';
   $('#consensusScore').textContent = '—';
   $('#consensusMarket').textContent = 'No shared market';
@@ -934,8 +986,8 @@ function renderConsensusEngine(engine) {
   }
   const final = engine.final || null;
   const classification = String(engine.classification || 'NO_SIGNAL');
-  $('#consensusSelection').textContent = final?.label || (classification === 'CONFLICT' ? 'No Banker — Engine Conflict' : classification === 'HOLD_MISSING_SHARED_PRICE' ? 'Agreement found — shared price missing' : 'No shared engine direction');
-  $('#consensusExplanation').textContent = (engine.reasons || [])[0] || (classification === 'CONFLICT' ? 'Opposing engine directions prevent a banker.' : 'No compatible route agreement qualified.');
+  $('#consensusSelection').textContent = final?.label || (classification === 'CONFLICT' ? 'No Banker — Engine Conflict' : classification === 'HOLD_MISSING_SHARED_PRICE' ? 'Agreement found — shared price missing' : classification === 'ZEUS_HOLD' ? 'Zeus hold — statistical edge not authorized' : 'No shared engine direction');
+  $('#consensusExplanation').textContent = (engine.reasons || [])[0] || (classification === 'CONFLICT' ? 'Opposing engine directions prevent a banker.' : classification === 'ZEUS_HOLD' ? (engine.zeus?.reason || 'Zeus found a material statistical contradiction.') : 'No compatible route agreement qualified.');
   $('#consensusDecision').textContent = classification.replaceAll('_', ' ');
   $('#consensusScore').textContent = Number(engine.score || 0) ? `${Number(engine.score).toFixed(0)}%` : '—';
   $('#consensusMarket').textContent = final?.label || 'No shared market';
@@ -945,7 +997,7 @@ function renderConsensusEngine(engine) {
   $('#consensusMeter').style.width = `${Math.max(0, Math.min(100, Number(engine.agreementCount || 0) / 7 * 100))}%`;
   $('#consensusResultCard').className = `route-result-card consensus-result-card ${classification.toLowerCase().replaceAll('_', '-')}`;
   $('#consensusEnginePicks').innerHTML = (engine.enginePicks || []).map(item => `<span class="engine-proof-chip ${item.decision === 'FIRE' ? 'fire' : 'safer'}"><b>${esc(item.engineName || item.engine)}</b><small>${esc(item.label || item.market)} · ${esc(item.decision || '')}</small></span>`).join('') || '<span class="engine-proof-chip"><b>No qualified engines</b><small>Waiting for a complete route</small></span>';
-  $('#consensusConflicts').innerHTML = (engine.conflictReasons || []).map(reason => `<p>× ${esc(reason)}</p>`).join('');
+  $('#consensusConflicts').innerHTML = (engine.conflictReasons || []).map(reason => `<p>× ${esc(reason)}</p>`).join('') + (engine.zeusVerdict ? `<p class="zeus-consensus-note">⚡ Zeus: ${esc(engine.zeusVerdict)}${engine.zeus?.confidence ? ` · ${Math.round(Number(engine.zeus.confidence))}/100` : ''}</p>` : '');
 }
 
 function highlightFavourite(side) {

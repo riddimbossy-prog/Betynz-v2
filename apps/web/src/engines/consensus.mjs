@@ -232,7 +232,7 @@ export function consensusSummary(rows = []) {
     qualified: count('QUALIFIED_PICK'),
     safer: count('SAFER_PICK'),
     conflicts: count('CONFLICT'),
-    holds: count('HOLD_MISSING_SHARED_PRICE')
+    holds: count('HOLD_MISSING_SHARED_PRICE') + count('ZEUS_HOLD')
   };
 }
 

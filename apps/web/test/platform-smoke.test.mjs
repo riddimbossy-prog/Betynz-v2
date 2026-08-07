@@ -106,7 +106,7 @@ test('dashboard experience includes board-aware sections, rolling settled wins a
   assert.match(manifest, /maskable-512\.png/);
   assert.match(manifest, /launch_handler/);
   assert.match(motion, /pwa-launch-splash/);
-  assert.match(sw, /betynz-v5-0-16/);
+  assert.match(sw, /betynz-v5-0-18/);
 });
 
 test('production server boots with API-Football as the only football source', async t => {
@@ -167,9 +167,9 @@ test('production server boots with API-Football as the only football source', as
   t.after(() => child.kill('SIGTERM'));
 
   const health = await (await waitFor(`http://127.0.0.1:${port}/api/health`)).json();
-  assert.equal(health.version, '5.0.16');
+  assert.equal(health.version, '5.0.18');
   assert.equal(health.configured.apiFootball, true);
-  assert.deepEqual(health.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'APEX_INTELLIGENCE', 'CONVERGENCE_ROUTE', 'MOMENTUM_STREAK', 'STREAK_VALUE', 'HTFT_MOMENTUM']);
+  assert.deepEqual(health.engines, ['MARKET_ROUTE', 'PPG_ROUTE', 'APEX_INTELLIGENCE', 'CONVERGENCE_ROUTE', 'MOMENTUM_STREAK', 'STREAK_VALUE', 'HTFT_MOMENTUM', 'ZEUS_SUPERVISOR']);
   assert.equal(health.sourceRoles.fixtures, 'API_FOOTBALL');
   assert.equal(health.sourceRoles.streakIntelligence, 'STATS_API');
 

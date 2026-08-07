@@ -1,9 +1,9 @@
 {
   "name": "betynz-api-football-only",
-  "version": "5.0.16",
+  "version": "5.0.18",
   "private": true,
   "type": "module",
-  "description": "Single-Render Betynz platform using API-Football core data, Stats API enrichment, seven engines, and a universal 1.20\u20132.00 publication odds gate.",
+  "description": "Single-Render Betynz platform using API-Football core data, Stats API enrichment, seven engines, Zeus statistical supervision, and a universal 1.20\u20132.00 publication odds gate.",
   "engines": {
     "node": ">=20"
   },

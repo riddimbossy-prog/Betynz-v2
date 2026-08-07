@@ -10,6 +10,20 @@ let windowCount = 0;
 let cooldownUntil = 0;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function statsCacheMaxEntries() {
+  return Math.max(100, Math.min(5000, Number(process.env.STATS_API_CACHE_MAX_ENTRIES || 500)));
+}
+
+function pruneStatsCache(now = Date.now()) {
+  for (const [key, item] of cache.entries()) if (!item || now > item.expiresAt) cache.delete(key);
+  const cap = statsCacheMaxEntries();
+  while (cache.size > cap) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
+}
 const num = value => Number.isFinite(Number(value)) ? Number(value) : null;
 const text = value => String(value ?? '').trim();
 
@@ -140,11 +154,17 @@ async function request(path, params = {}, ttlSeconds = null) {
   const current = config();
   const key = `${path}?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== null && v !== undefined && v !== '').map(([k,v]) => [k,String(v)])).toString()}`;
   const now = Date.now();
+  pruneStatsCache(now);
   const cached = cache.get(key);
-  if (cached && cached.expiresAt > now) return cached.value;
+  if (cached && cached.expiresAt > now) {
+    cache.delete(key); cache.set(key, cached);
+    return cached.value;
+  }
   if (inflight.has(key)) return inflight.get(key);
   const task = fetchJson(path, params).then(value => {
+    if (cache.has(key)) cache.delete(key);
     cache.set(key, { value, expiresAt: Date.now() + 1000 * (ttlSeconds ?? current.cacheTtlSeconds) });
+    pruneStatsCache();
     return value;
   }).finally(() => inflight.delete(key));
   inflight.set(key, task);

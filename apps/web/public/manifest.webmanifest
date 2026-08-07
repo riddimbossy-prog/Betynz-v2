@@ -2,18 +2,27 @@
   "id": "/",
   "name": "Betynz Football Intelligence",
   "short_name": "Betynz",
-  "description": "Seven-day football intelligence with seven independent engines, consensus bankers, official proof, automatic settlement and performance learning.",
+  "description": "Seven-day football intelligence with seven independent engines, Zeus statistical supervision, official proof, automatic settlement and performance learning.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
   "background_color": "#030406",
   "theme_color": "#050607",
   "orientation": "any",
-  "categories": ["sports", "utilities"],
+  "categories": [
+    "sports",
+    "utilities"
+  ],
   "lang": "en",
   "dir": "ltr",
-  "launch_handler": { "client_mode": "navigate-existing" },
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "icons": [
     {
       "src": "/assets/icon-192.png",
@@ -42,22 +51,48 @@
   ],
   "shortcuts": [
     {
+      "name": "Zeus Intelligence",
+      "short_name": "Zeus",
+      "url": "/zeus.html",
+      "icons": [
+        {
+          "src": "/assets/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
       "name": "Qualified Picks",
       "short_name": "Picks",
       "url": "/picks.html",
-      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/assets/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Live Matches",
       "short_name": "Live",
       "url": "/live.html",
-      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/assets/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Settled Proof",
       "short_name": "Proof",
       "url": "/proof.html",
-      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/assets/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

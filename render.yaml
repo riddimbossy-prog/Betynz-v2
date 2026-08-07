@@ -99,6 +99,20 @@ services:
         value: "2"
       - key: STATS_VALUE_CACHE_TTL_SECONDS
         value: "1800"
+      - key: BETYNZ_CACHE_MAX_ENTRIES
+        value: "700"
+      - key: API_FOOTBALL_MEDIA_CACHE_MAX_ENTRIES
+        value: "320"
+      - key: API_FOOTBALL_MEDIA_CACHE_MAX_MB
+        value: "32"
+      - key: STATS_API_CACHE_MAX_ENTRIES
+        value: "500"
+      - key: ANALYSIS_SNAPSHOT_MAX_DATES
+        value: "8"
+      - key: CONSENSUS_SNAPSHOT_MAX_WINDOWS
+        value: "8"
+      - key: AUTO_SETTLEMENT_START_DELAY_SECONDS
+        value: "60"
       - key: CACHE_TTL_SECONDS
         value: "120"
       - key: FIXTURE_BOARD_CACHE_TTL_SECONDS
@@ -119,6 +133,8 @@ services:
         value: "30"
       - key: CONSENSUS_CACHE_TTL_SECONDS
         value: "180"
+      - key: ZEUS_CACHE_TTL_SECONDS
+        value: "1800"
       - key: AUTO_SETTLEMENT_ENABLED
         value: "true"
       - key: AUTO_SETTLEMENT_INTERVAL_MINUTES

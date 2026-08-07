@@ -10,11 +10,12 @@ import { analyzeConvergence, convergenceSummary } from './engines/convergence.mj
 import { analyzeMomentumStreak, momentumStreakSummary } from './engines/momentumStreak.mjs';
 import { analyzeStreakValue, streakValueSummary } from './engines/streakValue.mjs';
 import { analyzeHtftMomentum, htftMomentumSummary } from './engines/htftMomentum.mjs';
+import { analyzeZeusIntelligence, applyZeusSupervisor, zeusSummary } from './engines/zeusIntelligence.mjs';
 import { applyUniversalOddsGate, isUniversalOddsPublishable, UNIVERSAL_ODDS_GATE } from './engines/universalOddsGate.mjs';
 import { buildConsensusForFixture, buildConsensusWindow, consensusSummary } from './engines/consensus.mjs';
 import { extractVenueStats, matchFixture } from './lib/venueStats.mjs';
 import { statsApiConfigured, statsApiRateState, buildStatsApiFixtureEvidence, addGoalEvidence } from './lib/statsApi.mjs';
-import { cacheGet, cacheSet, cacheStats } from './lib/cache.mjs';
+import { cacheGet, cacheSet, cacheStats, cachePrune } from './lib/cache.mjs';
 import { safeDate, normalizeName } from './lib/utils.mjs';
 import {
   logEnginePredictions,
@@ -54,7 +55,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.16';
+const APP_VERSION = '5.0.18';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const APEX_INTELLIGENCE_CODE = 'APEX_INTELLIGENCE';
@@ -62,7 +63,9 @@ const CONVERGENCE_ROUTE_CODE = 'CONVERGENCE_ROUTE';
 const MOMENTUM_STREAK_CODE = 'MOMENTUM_STREAK';
 const STREAK_VALUE_CODE = 'STREAK_VALUE';
 const HTFT_MOMENTUM_CODE = 'HTFT_MOMENTUM';
-const ENGINE_CODES = [MARKET_ROUTE_CODE, PPG_ROUTE_CODE, APEX_INTELLIGENCE_CODE, CONVERGENCE_ROUTE_CODE, MOMENTUM_STREAK_CODE, STREAK_VALUE_CODE, HTFT_MOMENTUM_CODE];
+const ZEUS_SUPERVISOR_CODE = 'ZEUS_SUPERVISOR';
+const BASE_ENGINE_CODES = [MARKET_ROUTE_CODE, PPG_ROUTE_CODE, APEX_INTELLIGENCE_CODE, CONVERGENCE_ROUTE_CODE, MOMENTUM_STREAK_CODE, STREAK_VALUE_CODE, HTFT_MOMENTUM_CODE];
+const ENGINE_CODES = [...BASE_ENGINE_CODES, ZEUS_SUPERVISOR_CODE];
 const CONSENSUS_SYSTEM_CODE = 'CONSENSUS_SYSTEM';
 const root = fileURLToPath(new URL('../public', import.meta.url));
 const port = Number(process.env.PORT || 10000);
@@ -82,6 +85,55 @@ const mediaCache = new Map();
 const mediaInflight = new Map();
 const mediaQueue = [];
 let mediaActive = 0;
+let mediaCacheBytes = 0;
+
+function mediaCacheMaxEntries() {
+  return Math.max(64, Math.min(2000, Number(process.env.API_FOOTBALL_MEDIA_CACHE_MAX_ENTRIES || 320)));
+}
+
+function mediaCacheMaxBytes() {
+  return Math.max(8, Math.min(256, Number(process.env.API_FOOTBALL_MEDIA_CACHE_MAX_MB || 32))) * 1024 * 1024;
+}
+
+function pruneMediaCache(now = Date.now(), reserveBytes = 0) {
+  for (const [key, value] of mediaCache.entries()) {
+    if (!value || value.expiresAt <= now) {
+      mediaCacheBytes -= Number(value?.body?.length || 0);
+      mediaCache.delete(key);
+    }
+  }
+  const entryCap = mediaCacheMaxEntries();
+  const byteCap = mediaCacheMaxBytes();
+  while (mediaCache.size >= entryCap || mediaCacheBytes + reserveBytes > byteCap) {
+    const oldest = mediaCache.keys().next().value;
+    if (oldest === undefined) break;
+    const value = mediaCache.get(oldest);
+    mediaCacheBytes -= Number(value?.body?.length || 0);
+    mediaCache.delete(oldest);
+  }
+  if (mediaCacheBytes < 0) mediaCacheBytes = 0;
+}
+
+function mediaCacheGet(key, now = Date.now()) {
+  pruneMediaCache(now);
+  const value = mediaCache.get(key);
+  if (!value || value.expiresAt <= now) return null;
+  mediaCache.delete(key);
+  mediaCache.set(key, value);
+  return value;
+}
+
+function mediaCacheSet(key, value) {
+  const bytes = Number(value?.body?.length || 0);
+  if (mediaCache.has(key)) {
+    mediaCacheBytes -= Number(mediaCache.get(key)?.body?.length || 0);
+    mediaCache.delete(key);
+  }
+  pruneMediaCache(Date.now(), bytes);
+  mediaCache.set(key, value);
+  mediaCacheBytes += bytes;
+  return value;
+}
 
 function mediaBaseUrl() {
   return String(process.env.API_FOOTBALL_MEDIA_BASE_URL || 'https://media.api-sports.io/football').replace(/\/+$/, '');
@@ -117,8 +169,8 @@ function apiFootballMediaUrl(kind, id) {
 async function loadApiFootballMedia(kind, id) {
   const key = `${kind}:${id}`;
   const now = Date.now();
-  const cached = mediaCache.get(key);
-  if (cached && cached.expiresAt > now) return cached;
+  const cached = mediaCacheGet(key, now);
+  if (cached) return cached;
   if (mediaInflight.has(key)) return mediaInflight.get(key);
 
   const task = scheduleMedia(async () => {
@@ -129,7 +181,7 @@ async function loadApiFootballMedia(kind, id) {
       const keyValue = String(process.env.API_FOOTBALL_KEY || '');
       const headers = {
         accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'user-agent': 'Betynz-Media-Proxy/5.0.16'
+        'user-agent': 'Betynz-Media-Proxy/5.0.18'
       };
       if (keyValue) headers[keyHeader] = keyValue;
       const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
@@ -140,7 +192,7 @@ async function loadApiFootballMedia(kind, id) {
       const maxBytes = Math.max(100_000, Number(process.env.API_FOOTBALL_MEDIA_MAX_BYTES || 2_000_000));
       if (!body.length || body.length > maxBytes) throw Object.assign(new Error('Crest image size is invalid'), { status: 502 });
       const value = { body, contentType, expiresAt: now + Math.max(3600, Number(process.env.API_FOOTBALL_VISUAL_CACHE_TTL_SECONDS || 604800)) * 1000 };
-      mediaCache.set(key, value);
+      mediaCacheSet(key, value);
       return value;
     } finally {
       clearTimeout(timeout);
@@ -200,6 +252,30 @@ function jsonCached(res, status, body, maxAge = 30, extra = {}) {
     'cache-control': `public, max-age=${Math.max(0, Number(maxAge) || 0)}, stale-while-revalidate=${Math.max(60, (Number(maxAge) || 0) * 10)}`,
     ...extra
   });
+}
+
+function boundedMapSet(map, key, value, maxEntries = 10) {
+  if (map.has(key)) map.delete(key);
+  map.set(key, value);
+  const cap = Math.max(2, Number(maxEntries) || 10);
+  while (map.size > cap) {
+    const oldest = map.keys().next().value;
+    if (oldest === undefined) break;
+    map.delete(oldest);
+  }
+  return value;
+}
+
+function runtimeMemory() {
+  const m = process.memoryUsage();
+  const mb = value => Math.round(Number(value || 0) / 1024 / 1024 * 10) / 10;
+  return { rssMb: mb(m.rss), heapUsedMb: mb(m.heapUsed), heapTotalMb: mb(m.heapTotal), externalMb: mb(m.external), arrayBuffersMb: mb(m.arrayBuffers) };
+}
+
+function pruneRuntimeCaches() {
+  cachePrune();
+  pruneMediaCache();
+  return { cache: cacheStats(), media: { entries: mediaCache.size, bytes: mediaCacheBytes, maxEntries: mediaCacheMaxEntries(), maxBytes: mediaCacheMaxBytes() } };
 }
 
 function utcDateOffset(offset = 0) {
@@ -263,20 +339,24 @@ async function requestSettlement(date, options = {}) {
   if (!force && previous?.finishedAt && Date.now() - previous.finishedAt < cooldownMs) return previous.result;
   if (settlementInflight.has(date)) return settlementInflight.get(date);
   const task = settleDate(date).then(result => {
-    settlementState.set(date, { finishedAt: Date.now(), result });
+    boundedMapSet(settlementState, date, { finishedAt: Date.now(), result }, 14);
     return result;
   }).catch(error => {
     const result = { date, configured: supabaseConfigured(), checked: 0, settled: 0, consensusSettled: 0, error: error?.message || 'Settlement failed', source: 'SETTLEMENT_ERROR' };
-    settlementState.set(date, { finishedAt: Date.now(), result });
+    boundedMapSet(settlementState, date, { finishedAt: Date.now(), result }, 14);
     return result;
   }).finally(() => settlementInflight.delete(date));
   settlementInflight.set(date, task);
   return task;
 }
 
-function requestRecentSettlements(lookbackDays = 3) {
+async function requestRecentSettlements(lookbackDays = 3) {
   const days = Math.max(1, Math.min(7, Number(lookbackDays) || 3));
-  return Promise.all(Array.from({ length: days }, (_, offset) => requestSettlement(utcDateOffset(-offset))));
+  const results = [];
+  for (let offset = 0; offset < days; offset += 1) {
+    results.push(await requestSettlement(utcDateOffset(-offset)));
+  }
+  return results;
 }
 
 function publicWinRow(row, recordType = 'ENGINE') {
@@ -455,6 +535,7 @@ function engineName(engineCode) {
   if (engineCode === MOMENTUM_STREAK_CODE) return 'Momentum & Streak Engine';
   if (engineCode === STREAK_VALUE_CODE) return 'Atlas Streak Value Engine';
   if (engineCode === HTFT_MOMENTUM_CODE) return 'Chronos HT/FT Momentum Engine';
+  if (engineCode === ZEUS_SUPERVISOR_CODE) return 'Zeus Statistical Intelligence Engine';
   if (engineCode === CONSENSUS_SYSTEM_CODE) return 'Consensus System';
   return 'Market Route Engine';
 }
@@ -466,6 +547,7 @@ function engineSummary(engineCode, result) {
   if (engineCode === MOMENTUM_STREAK_CODE) return momentumStreakSummary(result);
   if (engineCode === STREAK_VALUE_CODE) return streakValueSummary(result);
   if (engineCode === HTFT_MOMENTUM_CODE) return htftMomentumSummary(result);
+  if (engineCode === ZEUS_SUPERVISOR_CODE) return zeusSummary(result);
   return marketRouteSummary(result);
 }
 
@@ -757,7 +839,7 @@ async function getStatsRouteBoards(date) {
         htft: progressiveEngineResponse({ date, engine: 'Chronos HT/FT Momentum Engine', items: htftMap, processed, total, complete, failed, warning, enrichmentSource })
       };
       for (const response of Object.values(snapshot)) response.oddsPending = Boolean(board.oddsPending);
-      statsRouteViewSnapshots.set(date, snapshot);
+      boundedMapSet(statsRouteViewSnapshots, date, snapshot, Number(process.env.ANALYSIS_SNAPSHOT_MAX_DATES || 8));
       cacheSet(`market-route-board:${date}`, market, complete ? 300 : 120);
       return { market, ...snapshot };
     };
@@ -974,6 +1056,7 @@ function publicStatsValueEvidence(evidence = null) {
     lossRate: profile.lossRate ?? null,
     xgFor: profile.xgFor ?? null,
     xgAgainst: profile.xgAgainst ?? null,
+    xgSamples: profile.xgSamples ?? 0,
     strengthScore: profile.strengthScore ?? null,
     classification: profile.classification || null,
     streaks: profile.streaks || {}
@@ -1057,7 +1140,7 @@ async function getStreakValueBoard(date) {
         generatedAt: new Date().toISOString(),
         cache: 'MISS'
       };
-      streakValueViewSnapshots.set(date, response);
+      boundedMapSet(streakValueViewSnapshots, date, response, Number(process.env.ANALYSIS_SNAPSHOT_MAX_DATES || 8));
       if (complete) cacheSet(key, response, Number(process.env.STATS_VALUE_CACHE_TTL_SECONDS || 1800));
       return response;
     };
@@ -1095,7 +1178,7 @@ async function getStreakValueBoard(date) {
   })().catch(error => {
     const current = streakValueViewSnapshots.get(date) || waitingStreakValueResponse(date, [], true);
     const failed = { ...current, complete: false, failed: false, warning: error.message || 'Stats API analysis is temporarily unavailable.', progress: { ...(current.progress || {}), stage: 'RETRYING' } };
-    streakValueViewSnapshots.set(date, failed);
+    boundedMapSet(streakValueViewSnapshots, date, failed, Number(process.env.ANALYSIS_SNAPSHOT_MAX_DATES || 8));
     return failed;
   }).finally(() => streakValueViewJobs.delete(key));
   streakValueViewJobs.set(key, task);
@@ -1107,12 +1190,94 @@ async function ensureStreakValueView(date) {
   if (!snapshot) {
     const board = cacheGet(`single-engine-fixtures:${date}`) || cacheGet(`dashboard-fixtures:${date}`) || { fixtures: [], oddsPending: true };
     snapshot = waitingStreakValueResponse(date, board.fixtures || [], board.oddsPending);
-    streakValueViewSnapshots.set(date, snapshot);
+    boundedMapSet(streakValueViewSnapshots, date, snapshot, Number(process.env.ANALYSIS_SNAPSHOT_MAX_DATES || 8));
   }
   if (!snapshot.complete && !streakValueViewJobs.has(`streak-value-board:${date}`)) {
     queueMicrotask(() => getStreakValueBoard(date).catch(error => console.error('Atlas background analysis failed:', error.message)));
   }
   return streakValueViewSnapshots.get(date) || snapshot;
+}
+
+
+function byFixtureId(items = []) {
+  return new Map((items || []).map(item => [String(item?.fixture?.id || ''), item]).filter(([id]) => id));
+}
+
+function composeZeusBoard(date, board, marketBoard, statsSnapshot, streakSnapshot) {
+  const market = byFixtureId(marketBoard?.all || []);
+  const ppg = byFixtureId(statsSnapshot?.ppg?.all || []);
+  const apex = byFixtureId(statsSnapshot?.apex?.all || []);
+  const convergence = byFixtureId(statsSnapshot?.convergence?.all || []);
+  const momentum = byFixtureId(statsSnapshot?.momentum?.all || []);
+  const htft = byFixtureId(statsSnapshot?.htft?.all || []);
+  const atlas = byFixtureId(streakSnapshot?.all || []);
+  const fixtures = predictionPriority((board?.fixtures || []).filter(Boolean));
+  const all = fixtures.map(fixture => {
+    const id = String(fixture.id || '');
+    const venueForm = apex.get(id)?.venueForm || ppg.get(id)?.venueForm || null;
+    const stats = venueForm ? { home: venueForm.home, away: venueForm.away } : null;
+    const statsEvidence = atlas.get(id)?.statsEvidence || null;
+    const engineResults = [
+      { code: MARKET_ROUTE_CODE, result: market.get(id)?.engine },
+      { code: PPG_ROUTE_CODE, result: ppg.get(id)?.engine },
+      { code: APEX_INTELLIGENCE_CODE, result: apex.get(id)?.engine },
+      { code: CONVERGENCE_ROUTE_CODE, result: convergence.get(id)?.engine },
+      { code: MOMENTUM_STREAK_CODE, result: momentum.get(id)?.engine },
+      { code: STREAK_VALUE_CODE, result: atlas.get(id)?.engine },
+      { code: HTFT_MOMENTUM_CODE, result: htft.get(id)?.engine }
+    ].filter(item => item.result);
+    const raw = analyzeZeusIntelligence({ fixture, stats, statsEvidence, engineResults });
+    return { fixture: publicFixture(fixture), engine: applyUniversalOddsGate(raw, fixture.odds || {}), venueForm, statsEvidence };
+  }).filter(item => item.fixture);
+  const statsComplete = Boolean(statsSnapshot?.ppg?.complete && statsSnapshot?.apex?.complete && statsSnapshot?.convergence?.complete && statsSnapshot?.momentum?.complete && statsSnapshot?.htft?.complete);
+  const complete = Boolean(statsComplete && streakSnapshot?.complete && !board?.oddsPending);
+  const processed = Math.max(Number(statsSnapshot?.apex?.progress?.processed || 0), Number(streakSnapshot?.progress?.processed || 0));
+  const total = Math.max(Number(statsSnapshot?.apex?.progress?.total || 0), Number(streakSnapshot?.progress?.total || 0), fixtures.filter(isUpcomingPredictionFixture).length);
+  return {
+    date,
+    engine: 'Zeus Statistical Intelligence Engine',
+    source: 'COMPOSITE_STATISTICAL_SUPERVISOR',
+    enrichmentSource: 'API_FOOTBALL_PLUS_STATS_API_PLUS_SEVEN_ENGINES',
+    warning: statsSnapshot?.apex?.warning || streakSnapshot?.warning || null,
+    qualified: all.filter(item => item?.engine?.selection),
+    all,
+    summary: { ...zeusSummary(all), analysed: all.filter(item => !['WAITING'].includes(item?.engine?.decision)).length },
+    progress: { stage: complete ? 'COMPLETE' : 'SUPERVISING', processed, total, percent: total ? Math.min(99, Math.round(processed / total * 100)) : complete ? 100 : 0 },
+    complete,
+    failed: false,
+    generatedAt: new Date().toISOString(),
+    cache: 'MISS'
+  };
+}
+
+const zeusViewSnapshots = new Map();
+
+async function getZeusBoard(date) {
+  const key = `zeus-board:${date}`;
+  const cached = cacheGet(key);
+  if (cached) return cached;
+  const board = await getFastFixtureBoard(date);
+  const [marketBoard, statsSnapshot, streakSnapshot] = await Promise.all([
+    getMarketRouteBoard(date), ensureStatsRouteView(date), ensureStreakValueView(date)
+  ]);
+  const response = composeZeusBoard(date, board, marketBoard, statsSnapshot, streakSnapshot);
+  boundedMapSet(zeusViewSnapshots, date, response, Number(process.env.ANALYSIS_SNAPSHOT_MAX_DATES || 8));
+  if (response.complete) {
+    cacheSet(key, response, Number(process.env.ZEUS_CACHE_TTL_SECONDS || 1800));
+    storePredictions(date, response.all, ZEUS_SUPERVISOR_CODE).catch(error => console.error('Zeus prediction storage failed:', error.message));
+  }
+  return response;
+}
+
+function decorateConsensusWithZeus(row, zeusItem, date) {
+  const supervised = applyZeusSupervisor(row, zeusItem?.engine || null);
+  const zeusPick = zeusItem ? publicQualifiedPick(zeusItem, date || row?.date, ZEUS_SUPERVISOR_CODE) : null;
+  if (!zeusPick) return supervised;
+  return {
+    ...supervised,
+    engines: [...new Set([...(supervised.engines || []), ZEUS_SUPERVISOR_CODE])],
+    enginePicks: [...(supervised.enginePicks || []), { ...zeusPick, reasons: (zeusPick.reasons || []).slice(0, 4) }]
+  };
 }
 
 function publicQualifiedPick(item, date, engineCode = MARKET_ROUTE_CODE) {
@@ -1231,47 +1396,61 @@ async function storeConsensusRows(rows = []) {
 
 async function getQualifiedPicksWindow(from, days = 7) {
   const safeDays = Math.max(1, Math.min(7, Number(days) || 7));
-  const key = `qualified-picks-v35:${from}:${safeDays}`;
+  const key = `qualified-picks-v36:${from}:${safeDays}`;
   const cached = cacheGet(key);
   if (cached) return { ...cached, cache: 'HIT' };
   const dates = Array.from({ length: safeDays }, (_, index) => addDays(from, index));
-  const marketBoards = await Promise.all(dates.map(date => getMarketRouteBoard(date).catch(() => ({ date, qualified: [], summary: {} }))));
-  const marketPicks = marketBoards.flatMap(board => (board.qualified || []).map(item => publicQualifiedPick(item, board.date, MARKET_ROUTE_CODE)).filter(Boolean));
-  const statsPicks = [];
-  const dateQueue = [...dates];
-  async function statsWorker() {
-    while (dateQueue.length) {
-      const date = dateQueue.shift();
-      try {
-        const bundle = await getStatsRouteBoards(date);
-        statsPicks.push(...(bundle.ppg.qualified || []).map(item => publicQualifiedPick(item, date, PPG_ROUTE_CODE)).filter(Boolean));
-        statsPicks.push(...(bundle.apex.qualified || []).map(item => publicQualifiedPick(item, date, APEX_INTELLIGENCE_CODE)).filter(Boolean));
-        statsPicks.push(...(bundle.convergence.qualified || []).map(item => publicQualifiedPick(item, date, CONVERGENCE_ROUTE_CODE)).filter(Boolean));
-        statsPicks.push(...(bundle.momentum.qualified || []).map(item => publicQualifiedPick(item, date, MOMENTUM_STREAK_CODE)).filter(Boolean));
-        statsPicks.push(...(bundle.htft.qualified || []).map(item => publicQualifiedPick(item, date, HTFT_MOMENTUM_CODE)).filter(Boolean));
-        const atlas = await getStreakValueBoard(date).catch(() => ({ qualified: [] }));
-        statsPicks.push(...(atlas.qualified || []).map(item => publicQualifiedPick(item, date, STREAK_VALUE_CODE)).filter(Boolean));
-      } catch {}
-    }
-  }
-  await Promise.all([statsWorker(), statsWorker()]);
-  const finalMarketBoards = await Promise.all(dates.map(date => getMarketRouteBoard(date).catch(() => null)));
-  const finalMarketPicks = finalMarketBoards.flatMap((board, index) => (board?.qualified || marketBoards[index]?.qualified || []).map(item => publicQualifiedPick(item, dates[index], MARKET_ROUTE_CODE)).filter(Boolean));
-  const unique = new Map();
-  for (const pick of [...finalMarketPicks, ...statsPicks]) unique.set(`${pick.fixtureId}:${pick.engine}:${pick.market}`, pick);
-  const enginePicksInternal = [...unique.values()];
-  enginePicksInternal.sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff) || (a.decision === 'FIRE' ? -1 : 1));
+  const enginePicksInternal = [];
 
-  const consensusRows = buildConsensusWindow(enginePicksInternal).map(consensusLifecycle);
+  // Keep only one deep date alive at a time. The selected date completes before
+  // future dates begin, which sharply reduces memory/queue pressure on one
+  // Render instance and prevents full-service 502s during seven-day Consensus.
+  for (const date of dates) {
+    const marketInitial = await getMarketRouteBoard(date).catch(() => ({ date, qualified: [], summary: {} }));
+    let bundle = null;
+    try { bundle = await getStatsRouteBoards(date); } catch {}
+    let atlas = { qualified: [] };
+    try { atlas = await getStreakValueBoard(date); } catch {}
+    const marketFinal = await getMarketRouteBoard(date).catch(() => marketInitial);
+
+    enginePicksInternal.push(...(marketFinal?.qualified || marketInitial?.qualified || []).map(item => publicQualifiedPick(item, date, MARKET_ROUTE_CODE)).filter(Boolean));
+    if (bundle) {
+      enginePicksInternal.push(...(bundle.ppg?.qualified || []).map(item => publicQualifiedPick(item, date, PPG_ROUTE_CODE)).filter(Boolean));
+      enginePicksInternal.push(...(bundle.apex?.qualified || []).map(item => publicQualifiedPick(item, date, APEX_INTELLIGENCE_CODE)).filter(Boolean));
+      enginePicksInternal.push(...(bundle.convergence?.qualified || []).map(item => publicQualifiedPick(item, date, CONVERGENCE_ROUTE_CODE)).filter(Boolean));
+      enginePicksInternal.push(...(bundle.momentum?.qualified || []).map(item => publicQualifiedPick(item, date, MOMENTUM_STREAK_CODE)).filter(Boolean));
+      enginePicksInternal.push(...(bundle.htft?.qualified || []).map(item => publicQualifiedPick(item, date, HTFT_MOMENTUM_CODE)).filter(Boolean));
+    }
+    enginePicksInternal.push(...(atlas?.qualified || []).map(item => publicQualifiedPick(item, date, STREAK_VALUE_CODE)).filter(Boolean));
+    const boardForZeus = await getFastFixtureBoard(date).catch(() => ({ fixtures: [], oddsPending: true }));
+    const zeus = composeZeusBoard(date, boardForZeus, marketFinal, bundle || {}, atlas || {});
+    enginePicksInternal.push(...(zeus?.qualified || []).map(item => publicQualifiedPick(item, date, ZEUS_SUPERVISOR_CODE)).filter(Boolean));
+    boundedMapSet(zeusViewSnapshots, date, zeus, Number(process.env.ANALYSIS_SNAPSHOT_MAX_DATES || 8));
+
+    // Reclaim expired/general cache entries between dates before moving deeper
+    // into the seven-day window.
+    pruneRuntimeCaches();
+  }
+
+  const unique = new Map();
+  for (const pick of enginePicksInternal) unique.set(`${pick.fixtureId}:${pick.engine}:${pick.market}`, pick);
+  const internal = [...unique.values()];
+  internal.sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff) || (a.decision === 'FIRE' ? -1 : 1));
+
+  const zeusRowsByFixture = new Map();
+  for (const date of dates) for (const item of zeusViewSnapshots.get(date)?.all || []) zeusRowsByFixture.set(String(item?.fixture?.id || ''), item);
+  const consensusRows = buildConsensusWindow(internal.filter(pick => pick.engine !== ZEUS_SUPERVISOR_CODE))
+    .map(consensusLifecycle)
+    .map(row => decorateConsensusWithZeus(row, zeusRowsByFixture.get(String(row.fixtureId)), row.date));
   await storeConsensusRows(consensusRows);
-  const enginePicks = enginePicksInternal.map(({ _odds, ...pick }) => pick);
+  const enginePicks = internal.map(({ _odds, ...pick }) => pick);
 
   const elite = consensusRows.filter(item => item.classification === 'ELITE_BANKER');
   const consensusBankers = consensusRows.filter(item => item.classification === 'CONSENSUS_BANKER');
   const singleQualified = consensusRows.filter(item => item.classification === 'QUALIFIED_PICK');
   const saferConsensus = consensusRows.filter(item => item.classification === 'SAFER_PICK');
   const conflicts = consensusRows.filter(item => item.classification === 'CONFLICT');
-  const holds = consensusRows.filter(item => item.classification === 'HOLD_MISSING_SHARED_PRICE');
+  const holds = consensusRows.filter(item => ['HOLD_MISSING_SHARED_PRICE','ZEUS_HOLD'].includes(item.classification));
   const publishable = [...elite, ...consensusBankers, ...singleQualified, ...saferConsensus]
     .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff) || b.agreementCount - a.agreementCount || b.score - a.score);
   const bankers = [...elite, ...consensusBankers].sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff) || b.agreementCount - a.agreementCount);
@@ -1285,6 +1464,7 @@ async function getQualifiedPicksWindow(from, days = 7) {
     conflicts: conflicts.filter(item => item.date === date),
     enginePicks: enginePicks.filter(item => item.date === date)
   }));
+
   const response = {
     from,
     to: dates.at(-1),
@@ -1301,12 +1481,7 @@ async function getQualifiedPicksWindow(from, days = 7) {
     holds,
     byDate,
     consensus: { elite, bankers: consensusBankers, qualified: singleQualified, safer: saferConsensus, conflicts, holds, all: consensusRows },
-    summary: {
-      ...consensusSummary(consensusRows),
-      bankers: bankers.length,
-      engineQualified: enginePicks.length,
-      publishable: publishable.length
-    },
+    summary: { ...consensusSummary(consensusRows), bankers: bankers.length, engineQualified: enginePicks.length, publishable: publishable.length },
     generatedAt: new Date().toISOString(),
     cache: 'MISS'
   };
@@ -1317,7 +1492,7 @@ async function getQualifiedPicksWindow(from, days = 7) {
 const consensusViewSnapshots = new Map();
 const consensusViewJobs = new Map();
 
-function partialConsensusResponse(from, days, marketBoard, statsSnapshot, streakSnapshot = null) {
+function partialConsensusResponse(from, days, marketBoard, statsSnapshot, streakSnapshot = null, zeusSnapshot = null) {
   const safeDays = Math.max(1, Math.min(7, Number(days) || 7));
   const dates = Array.from({ length: safeDays }, (_, index) => addDays(from, index));
   const enginePicksInternal = [
@@ -1327,22 +1502,26 @@ function partialConsensusResponse(from, days, marketBoard, statsSnapshot, streak
     ...(statsSnapshot?.convergence?.qualified || []).map(item => publicQualifiedPick(item, from, CONVERGENCE_ROUTE_CODE)).filter(Boolean),
     ...(statsSnapshot?.momentum?.qualified || []).map(item => publicQualifiedPick(item, from, MOMENTUM_STREAK_CODE)).filter(Boolean),
     ...(statsSnapshot?.htft?.qualified || []).map(item => publicQualifiedPick(item, from, HTFT_MOMENTUM_CODE)).filter(Boolean),
-    ...(streakSnapshot?.qualified || []).map(item => publicQualifiedPick(item, from, STREAK_VALUE_CODE)).filter(Boolean)
+    ...(streakSnapshot?.qualified || []).map(item => publicQualifiedPick(item, from, STREAK_VALUE_CODE)).filter(Boolean),
+    ...(zeusSnapshot?.qualified || []).map(item => publicQualifiedPick(item, from, ZEUS_SUPERVISOR_CODE)).filter(Boolean)
   ];
   const unique = new Map();
   for (const pick of enginePicksInternal) unique.set(`${pick.fixtureId}:${pick.engine}:${pick.market}`, pick);
   const internal = [...unique.values()].sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
-  const consensusRows = buildConsensusWindow(internal).map(consensusLifecycle);
+  const zeusMap = byFixtureId(zeusSnapshot?.all || []);
+  const consensusRows = buildConsensusWindow(internal.filter(pick => pick.engine !== ZEUS_SUPERVISOR_CODE))
+    .map(consensusLifecycle)
+    .map(row => decorateConsensusWithZeus(row, zeusMap.get(String(row.fixtureId)), row.date));
   const enginePicks = internal.map(({ _odds, ...pick }) => pick);
   const elite = consensusRows.filter(item => item.classification === 'ELITE_BANKER');
   const consensusBankers = consensusRows.filter(item => item.classification === 'CONSENSUS_BANKER');
   const singleQualified = consensusRows.filter(item => item.classification === 'QUALIFIED_PICK');
   const saferConsensus = consensusRows.filter(item => item.classification === 'SAFER_PICK');
   const conflicts = consensusRows.filter(item => item.classification === 'CONFLICT');
-  const holds = consensusRows.filter(item => item.classification === 'HOLD_MISSING_SHARED_PRICE');
+  const holds = consensusRows.filter(item => ['HOLD_MISSING_SHARED_PRICE','ZEUS_HOLD'].includes(item.classification));
   const publishable = [...elite, ...consensusBankers, ...singleQualified, ...saferConsensus];
   const bankers = [...elite, ...consensusBankers];
-  const statsComplete = Boolean(statsSnapshot?.ppg?.complete && statsSnapshot?.apex?.complete && statsSnapshot?.convergence?.complete && statsSnapshot?.momentum?.complete && statsSnapshot?.htft?.complete && streakSnapshot?.complete);
+  const statsComplete = Boolean(statsSnapshot?.ppg?.complete && statsSnapshot?.apex?.complete && statsSnapshot?.convergence?.complete && statsSnapshot?.momentum?.complete && statsSnapshot?.htft?.complete && streakSnapshot?.complete && zeusSnapshot?.complete);
   const fixtureTotal = Number(statsSnapshot?.ppg?.summary?.fixtures || statsSnapshot?.apex?.summary?.fixtures || marketBoard?.summary?.fixtures || 0);
   const fixtureProcessed = statsComplete ? fixtureTotal : Number(statsSnapshot?.ppg?.progress?.processed || statsSnapshot?.apex?.progress?.processed || statsSnapshot?.apex?.summary?.analysed || 0);
   const total = safeDays === 1 ? fixtureTotal : safeDays;
@@ -1383,24 +1562,27 @@ function partialConsensusResponse(from, days, marketBoard, statsSnapshot, streak
 async function getQualifiedPicksWindowView(from, days = 7) {
   const safeDays = Math.max(1, Math.min(7, Number(days) || 7));
   const key = `${from}:${safeDays}`;
-  const finalCached = cacheGet(`qualified-picks-v35:${from}:${safeDays}`);
+  const finalCached = cacheGet(`qualified-picks-v36:${from}:${safeDays}`);
   if (finalCached) return { ...finalCached, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: safeDays, total: safeDays, percent: 100 }, cache: 'HIT' };
 
   const marketBoard = await getMarketRouteBoard(from);
   const statsSnapshot = await ensureStatsRouteView(from);
   const streakSnapshot = await ensureStreakValueView(from);
-  const partial = partialConsensusResponse(from, safeDays, marketBoard, statsSnapshot, streakSnapshot);
-  consensusViewSnapshots.set(key, partial);
+  const boardForZeus = await getFastFixtureBoard(from).catch(() => ({ fixtures: [], oddsPending: true }));
+  const zeusSnapshot = composeZeusBoard(from, boardForZeus, marketBoard, statsSnapshot, streakSnapshot);
+  boundedMapSet(zeusViewSnapshots, from, zeusSnapshot, Number(process.env.ANALYSIS_SNAPSHOT_MAX_DATES || 8));
+  const partial = partialConsensusResponse(from, safeDays, marketBoard, statsSnapshot, streakSnapshot, zeusSnapshot);
+  boundedMapSet(consensusViewSnapshots, key, partial, Number(process.env.CONSENSUS_SNAPSHOT_MAX_WINDOWS || 8));
 
   if (!consensusViewJobs.has(key)) {
     const task = getQualifiedPicksWindow(from, safeDays).then(final => {
       const complete = { ...final, complete: true, failed: false, progress: { stage: 'COMPLETE', processed: safeDays, total: safeDays, percent: 100 } };
-      consensusViewSnapshots.set(key, complete);
+      boundedMapSet(consensusViewSnapshots, key, complete, Number(process.env.CONSENSUS_SNAPSHOT_MAX_WINDOWS || 8));
       return complete;
     }).catch(error => {
       const current = consensusViewSnapshots.get(key) || partial;
       const failed = { ...current, complete: true, failed: true, error: error.message || 'Consensus analysis failed', progress: { stage: 'FAILED', processed: 0, total: safeDays, percent: 0 } };
-      consensusViewSnapshots.set(key, failed);
+      boundedMapSet(consensusViewSnapshots, key, failed, Number(process.env.CONSENSUS_SNAPSHOT_MAX_WINDOWS || 8));
       return failed;
     }).finally(() => consensusViewJobs.delete(key));
     consensusViewJobs.set(key, task);
@@ -1435,10 +1617,10 @@ function compactEngineAudit(item, code) {
 }
 
 async function getEngineAudit(date) {
-  const key = `engine-audit-v35:${date}`;
+  const key = `engine-audit-v36:${date}`;
   const cached = cacheGet(key);
   if (cached) return { ...cached, cache: 'HIT' };
-  const [market, stats, atlas] = await Promise.all([getMarketRouteBoard(date), getStatsRouteBoards(date), getStreakValueBoard(date).catch(() => ({ all: [] }))]);
+  const [market, stats, atlas, zeus] = await Promise.all([getMarketRouteBoard(date), getStatsRouteBoards(date), getStreakValueBoard(date).catch(() => ({ all: [] })), getZeusBoard(date).catch(() => ({ all: [] }))]);
   const groups = new Map();
   function add(items, code) {
     for (const item of items || []) {
@@ -1454,6 +1636,7 @@ async function getEngineAudit(date) {
   add(stats.convergence.all, CONVERGENCE_ROUTE_CODE);
   add(stats.momentum.all, MOMENTUM_STREAK_CODE);
   add(stats.htft.all, HTFT_MOMENTUM_CODE);
+  add(zeus.all, ZEUS_SUPERVISOR_CODE);
   add(atlas.all, STREAK_VALUE_CODE);
 
   const rows = [];
@@ -1466,7 +1649,8 @@ async function getEngineAudit(date) {
       const pick = publicQualifiedPick(item, date, code);
       if (pick) selected.push(pick);
     }
-    const consensus = consensusLifecycle(buildConsensusForFixture({
+    const basePicks = selected.filter(pick => pick.engine !== ZEUS_SUPERVISOR_CODE);
+    const baseConsensus = consensusLifecycle(buildConsensusForFixture({
       fixture: {
         fixtureId,
         date,
@@ -1476,9 +1660,11 @@ async function getEngineAudit(date) {
         home: fixture.home,
         away: fixture.away
       },
-      picks: selected,
+      picks: basePicks,
       odds: fixture.odds || {}
     }));
+    const zeusEngine = group.engines[ZEUS_SUPERVISOR_CODE]?.engine || null;
+    const consensus = zeusEngine ? applyZeusSupervisor(baseConsensus, zeusEngine) : baseConsensus;
     rows.push({
       fixtureId,
       date,
@@ -1567,7 +1753,9 @@ async function apiRoute(req, res, url) {
     configured: { apiFootball: apiFootballConfigured(), statsApi: statsApiConfigured(), supabase: supabaseConfigured() },
     providerQueue: apiFootballRateState(),
     statsProviderQueue: statsApiRateState(),
-    sourceRoles: { fixtures: 'API_FOOTBALL', odds: 'API_FOOTBALL', live: 'API_FOOTBALL', results: 'API_FOOTBALL', coreStatistics: 'API_FOOTBALL', streakIntelligence: 'STATS_API', xg: 'STATS_API', visuals: 'API_FOOTBALL' },
+    runtime: runtimeMemory(),
+    runtimeCaches: pruneRuntimeCaches(),
+    sourceRoles: { fixtures: 'API_FOOTBALL', odds: 'API_FOOTBALL', live: 'API_FOOTBALL', results: 'API_FOOTBALL', coreStatistics: 'API_FOOTBALL', streakIntelligence: 'STATS_API', xg: 'STATS_API', visuals: 'API_FOOTBALL', supervisor: 'ZEUS_COMPOSITE' },
     fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null },
     oddsGate: UNIVERSAL_ODDS_GATE,
     time: new Date().toISOString()
@@ -1576,8 +1764,8 @@ async function apiRoute(req, res, url) {
   if (url.pathname === '/api/config') return json(res, 200, {
     appName: process.env.APP_NAME || 'Betynz',
     version: APP_VERSION,
-    engines: ['Market Route Engine', 'PPG Route Engine', 'Apex Intelligence Engine', 'Convergence Engine', 'Momentum & Streak Engine', 'Atlas Streak Value Engine', 'Chronos HT/FT Momentum Engine'],
-    systems: ['Consensus Bankers', 'Settlement Calibration'],
+    engines: ['Market Route Engine', 'PPG Route Engine', 'Apex Intelligence Engine', 'Convergence Engine', 'Momentum & Streak Engine', 'Atlas Streak Value Engine', 'Chronos HT/FT Momentum Engine', 'Zeus Statistical Intelligence Engine'],
+    systems: ['Seven-Engine Consensus', 'Zeus Statistical Supervision', 'Settlement Calibration'],
     consensusFreezeMinutes: Math.max(5, Number(process.env.CONSENSUS_FREEZE_MINUTES || 30)),
     dataSources: { fixtures: 'API-Football', odds: 'API-Football', primaryStatistics: 'API-Football', streaksAndXg: 'Stats API', visuals: 'API-Football', live: 'API-Football', results: 'API-Football' },
     fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null },
@@ -1782,6 +1970,12 @@ async function apiRoute(req, res, url) {
     return jsonCached(res, 200, await getHtftMomentumView(date), 5);
   }
 
+  if (url.pathname === '/api/zeus-board') {
+    const date = url.searchParams.get('date') || utcDateOffset(0);
+    if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    return jsonCached(res, 200, await getZeusBoard(date), 5);
+  }
+
   if (url.pathname === '/api/qualified-picks' || url.pathname === '/api/consensus-picks') {
     const from = url.searchParams.get('from') || utcDateOffset(0);
     const days = Number(url.searchParams.get('days') || 7);
@@ -1836,7 +2030,18 @@ async function apiRoute(req, res, url) {
         publicQualifiedPick({ fixture, engine: streakValueEngine }, date, STREAK_VALUE_CODE),
         publicQualifiedPick({ fixture, engine: htftEngine }, date, HTFT_MOMENTUM_CODE)
       ].filter(Boolean);
-      const consensusEngine = consensusLifecycle(buildConsensusForFixture({
+      const zeusEngine = applyUniversalOddsGate(analyzeZeusIntelligence({
+        fixture,
+        stats,
+        statsEvidence: atlasItem?.statsEvidence || null,
+        engineResults: [
+          { code: MARKET_ROUTE_CODE, result: engine }, { code: PPG_ROUTE_CODE, result: ppgEngine },
+          { code: APEX_INTELLIGENCE_CODE, result: apexEngine }, { code: CONVERGENCE_ROUTE_CODE, result: convergenceEngine },
+          { code: MOMENTUM_STREAK_CODE, result: momentumEngine }, { code: STREAK_VALUE_CODE, result: streakValueEngine },
+          { code: HTFT_MOMENTUM_CODE, result: htftEngine }
+        ]
+      }), fixture.odds || {});
+      const consensusEngine = decorateConsensusWithZeus(consensusLifecycle(buildConsensusForFixture({
         fixture: {
           fixtureId: fixture.id,
           date,
@@ -1848,7 +2053,7 @@ async function apiRoute(req, res, url) {
         },
         picks: selectedPicks,
         odds: fixture.odds || {}
-      }));
+      })), { fixture, engine: zeusEngine }, date);
       await Promise.all([
         storePredictions(date, [{ fixture, engine }], MARKET_ROUTE_CODE),
         storePredictions(date, [{ fixture, engine: ppgEngine }], PPG_ROUTE_CODE),
@@ -1857,6 +2062,7 @@ async function apiRoute(req, res, url) {
         storePredictions(date, [{ fixture, engine: momentumEngine }], MOMENTUM_STREAK_CODE),
         storePredictions(date, [{ fixture, engine: streakValueEngine }], STREAK_VALUE_CODE),
         storePredictions(date, [{ fixture, engine: htftEngine }], HTFT_MOMENTUM_CODE),
+        storePredictions(date, [{ fixture, engine: zeusEngine }], ZEUS_SUPERVISOR_CODE),
         storeConsensusRows([consensusEngine])
       ]);
       const response = {
@@ -1869,6 +2075,7 @@ async function apiRoute(req, res, url) {
         momentumEngine,
         streakValueEngine,
         htftEngine,
+        zeusEngine,
         consensusEngine,
         venueForm: publicVenueForm(stats),
         statisticsAvailable: Boolean(stats?.homeSplit || stats?.awaySplit),
@@ -2083,12 +2290,20 @@ const server = createServer(async (req, res) => {
   }
 });
 
+server.keepAliveTimeout = 5_000;
+server.headersTimeout = 15_000;
+server.requestTimeout = 30_000;
+server.on('error', error => console.error('HTTP server error:', error?.message || error));
+process.on('unhandledRejection', reason => console.error('Unhandled promise rejection:', reason?.message || reason));
+process.on('uncaughtExceptionMonitor', error => console.error('Uncaught exception:', error?.message || error));
+
 server.listen(port, () => console.log(`Betynz ${APP_VERSION} listening on ${port}`));
 
 if (String(process.env.AUTO_SETTLEMENT_ENABLED || 'true').toLowerCase() === 'true') {
   const interval = Math.max(5, Number(process.env.AUTO_SETTLEMENT_INTERVAL_MINUTES || 10)) * 60_000;
   const lookback = Math.max(1, Math.min(7, Number(process.env.AUTO_SETTLEMENT_LOOKBACK_DAYS || 3)));
   const run = () => requestRecentSettlements(lookback).catch(() => null);
-  setTimeout(run, 12_000).unref?.();
+  const startDelay = Math.max(30, Number(process.env.AUTO_SETTLEMENT_START_DELAY_SECONDS || 60)) * 1000;
+  setTimeout(run, startDelay).unref?.();
   setInterval(run, interval).unref?.();
 }

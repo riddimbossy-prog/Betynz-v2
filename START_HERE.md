@@ -1,22 +1,30 @@
-# Betynz v5.0.16 Start Here
+# Betynz v5.0.18 — Zeus Statistical Supervisor
 
-This is the seven-engine single-Render Betynz build with API-Football core data, Stats API enrichment and the universal **1.20–2.00** publication odds gate.
+This is the single-Render Betynz build with seven independent prediction engines plus **Zeus Statistical Intelligence** as the final statistical supervisor.
 
-## Upgrade from v5.0.15
+## Before deployment
 
-1. Replace the repository contents with this release, keeping the hidden `.git` folder.
-2. Keep your existing Render secrets, including `API_FOOTBALL_KEY` and `STATS_API_KEY`.
-3. Commit and push through GitHub Desktop.
-4. In Render choose **Manual Deploy → Clear build cache & deploy**.
-5. Hard refresh once with `Ctrl + Shift + R`.
+Keep the existing Render secrets:
 
-No Supabase migration is required for this release.
+- `API_FOOTBALL_KEY`
+- `STATS_API_KEY`
+- your existing Supabase variables
 
-## Universal odds rule
+Zeus requires **no new provider key**. It reuses the API-Football venue/HTFT/core data, Stats API streak/xG/SOT evidence, and the seven engine outputs.
 
-- Final odds **1.20 through 2.00 inclusive** are publishable.
-- Below 1.20: Betynz attempts a compatible market upgrade.
-- Above 2.00: Betynz attempts a compatible safer-market downgrade.
-- If no compatible alternative lands inside the band, the selection is rejected.
+## Supabase upgrade
 
-All seven engines and Consensus use the same final publication gate.
+If you are upgrading an existing Betynz v5.0.17 database, run this file once in the Supabase SQL Editor:
+
+`apps/web/sql/016_zeus_statistical_supervisor.sql`
+
+Do not rerun the fresh schema on an existing database. A brand-new Supabase project can use `apps/web/sql/001_market_route_fresh.sql`.
+
+## Deploy
+
+1. Replace the repository contents with this release, keeping the hidden `.git` folder if you use GitHub Desktop.
+2. Commit and push.
+3. In Render choose **Manual Deploy → Clear build cache & deploy**.
+4. Hard refresh the web app (`Ctrl + Shift + R`).
+
+The deployment remains one GitHub repository, one Render web service and one root `render.yaml`.

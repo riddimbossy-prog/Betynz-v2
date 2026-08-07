@@ -1,4 +1,4 @@
--- Betynz v5.0.14 fresh database schema with seven engines, consensus and calibration.
+-- Betynz v5.0.18 fresh database schema with seven independent engines, Zeus supervision, consensus and calibration.
 -- Use this only for a new Supabase project.
 
 create extension if not exists pgcrypto;
@@ -34,7 +34,7 @@ create table if not exists public.engine_predictions (
   league_name text,
   home_team text not null,
   away_team text not null,
-  engine text not null check (engine in ('MARKET_ROUTE','PPG_ROUTE','APEX_INTELLIGENCE','CONVERGENCE_ROUTE','MOMENTUM_STREAK','STREAK_VALUE','HTFT_MOMENTUM')),
+  engine text not null check (engine in ('MARKET_ROUTE','PPG_ROUTE','APEX_INTELLIGENCE','CONVERGENCE_ROUTE','MOMENTUM_STREAK','STREAK_VALUE','HTFT_MOMENTUM','ZEUS_SUPERVISOR')),
   market text not null,
   odds numeric(8,3),
   engine_score numeric(5,2),
@@ -57,7 +57,7 @@ create table if not exists public.prediction_snapshots (
   league_name text,
   home_team text not null,
   away_team text not null,
-  engine text not null check (engine in ('MARKET_ROUTE','PPG_ROUTE','APEX_INTELLIGENCE','CONVERGENCE_ROUTE','MOMENTUM_STREAK','STREAK_VALUE','HTFT_MOMENTUM')),
+  engine text not null check (engine in ('MARKET_ROUTE','PPG_ROUTE','APEX_INTELLIGENCE','CONVERGENCE_ROUTE','MOMENTUM_STREAK','STREAK_VALUE','HTFT_MOMENTUM','ZEUS_SUPERVISOR')),
   market text not null,
   selection_label text,
   odds numeric(8,3),

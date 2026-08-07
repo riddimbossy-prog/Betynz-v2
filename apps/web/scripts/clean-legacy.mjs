@@ -19,7 +19,8 @@ const allowedTests = new Set([
   'consensus.test.mjs',
   'calibration.test.mjs',
   'settlement.test.mjs',
-  'seven-engine-reset.test.mjs',
+  'eight-engine-zeus.test.mjs',
+  'zeus-intelligence.test.mjs',
   'streak-value.test.mjs',
   'htft-momentum.test.mjs',
   'transient-502-resilience.test.mjs',
@@ -30,7 +31,8 @@ const allowedTests = new Set([
   'platform-smoke.test.mjs',
   'progressive-engine-analysis.test.mjs',
   'fast-prediction-pipeline.test.mjs',
-  'universal-odds-gate.test.mjs'
+  'universal-odds-gate.test.mjs',
+  'runtime-stability.test.mjs'
 ]);
 
 try {
