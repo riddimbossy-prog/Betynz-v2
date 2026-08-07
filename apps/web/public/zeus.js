@@ -1,3 +1,4 @@
+import { dataBackedButton } from './data-backed-ui.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -27,6 +28,7 @@ function render(){if(!payload)return;const filter=$('#zeusDecisionFilter').value
   <div class="route-pick-head"><div><small>${esc(f.league?.country||'International')} · ${esc(f.league?.name||'League')} · ${esc(kickoff(f.kickoff))}</small><h2>${esc(f.home?.name)} vs ${esc(f.away?.name)}</h2></div><span class="zeus-verdict ${String(verdict).toLowerCase()}">${esc(badge(e.decision))}</span></div>
   <div class="zeus-meters"><div><small>ZEUS CONFIDENCE</small><strong>${Math.round(Number(e.confidence||0))}<i>/100</i></strong></div><div><small>DATA QUALITY</small><strong>${Math.round(Number(e.dataQuality||0))}<i>/100</i></strong></div><div><small>DOMINANT DIRECTION</small><b>${esc(String(e.dominantDirection||'NO CLEAR EDGE').replaceAll('_',' '))}</b></div><div><small>EVIDENCE FAMILIES</small><b>${Number(e.evidenceFamilies?.length||s.evidenceFamilies||0)}</b></div></div>
   ${s.market?`<div class="route-market zeus-market"><span><small>ZEUS APPROVED DIRECTION</small><b>${esc(s.label||s.market)}</b></span><strong>${odd(s.odds)}</strong></div>`:`<div class="zeus-hold-copy"><b>${esc(e.supervisor?.reason||'No clear statistical edge.')}</b></div>`}
+  ${s.market?dataBackedButton(e.dataValidation || s.dataValidation):''}
   <div class="zeus-card-grid"><section><h3>Strongest evidence</h3>${evidenceRows(candidate)||'<div class="muted">Evidence is still building.</div>'}</section><section><h3>Contradiction control</h3>${contradictionRows(e)}</section></div>
   <p class="muted">${esc(e.explanation||'')}</p>
  </article>`;}).join('');window.dispatchEvent(new CustomEvent('betynz:content-rendered'));

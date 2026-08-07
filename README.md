@@ -1,19 +1,5 @@
-# Betynz v5.0.18 — Seven Engines + Zeus Statistical Supervisor
+# Betynz v5.0.20 — Match-Specific Adaptive Recovery
 
-Single-Render football prediction platform using API-Football for fixtures, odds, live/results and core statistics, plus Stats API enrichment for Atlas.
+Betynz runs seven independent football-analysis engines plus Zeus statistical supervision. v5.0.20 adds a final adaptive recovery layer: when a proposed market fails its exact threshold/data check, the platform re-opens that individual fixture, examines the remaining market structure and statistics, and only publishes an alternative if that exact market is independently data-backed and priced 1.20–2.00.
 
-Active engines:
-
-1. Market Route
-2. PPG Route
-3. Apex Intelligence
-4. Convergence
-5. Momentum & Streak
-6. Atlas Streak Value
-7. Chronos HT/FT Momentum
-
-## Final publication gate
-
-Every official engine selection and every Consensus selection must finish at **1.20–2.00 inclusive**. Low prices are upgraded only to compatible harder markets; high prices are downgraded only to compatible safer markets. If no compatible market exists in the band, Betynz rejects the selection.
-
-This is a final publication layer and does not replace the evidence rules inside the individual engines.
+See `START_HERE.md` and `RELEASE_V5_0_20.md`.

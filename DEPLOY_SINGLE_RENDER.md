@@ -1,3 +1,9 @@
-# Deploy Betynz v5.0.18 on one Render service
+# Deploy Betynz v5.0.20 on one Render service
 
-Use the root `render.yaml`. Keep `API_FOOTBALL_KEY` and `STATS_API_KEY` private in Render. For an existing Supabase database run `apps/web/sql/015_seven_engine_stats_htft.sql` once. Deploy with **Clear build cache & deploy**, then confirm `/api/health` reports `5.0.14`.
+The repository contains one `render.yaml` and one web service.
+
+Keep the existing `API_FOOTBALL_KEY`, `STATS_API_KEY`, Supabase variables and the v5.0.17+ runtime-safety values.
+
+No new database migration is required when upgrading from v5.0.19 with SQL 016 already applied.
+
+Deploy with **Manual Deploy → Clear build cache & deploy** and verify `/api/health` reports `5.0.20`.

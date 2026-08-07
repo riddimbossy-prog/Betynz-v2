@@ -1,30 +1,19 @@
-# Betynz v5.0.18 — Zeus Statistical Supervisor
+# Betynz v5.0.20 — Start Here
 
-This is the single-Render Betynz build with seven independent prediction engines plus **Zeus Statistical Intelligence** as the final statistical supervisor.
+This is a complete single-Render replacement build.
 
-## Before deployment
+## Upgrade from v5.0.19
 
-Keep the existing Render secrets:
+No new Supabase migration is required if SQL `016_zeus_statistical_supervisor.sql` is already installed.
 
-- `API_FOOTBALL_KEY`
-- `STATS_API_KEY`
-- your existing Supabase variables
+1. Extract this package.
+2. Replace the repository contents while keeping your existing `.git` folder.
+3. Commit and push through GitHub Desktop.
+4. In Render choose **Manual Deploy → Clear build cache & deploy**.
+5. After the service is healthy, hard-refresh the site once with `Ctrl + Shift + R`.
 
-Zeus requires **no new provider key**. It reuses the API-Football venue/HTFT/core data, Stats API streak/xG/SOT evidence, and the seven engine outputs.
+## What changed
 
-## Supabase upgrade
+The final validation layer now performs match-specific recovery instead of a fixed safer-market fallback. Every recovered market must still pass the universal 1.20–2.00 gate and its own statistical validation.
 
-If you are upgrading an existing Betynz v5.0.17 database, run this file once in the Supabase SQL Editor:
-
-`apps/web/sql/016_zeus_statistical_supervisor.sql`
-
-Do not rerun the fresh schema on an existing database. A brand-new Supabase project can use `apps/web/sql/001_market_route_fresh.sql`.
-
-## Deploy
-
-1. Replace the repository contents with this release, keeping the hidden `.git` folder if you use GitHub Desktop.
-2. Commit and push.
-3. In Render choose **Manual Deploy → Clear build cache & deploy**.
-4. Hard refresh the web app (`Ctrl + Shift + R`).
-
-The deployment remains one GitHub repository, one Render web service and one root `render.yaml`.
+Check `/api/health` after deployment. It should report version `5.0.20` and include `adaptiveRecoveryPolicy`.

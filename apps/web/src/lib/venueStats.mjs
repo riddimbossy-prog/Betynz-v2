@@ -273,7 +273,9 @@ function normalizeSummary(summary) {
     over15: rawFlat.over15 ?? 0, over25: rawFlat.over25 ?? 0,
     under25: rawFlat.under25 ?? 0, under35: rawFlat.under35 ?? 0,
     btts: value('btts', 'bttsYes', 'btts_yes'), scored2Plus: value('scored2Plus', 'scored_2_plus', 'teamOver15', 'team_over_1_5'),
+    scored3Plus: value('scored3Plus', 'scored_3_plus', 'teamOver25', 'team_over_2_5'),
     conceded2Plus: value('conceded2Plus', 'conceded_2_plus', 'opponentOver15', 'opponent_over_1_5'),
+    conceded3Plus: value('conceded3Plus', 'conceded_3_plus', 'opponentOver25', 'opponent_over_2_5'),
     firstHalfOver05: value('firstHalfOver05', 'first_half_over_0_5', 'fh_over_0_5'),
     goalsForAvg: value('goalsForAvg', 'goals_for_avg', 'average_goals_scored'),
     goalsAgainstAvg: value('goalsAgainstAvg', 'goals_against_avg', 'average_goals_conceded'),
@@ -281,7 +283,8 @@ function normalizeSummary(summary) {
       played: recentValue('played', 'matches_played') || Math.min(3, played),
       wins: recentValue('wins'), draws: recentValue('draws'), losses: recentValue('losses'),
       scoredIn: recentValue('scoredIn', 'scored_in', 'teamOver05'), concededIn: recentValue('concededIn', 'conceded_in', 'opponentOver05'),
-      scored2Plus: recentValue('scored2Plus', 'teamOver15'), conceded2Plus: recentValue('conceded2Plus', 'opponentOver15'),
+      scored2Plus: recentValue('scored2Plus', 'teamOver15'), scored3Plus: recentValue('scored3Plus', 'teamOver25'),
+      conceded2Plus: recentValue('conceded2Plus', 'opponentOver15'), conceded3Plus: recentValue('conceded3Plus', 'opponentOver25'),
       over15: rawRecentGoal.over15 ?? 0, over25: rawRecentGoal.over25 ?? 0,
       under35: rawRecentGoal.under35 ?? 0, btts: recentValue('btts', 'bttsYes'),
       firstHalfOver05: recentValue('firstHalfOver05', 'first_half_over_0_5')
@@ -335,7 +338,8 @@ function normalizeSummary(summary) {
     cleanSheets: pct(result.cleanSheets, denominator), failedToScore: pct(result.failedToScore, denominator),
     over15: pct(result.over15, denominator), over25: pct(result.over25, denominator), under25: pct(result.under25, denominator),
     under35: pct(result.under35, denominator), btts: pct(result.btts, denominator), scored2Plus: pct(result.scored2Plus, denominator),
-    conceded2Plus: pct(result.conceded2Plus, denominator), firstHalfOver05: pct(result.firstHalfOver05, denominator)
+    scored3Plus: pct(result.scored3Plus, denominator), conceded2Plus: pct(result.conceded2Plus, denominator),
+    conceded3Plus: pct(result.conceded3Plus, denominator), firstHalfOver05: pct(result.firstHalfOver05, denominator)
   };
   return result;
 }
@@ -366,13 +370,15 @@ function summarizeRows(rows) {
     scoredIn: count(row => row.gf > 0), concededIn: count(row => row.ga > 0), cleanSheets: count(row => row.ga === 0),
     failedToScore: count(row => row.gf === 0), over15: count(row => row.gf + row.ga >= 2), over25: count(row => row.gf + row.ga >= 3),
     under25: count(row => row.gf + row.ga <= 2), under35: count(row => row.gf + row.ga <= 3), btts: count(row => row.gf > 0 && row.ga > 0),
-    scored2Plus: count(row => row.gf >= 2), conceded2Plus: count(row => row.ga >= 2), firstHalfOver05: count(row => Number.isFinite(row.halfGoals) && row.halfGoals >= 1),
+    scored2Plus: count(row => row.gf >= 2), scored3Plus: count(row => row.gf >= 3),
+    conceded2Plus: count(row => row.ga >= 2), conceded3Plus: count(row => row.ga >= 3), firstHalfOver05: count(row => Number.isFinite(row.halfGoals) && row.halfGoals >= 1),
     goalsForAvg: round(mean(selected.map(row => row.gf)) || 0, 2), goalsAgainstAvg: round(mean(selected.map(row => row.ga)) || 0, 2),
     recent3: {
       played: recent.length,
       wins: recentCount(row => row.gf > row.ga), draws: recentCount(row => row.gf === row.ga), losses: recentCount(row => row.gf < row.ga),
       scoredIn: recentCount(row => row.gf > 0), concededIn: recentCount(row => row.ga > 0),
-      scored2Plus: recentCount(row => row.gf >= 2), conceded2Plus: recentCount(row => row.ga >= 2),
+      scored2Plus: recentCount(row => row.gf >= 2), scored3Plus: recentCount(row => row.gf >= 3),
+      conceded2Plus: recentCount(row => row.ga >= 2), conceded3Plus: recentCount(row => row.ga >= 3),
       over15: recentCount(row => row.gf + row.ga >= 2), over25: recentCount(row => row.gf + row.ga >= 3),
       under35: recentCount(row => row.gf + row.ga <= 3), btts: recentCount(row => row.gf > 0 && row.ga > 0),
       firstHalfOver05: recentCount(row => Number.isFinite(row.halfGoals) && row.halfGoals >= 1)
@@ -383,7 +389,8 @@ function summarizeRows(rows) {
     scoredIn: pct(result.scoredIn, played), concededIn: pct(result.concededIn, played), cleanSheets: pct(result.cleanSheets, played),
     failedToScore: pct(result.failedToScore, played), over15: pct(result.over15, played), over25: pct(result.over25, played),
     under25: pct(result.under25, played), under35: pct(result.under35, played), btts: pct(result.btts, played),
-    scored2Plus: pct(result.scored2Plus, played), conceded2Plus: pct(result.conceded2Plus, played), firstHalfOver05: pct(result.firstHalfOver05, played)
+    scored2Plus: pct(result.scored2Plus, played), scored3Plus: pct(result.scored3Plus, played),
+    conceded2Plus: pct(result.conceded2Plus, played), conceded3Plus: pct(result.conceded3Plus, played), firstHalfOver05: pct(result.firstHalfOver05, played)
   };
   return result;
 }

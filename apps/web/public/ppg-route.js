@@ -1,3 +1,4 @@
+import { dataBackedButton } from './data-backed-ui.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -113,6 +114,7 @@ function render() {
         <span class="decision-pill ${String(selection.decision || '').toLowerCase()}">${esc(selection.decision || engine.decision || 'FIRE')}</span>
       </div>
       <div class="route-market"><b>${esc(selection.label || selection.market)}</b><strong>${odd(selection.odds)}</strong></div>
+      ${dataBackedButton(engine.dataValidation || selection.dataValidation)}
       <div class="ppg-split-grid">
         <div><small>Home · last 5 home</small><strong>${Number(item.venueForm?.home?.ppg || 0).toFixed(2)} PPG</strong><div class="form-chips">${formChips(item.venueForm?.home?.form)}</div></div>
         <div><small>Away · last 5 away</small><strong>${Number(item.venueForm?.away?.ppg || 0).toFixed(2)} PPG</strong><div class="form-chips">${formChips(item.venueForm?.away?.form)}</div></div>

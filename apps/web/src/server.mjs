@@ -12,6 +12,8 @@ import { analyzeStreakValue, streakValueSummary } from './engines/streakValue.mj
 import { analyzeHtftMomentum, htftMomentumSummary } from './engines/htftMomentum.mjs';
 import { analyzeZeusIntelligence, applyZeusSupervisor, zeusSummary } from './engines/zeusIntelligence.mjs';
 import { applyUniversalOddsGate, isUniversalOddsPublishable, UNIVERSAL_ODDS_GATE } from './engines/universalOddsGate.mjs';
+import { applyDataBackedValidation, DATA_BACKED_POLICY } from './engines/dataBackedValidation.mjs';
+import { recoverSelectionByMatchReasoning, ADAPTIVE_RECOVERY_POLICY } from './engines/adaptiveMarketRecovery.mjs';
 import { buildConsensusForFixture, buildConsensusWindow, consensusSummary } from './engines/consensus.mjs';
 import { extractVenueStats, matchFixture } from './lib/venueStats.mjs';
 import { statsApiConfigured, statsApiRateState, buildStatsApiFixtureEvidence, addGoalEvidence } from './lib/statsApi.mjs';
@@ -55,7 +57,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.0.18';
+const APP_VERSION = '5.0.20';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const APEX_INTELLIGENCE_CODE = 'APEX_INTELLIGENCE';
@@ -181,7 +183,7 @@ async function loadApiFootballMedia(kind, id) {
       const keyValue = String(process.env.API_FOOTBALL_KEY || '');
       const headers = {
         accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'user-agent': 'Betynz-Media-Proxy/5.0.18'
+        'user-agent': 'Betynz-Media-Proxy/5.0.20'
       };
       if (keyValue) headers[keyHeader] = keyValue;
       const response = await fetch(apiFootballMediaUrl(kind, id), { headers, signal: controller.signal, redirect: 'follow' });
@@ -572,7 +574,9 @@ function publicProofRow(row) {
     awayScore: row.away_score,
     profit: row.profit_units,
     frozenAt: row.frozen_at,
-    reasons: Array.isArray(row.reasons) ? row.reasons : []
+    reasons: Array.isArray(row.reasons) ? row.reasons : [],
+    dataBacked: row?.payload?.dataValidation?.status === 'BACKED_BY_DATA',
+    dataValidation: row?.payload?.dataValidation || null
   };
 }
 
@@ -603,16 +607,25 @@ function publicConsensusProofRow(row) {
     profit: row.profit_units,
     frozenAt: row.frozen_at,
     reasons: Array.isArray(row.reasons) ? row.reasons : [],
+    dataBacked: row?.payload?.consensus?.final?.dataValidation?.status === 'BACKED_BY_DATA',
+    dataValidation: row?.payload?.consensus?.final?.dataValidation || null,
     enginePicks: Array.isArray(row.engine_picks) ? row.engine_picks : []
   };
+}
+
+function finalizeEngineOutput(rawEngine, fixture = {}, stats = null, statsEvidence = null) {
+  const source = rawEngine || {};
+  const oddsGated = applyUniversalOddsGate(source, fixture?.odds || {});
+  const dataChecked = applyDataBackedValidation(oddsGated, fixture, stats, statsEvidence);
+  return recoverSelectionByMatchReasoning(dataChecked, source, fixture, stats, statsEvidence);
 }
 
 function predictionRows(date, items = [], engineCode = MARKET_ROUTE_CODE) {
   const now = Date.now();
   return items.flatMap(item => {
     const fixture = item.fixture || {};
-    const gatedEngine = applyUniversalOddsGate(item.engine || {}, fixture.odds || {});
-    const selection = gatedEngine?.selection;
+    const gatedEngine = item.engine || {};
+    const selection = gatedEngine?.dataValidation?.status === 'BACKED_BY_DATA' ? gatedEngine?.selection : null;
     const kickoff = new Date(fixture.kickoff).getTime();
     if (!selection || !Number.isFinite(kickoff) || kickoff <= now) return [];
     return [{
@@ -634,7 +647,7 @@ function predictionRows(date, items = [], engineCode = MARKET_ROUTE_CODE) {
       settlement_status: 'PENDING',
       reasons: selection.reasons || [],
       odds_snapshot: fixture.odds || {},
-      payload: { fixture: publicFixture(fixture), engine: engineSummary(engineCode, gatedEngine), oddsGate: gatedEngine.oddsGate || null },
+      payload: { fixture: publicFixture(fixture), engine: engineSummary(engineCode, gatedEngine), oddsGate: gatedEngine.oddsGate || null, dataValidation: gatedEngine.dataValidation || null },
       frozen_at: new Date().toISOString()
     }];
   });
@@ -687,7 +700,7 @@ async function getMarketRouteBoard(date) {
     // added later from the shared stats job and in match intelligence.
     const items = (board.fixtures || []).map(fixture => ({
       fixture: publicFixture(fixture),
-      engine: applyUniversalOddsGate(analyzeMarketRoute(fixture, null), fixture.odds || {}),
+      engine: finalizeEngineOutput(analyzeMarketRoute(fixture, null), fixture, null, null),
       venueForm: null
     })).filter(item => item.fixture);
     storePredictions(date, items, MARKET_ROUTE_CODE).catch(error => console.error('Market prediction storage failed:', error.message));
@@ -751,7 +764,7 @@ function predictionPriority(fixtures = []) {
 function routeItem(fixture, stats, analyser) {
   const safeFixture = publicFixture(fixture);
   if (!safeFixture) return null;
-  return { fixture: safeFixture, engine: applyUniversalOddsGate(analyser(fixture, stats), fixture.odds || {}), venueForm: publicVenueForm(stats) };
+  return { fixture: safeFixture, engine: finalizeEngineOutput(analyser(fixture, stats), fixture, stats, null), venueForm: publicVenueForm(stats) };
 }
 
 function responseSummary(items = [], eligible = 0, processed = 0) {
@@ -1074,7 +1087,7 @@ function publicStatsValueEvidence(evidence = null) {
 function streakValueItem(fixture, evidence = null) {
   const safeFixture = publicFixture(fixture);
   if (!safeFixture) return null;
-  return { fixture: safeFixture, engine: applyUniversalOddsGate(analyzeStreakValue(fixture, evidence), fixture.odds || {}), statsEvidence: publicStatsValueEvidence(evidence) };
+  return { fixture: safeFixture, engine: finalizeEngineOutput(analyzeStreakValue(fixture, evidence), fixture, null, publicStatsValueEvidence(evidence)), statsEvidence: publicStatsValueEvidence(evidence) };
 }
 
 function waitingStreakValueResponse(date, fixtures = [], oddsPending = false) {
@@ -1155,12 +1168,12 @@ async function getStreakValueBoard(date) {
         const fixture = queue.shift();
         try {
           let evidence = await buildStatsApiFixtureEvidence(date, fixture);
-          let analysed = applyUniversalOddsGate(analyzeStreakValue(fixture, evidence), fixture.odds || {});
+          let analysed = finalizeEngineOutput(analyzeStreakValue(fixture, evidence), fixture, null, publicStatsValueEvidence(evidence));
           // Expensive match-stat calls are reserved for goal/team-total routes
           // that already have meaningful streak + price support.
           if (evidence?.mapped && goalCandidate(analysed)) {
             evidence = await addGoalEvidence(evidence);
-            analysed = applyUniversalOddsGate(analyzeStreakValue(fixture, evidence), fixture.odds || {});
+            analysed = finalizeEngineOutput(analyzeStreakValue(fixture, evidence), fixture, null, publicStatsValueEvidence(evidence));
           }
           items.set(String(fixture.id), { fixture: publicFixture(fixture), engine: analysed, statsEvidence: publicStatsValueEvidence(evidence) });
         } catch (error) {
@@ -1227,7 +1240,7 @@ function composeZeusBoard(date, board, marketBoard, statsSnapshot, streakSnapsho
       { code: HTFT_MOMENTUM_CODE, result: htft.get(id)?.engine }
     ].filter(item => item.result);
     const raw = analyzeZeusIntelligence({ fixture, stats, statsEvidence, engineResults });
-    return { fixture: publicFixture(fixture), engine: applyUniversalOddsGate(raw, fixture.odds || {}), venueForm, statsEvidence };
+    return { fixture: publicFixture(fixture), engine: finalizeEngineOutput(raw, fixture, stats, statsEvidence), venueForm, statsEvidence };
   }).filter(item => item.fixture);
   const statsComplete = Boolean(statsSnapshot?.ppg?.complete && statsSnapshot?.apex?.complete && statsSnapshot?.convergence?.complete && statsSnapshot?.momentum?.complete && statsSnapshot?.htft?.complete);
   const complete = Boolean(statsComplete && streakSnapshot?.complete && !board?.oddsPending);
@@ -1282,8 +1295,8 @@ function decorateConsensusWithZeus(row, zeusItem, date) {
 
 function publicQualifiedPick(item, date, engineCode = MARKET_ROUTE_CODE) {
   const fixture = item?.fixture || {};
-  const gatedEngine = applyUniversalOddsGate(item?.engine || {}, fixture.odds || item?._odds || {});
-  const selection = gatedEngine?.selection || null;
+  const gatedEngine = item?.engine || {};
+  const selection = gatedEngine?.dataValidation?.status === 'BACKED_BY_DATA' ? gatedEngine?.selection : null;
   if (!selection || !isUniversalOddsPublishable(selection.odds)) return null;
   const kickoff = new Date(fixture.kickoff).getTime();
   if (!Number.isFinite(kickoff) || kickoff <= Date.now()) return null;
@@ -1306,6 +1319,8 @@ function publicQualifiedPick(item, date, engineCode = MARKET_ROUTE_CODE) {
     grade: selection.grade,
     routeName: selection.routeName,
     reasons: Array.isArray(selection.reasons) ? selection.reasons.slice(0, 5) : [],
+    dataBacked: true,
+    dataValidation: gatedEngine.dataValidation || selection.dataValidation || null,
     missedCondition: selection.missedCondition || null,
     publishedAt: new Date().toISOString(),
     _odds: fixture.odds || {}
@@ -1314,7 +1329,7 @@ function publicQualifiedPick(item, date, engineCode = MARKET_ROUTE_CODE) {
 
 function publicSnapshotQualifiedPick(row) {
   const kickoff = new Date(row?.kickoff).getTime();
-  if (!Number.isFinite(kickoff) || kickoff <= Date.now() || !['FIRE','SAFER'].includes(String(row?.decision || '').toUpperCase()) || !isUniversalOddsPublishable(row?.odds)) return null;
+  if (!Number.isFinite(kickoff) || kickoff <= Date.now() || !['FIRE','SAFER'].includes(String(row?.decision || '').toUpperCase()) || !isUniversalOddsPublishable(row?.odds) || row?.payload?.dataValidation?.status !== 'BACKED_BY_DATA') return null;
   return {
     fixtureId: row.fixture_id,
     engine: row.engine,
@@ -1334,6 +1349,8 @@ function publicSnapshotQualifiedPick(row) {
     grade: row.grade,
     routeName: row.payload?.engine?.selection?.routeName || row.payload?.engine?.closest?.name || `${engineName(row.engine)} route`,
     reasons: Array.isArray(row.reasons) ? row.reasons.slice(0, 5) : [],
+    dataBacked: true,
+    dataValidation: row?.payload?.dataValidation || null,
     missedCondition: row.payload?.engine?.selection?.missedCondition || null
   };
 }
@@ -1379,7 +1396,7 @@ function consensusDatabaseRow(row) {
 }
 
 async function storeConsensusRows(rows = []) {
-  const publishable = rows.filter(row => ['ELITE_BANKER', 'CONSENSUS_BANKER', 'QUALIFIED_PICK', 'SAFER_PICK'].includes(row.classification) && row.final?.market && Number(row.final?.odds) > 1);
+  const publishable = rows.filter(row => ['ELITE_BANKER', 'CONSENSUS_BANKER', 'QUALIFIED_PICK', 'SAFER_PICK'].includes(row.classification) && row.final?.market && Number(row.final?.odds) > 1 && (!row.enginePicks?.some?.(pick => pick?.dataValidation) || row.final?.dataValidation?.status === 'BACKED_BY_DATA'));
   if (!publishable.length) return;
   const candidateRows = publishable.map(consensusDatabaseRow).filter(Boolean);
   const frozenRows = publishable.filter(row => row.status === 'FROZEN').map(row => ({
@@ -1450,7 +1467,7 @@ async function getQualifiedPicksWindow(from, days = 7) {
   const singleQualified = consensusRows.filter(item => item.classification === 'QUALIFIED_PICK');
   const saferConsensus = consensusRows.filter(item => item.classification === 'SAFER_PICK');
   const conflicts = consensusRows.filter(item => item.classification === 'CONFLICT');
-  const holds = consensusRows.filter(item => ['HOLD_MISSING_SHARED_PRICE','ZEUS_HOLD'].includes(item.classification));
+  const holds = consensusRows.filter(item => ['HOLD_MISSING_SHARED_PRICE','HOLD_DATA_VALIDATION','ZEUS_HOLD'].includes(item.classification));
   const publishable = [...elite, ...consensusBankers, ...singleQualified, ...saferConsensus]
     .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff) || b.agreementCount - a.agreementCount || b.score - a.score);
   const bankers = [...elite, ...consensusBankers].sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff) || b.agreementCount - a.agreementCount);
@@ -1518,7 +1535,7 @@ function partialConsensusResponse(from, days, marketBoard, statsSnapshot, streak
   const singleQualified = consensusRows.filter(item => item.classification === 'QUALIFIED_PICK');
   const saferConsensus = consensusRows.filter(item => item.classification === 'SAFER_PICK');
   const conflicts = consensusRows.filter(item => item.classification === 'CONFLICT');
-  const holds = consensusRows.filter(item => ['HOLD_MISSING_SHARED_PRICE','ZEUS_HOLD'].includes(item.classification));
+  const holds = consensusRows.filter(item => ['HOLD_MISSING_SHARED_PRICE','HOLD_DATA_VALIDATION','ZEUS_HOLD'].includes(item.classification));
   const publishable = [...elite, ...consensusBankers, ...singleQualified, ...saferConsensus];
   const bankers = [...elite, ...consensusBankers];
   const statsComplete = Boolean(statsSnapshot?.ppg?.complete && statsSnapshot?.apex?.complete && statsSnapshot?.convergence?.complete && statsSnapshot?.momentum?.complete && statsSnapshot?.htft?.complete && streakSnapshot?.complete && zeusSnapshot?.complete);
@@ -1758,6 +1775,8 @@ async function apiRoute(req, res, url) {
     sourceRoles: { fixtures: 'API_FOOTBALL', odds: 'API_FOOTBALL', live: 'API_FOOTBALL', results: 'API_FOOTBALL', coreStatistics: 'API_FOOTBALL', streakIntelligence: 'STATS_API', xg: 'STATS_API', visuals: 'API_FOOTBALL', supervisor: 'ZEUS_COMPOSITE' },
     fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null },
     oddsGate: UNIVERSAL_ODDS_GATE,
+    dataBackedPolicy: DATA_BACKED_POLICY,
+    adaptiveRecoveryPolicy: ADAPTIVE_RECOVERY_POLICY,
     time: new Date().toISOString()
   });
 
@@ -1770,6 +1789,8 @@ async function apiRoute(req, res, url) {
     dataSources: { fixtures: 'API-Football', odds: 'API-Football', primaryStatistics: 'API-Football', streaksAndXg: 'Stats API', visuals: 'API-Football', live: 'API-Football', results: 'API-Football' },
     fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null },
     oddsGate: UNIVERSAL_ODDS_GATE,
+    dataBackedPolicy: DATA_BACKED_POLICY,
+    adaptiveRecoveryPolicy: ADAPTIVE_RECOVERY_POLICY,
     responsiblePlay: 'Predictions are informational, not guarantees. Adults only.'
   });
 
@@ -2012,15 +2033,16 @@ async function apiRoute(req, res, url) {
         fixture.away = { ...fixture.away, id: apiStats.fixture.away?.id || fixture.away?.id || null, logo: apiStats.fixture.away?.logo || fixture.away?.logo || null };
         fixture.league = { ...fixture.league, id: apiStats.fixture.league?.id || fixture.league?.id || null, logo: apiStats.fixture.league?.logo || fixture.league?.logo || null, flag: apiStats.fixture.league?.flag || fixture.league?.flag || null, season: apiStats.fixture.league?.season || fixture.league?.season || null };
       }
-      const engine = applyUniversalOddsGate(analyzeMarketRoute(fixture, stats), fixture.odds || {});
-      const ppgEngine = applyUniversalOddsGate(analyzePpgRoute(fixture, stats), fixture.odds || {});
-      const apexEngine = applyUniversalOddsGate(analyzeApexIntelligence(fixture, stats), fixture.odds || {});
-      const convergenceEngine = applyUniversalOddsGate(analyzeConvergence(fixture, stats), fixture.odds || {});
-      const momentumEngine = applyUniversalOddsGate(analyzeMomentumStreak(fixture, stats), fixture.odds || {});
-      const htftEngine = applyUniversalOddsGate(analyzeHtftMomentum(fixture, stats), fixture.odds || {});
       const atlasSnapshot = await ensureStreakValueView(date);
       const atlasItem = (atlasSnapshot?.all || []).find(item => String(item?.fixture?.id || '') === String(fixture.id || ''));
-      const streakValueEngine = atlasItem?.engine || applyUniversalOddsGate(analyzeStreakValue(fixture, null), fixture.odds || {});
+      const statsEvidence = atlasItem?.statsEvidence || null;
+      const engine = finalizeEngineOutput(analyzeMarketRoute(fixture, stats), fixture, stats, statsEvidence);
+      const ppgEngine = finalizeEngineOutput(analyzePpgRoute(fixture, stats), fixture, stats, statsEvidence);
+      const apexEngine = finalizeEngineOutput(analyzeApexIntelligence(fixture, stats), fixture, stats, statsEvidence);
+      const convergenceEngine = finalizeEngineOutput(analyzeConvergence(fixture, stats), fixture, stats, statsEvidence);
+      const momentumEngine = finalizeEngineOutput(analyzeMomentumStreak(fixture, stats), fixture, stats, statsEvidence);
+      const htftEngine = finalizeEngineOutput(analyzeHtftMomentum(fixture, stats), fixture, stats, statsEvidence);
+      const streakValueEngine = atlasItem?.engine || finalizeEngineOutput(analyzeStreakValue(fixture, null), fixture, stats, atlasItem?.statsEvidence || null);
       const selectedPicks = [
         publicQualifiedPick({ fixture, engine }, date, MARKET_ROUTE_CODE),
         publicQualifiedPick({ fixture, engine: ppgEngine }, date, PPG_ROUTE_CODE),
@@ -2030,7 +2052,7 @@ async function apiRoute(req, res, url) {
         publicQualifiedPick({ fixture, engine: streakValueEngine }, date, STREAK_VALUE_CODE),
         publicQualifiedPick({ fixture, engine: htftEngine }, date, HTFT_MOMENTUM_CODE)
       ].filter(Boolean);
-      const zeusEngine = applyUniversalOddsGate(analyzeZeusIntelligence({
+      const zeusEngine = finalizeEngineOutput(analyzeZeusIntelligence({
         fixture,
         stats,
         statsEvidence: atlasItem?.statsEvidence || null,
@@ -2040,7 +2062,7 @@ async function apiRoute(req, res, url) {
           { code: MOMENTUM_STREAK_CODE, result: momentumEngine }, { code: STREAK_VALUE_CODE, result: streakValueEngine },
           { code: HTFT_MOMENTUM_CODE, result: htftEngine }
         ]
-      }), fixture.odds || {});
+      }), fixture, stats, atlasItem?.statsEvidence || null);
       const consensusEngine = decorateConsensusWithZeus(consensusLifecycle(buildConsensusForFixture({
         fixture: {
           fixtureId: fixture.id,

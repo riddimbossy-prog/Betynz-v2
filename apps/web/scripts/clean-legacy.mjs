@@ -32,7 +32,9 @@ const allowedTests = new Set([
   'progressive-engine-analysis.test.mjs',
   'fast-prediction-pipeline.test.mjs',
   'universal-odds-gate.test.mjs',
-  'runtime-stability.test.mjs'
+  'runtime-stability.test.mjs',
+  'data-backed-validation.test.mjs',
+  'adaptive-market-recovery.test.mjs'
 ]);
 
 try {

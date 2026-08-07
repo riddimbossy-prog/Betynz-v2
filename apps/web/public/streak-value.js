@@ -1,3 +1,4 @@
+import { dataBackedButton } from './data-backed-ui.js';
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const odd=v=>Number(v)>1?Number(v).toFixed(2):'—';
@@ -107,6 +108,7 @@ function render(){
         <span class="decision-pill ${String(s.decision||'').toLowerCase()}">${esc(s.decision||'FIRE')}</span>
       </div>
       <div class="route-market atlas-market-banner"><div><small>OFFICIAL ATLAS PICK</small><b>${esc(s.label||s.market)}</b></div><strong>${odd(s.odds)}</strong></div>
+      ${dataBackedButton(e.dataValidation || s.dataValidation)}
       <div class="atlas-team-grid">${evidence(ev.home,f.home?.name||'Home')}${evidence(ev.away,f.away?.name||'Away')}</div>
       <div class="atlas-signal-row">
         ${signalBox('xG',hg.xgFor??'—',ag.xgFor??'—',xgSub)}

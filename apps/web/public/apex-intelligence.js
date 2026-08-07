@@ -1,3 +1,4 @@
+import { dataBackedButton } from './data-backed-ui.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -112,6 +113,7 @@ function render() {
         <span class="decision-pill ${String(selection.decision || '').toLowerCase()}">${esc(selection.decision || engine.decision || 'FIRE')}</span>
       </div>
       <div class="route-market"><b>${esc(selection.label || selection.market)}</b><strong>${odd(selection.odds)}</strong></div>
+      ${dataBackedButton(engine.dataValidation || selection.dataValidation)}
       <div class="apex-score-row"><span>Composite score <b>${Number(selection.score || candidate.score || 0)}%</b></span><span>Evidence families <b>${Number(selection.evidenceFamilies || candidate.familyCount || 0)}</b></span><span>Data quality <b>${Number(engine.dataQuality || 0)}%</b></span></div>
       <div class="apex-split-grid">
         <div><small>Home · last 5 home</small><strong>${Number(item.venueForm?.home?.ppg || 0).toFixed(2)} strength</strong><div class="form-chips">${formChips(item.venueForm?.home?.form)}</div></div>

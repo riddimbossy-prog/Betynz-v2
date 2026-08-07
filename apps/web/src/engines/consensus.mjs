@@ -125,6 +125,8 @@ function publicEnginePick(pick) {
     score: Number(pick.score || 0),
     routeName: pick.routeName || null,
     reasons: Array.isArray(pick.reasons) ? pick.reasons.slice(0, 4) : [],
+    dataBacked: Boolean(pick.dataBacked),
+    dataValidation: pick.dataValidation || null,
     missedCondition: pick.missedCondition || null
   };
 }
@@ -179,19 +181,25 @@ export function buildConsensusForFixture({ fixture = {}, picks = [], odds = {} }
   const agreementCount = best.count;
   let classification = agreementCount >= 7 ? 'ELITE_BANKER' : agreementCount >= 5 ? 'CONSENSUS_BANKER' : agreementCount >= 2 ? 'QUALIFIED_PICK' : best.picks[0]?.decision === 'FIRE' ? 'QUALIFIED_PICK' : 'SAFER_PICK';
   if (agreementCount >= 2 && !isUniversalOddsPublishable(finalOdds)) classification = 'HOLD_MISSING_SHARED_PRICE';
+  const validationAware = usable.some(item => item?.dataValidation);
+  const finalValidation = best.picks.find(item =>
+    String(item.market || '').toUpperCase() === String(finalMarket || '').toUpperCase()
+    && item.dataValidation?.status === 'BACKED_BY_DATA'
+  )?.dataValidation || null;
+  if (validationAware && finalMarket && isUniversalOddsPublishable(finalOdds) && !finalValidation) classification = 'HOLD_DATA_VALIDATION';
 
   return {
     ...base,
     classification,
     agreementCount,
     agreementDirection: best.direction,
-    final: finalMarket && isUniversalOddsPublishable(finalOdds) ? { market: finalMarket, label: MARKET_LABELS[finalMarket] || best.picks[0]?.label || finalMarket, odds: finalOdds } : null,
+    final: finalMarket && isUniversalOddsPublishable(finalOdds) && (!validationAware || Boolean(finalValidation)) ? { market: finalMarket, label: MARKET_LABELS[finalMarket] || best.picks[0]?.label || finalMarket, odds: finalOdds, dataBacked: Boolean(finalValidation), dataValidation: finalValidation } : null,
     engines: best.picks.map(item => item.engine),
     enginePicks: usable.map(publicEnginePick),
     score: Number(best.averageScore.toFixed(1)),
     reasons: [
       `${agreementCount} independent engine${agreementCount === 1 ? '' : 's'} support ${best.direction.replaceAll('_', ' ').toLowerCase()}.`,
-      finalMarket ? `The safest shared market is ${MARKET_LABELS[finalMarket] || finalMarket}.` : 'No common market could be selected.',
+      classification === 'HOLD_DATA_VALIDATION' ? 'The shared market is waiting for exact statistical validation before publication.' : finalMarket ? `The safest shared market is ${MARKET_LABELS[finalMarket] || finalMarket}.` : 'No common market could be selected.',
       agreementCount >= 7 ? 'Elite status requires complete seven-engine agreement.' : agreementCount >= 5 ? `${agreementCount} of seven independent engines agree, so this qualifies as a consensus banker.` : agreementCount >= 2 ? `${agreementCount} engines agree, so this remains a shared qualified pick rather than a banker.` : 'This remains a single-engine qualified route.'
     ]
   };
@@ -232,7 +240,7 @@ export function consensusSummary(rows = []) {
     qualified: count('QUALIFIED_PICK'),
     safer: count('SAFER_PICK'),
     conflicts: count('CONFLICT'),
-    holds: count('HOLD_MISSING_SHARED_PRICE') + count('ZEUS_HOLD')
+    holds: count('HOLD_MISSING_SHARED_PRICE') + count('HOLD_DATA_VALIDATION') + count('ZEUS_HOLD')
   };
 }
 

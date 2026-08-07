@@ -1,3 +1,4 @@
+import { dataBackedButton } from './data-backed-ui.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -67,6 +68,12 @@ function engineChips(row) {
   return (row.enginePicks || []).map(item => `<span class="engine-proof-chip ${item.decision === 'FIRE' ? 'fire' : 'safer'}"><b>${esc(engineName(item.engine))}</b><small>${esc(item.label || item.market)}</small></span>`).join('');
 }
 
+
+function consensusValidation(row) {
+  const picks = Array.isArray(row?.enginePicks) ? row.enginePicks : [];
+  const exact = picks.find(p => p?.dataValidation?.status === 'BACKED_BY_DATA' && String(p.market||'') === String(row?.final?.market||''));
+  return exact?.dataValidation || picks.find(p => p?.dataValidation?.status === 'BACKED_BY_DATA')?.dataValidation || null;
+}
 function consensusCard(row, compact = false) {
   const cls = String(row.classification || '').toLowerCase().replaceAll('_', '-');
   const status = row.status === 'FROZEN' ? 'FROZEN BEFORE KICKOFF' : `PROVISIONAL · FREEZES ${row.freezeMinutes || 30} MIN BEFORE KICKOFF`;
@@ -75,6 +82,7 @@ function consensusCard(row, compact = false) {
     <small>${esc(row.country)} · ${esc(row.league)} · ${esc(dayLabel(row.date))} · ${esc(kickoffLabel(row.kickoff))}</small>
     <h3>${esc(row.home?.name)} <i>vs</i> ${esc(row.away?.name)}</h3>
     ${row.final ? `<div class="official-tip"><span>OFFICIAL TIP</span><strong>${esc(row.final.label || row.final.market)}</strong><b>${odd(row.final.odds)}</b></div>` : ''}
+    ${row.final ? dataBackedButton(consensusValidation(row), 'Statistically backed') : ''}
     <div class="agreement-meter"><span style="--agreement:${Math.max(1, Number(row.agreementCount || 0))}"></span><b>${Number(row.agreementCount || 0)}/7 engines agree</b><em>${row.zeusVerdict ? `⚡ Zeus ${esc(row.zeusVerdict)}` : `${Number(row.score || 0).toFixed(0)} agreement score`}</em></div>
     <div class="engine-proof-row">${engineChips(row)}</div>
     ${compact ? '' : `<ul>${(row.reasons || []).slice(0, 3).map(reason => `<li>${esc(reason)}</li>`).join('')}</ul>`}

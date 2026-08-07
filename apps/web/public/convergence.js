@@ -1,3 +1,4 @@
+import { dataBackedButton } from './data-backed-ui.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -104,6 +105,7 @@ function render() {
         <span class="decision-pill ${String(selection.decision || '').toLowerCase()}">${esc(selection.decision || 'FIRE')}</span>
       </div>
       <div class="route-market"><b>${esc(selection.label || selection.market)}</b><strong>${odd(selection.odds)}</strong></div>
+      ${dataBackedButton(engine.dataValidation || selection.dataValidation)}
       <div class="conv-card-blocks">${(candidate.blocks || []).map(block => `<div><small>${esc(block.name)}</small><b>${Number(block.score || 0).toFixed(0)}/25</b></div>`).join('')}</div>
       <p class="muted">${esc(engine.explanation || '')}</p>
       <div class="route-card-checks">${(candidate.blockers || []).map(reason => `<span class="fail">× ${esc(reason)}</span>`).join('') || `<span class="pass">✓ ${Number(selection.score || candidate.score || 0).toFixed(0)}% total convergence</span>`}</div>

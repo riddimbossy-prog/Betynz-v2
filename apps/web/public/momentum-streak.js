@@ -1,3 +1,4 @@
+import { dataBackedButton } from './data-backed-ui.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -113,6 +114,7 @@ function render() {
         <span class="decision-pill ${String(selection.decision || '').toLowerCase()}">${esc(selection.decision || 'FIRE')}</span>
       </div>
       <div class="route-market"><b>${esc(selection.label || selection.market)}</b><strong>${odd(selection.odds)}</strong></div>
+      ${dataBackedButton(engine.dataValidation || selection.dataValidation)}
       <div class="momentum-team-grid"><article><small>${esc(fixture.home?.name || 'Home')}</small>${streakLine(engine.home)}</article><article><small>${esc(fixture.away?.name || 'Away')}</small>${streakLine(engine.away)}</article></div>
       <div class="momentum-family-row">${(selection.streakFamilies || candidate.streakFamilies || []).map(value => `<span>${esc(String(value).replaceAll('_',' '))}</span>`).join('')}</div>
       <p class="muted">${esc(engine.explanation || '')}</p>

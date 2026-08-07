@@ -1,3 +1,4 @@
+import { dataBackedButton } from './data-backed-ui.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -85,6 +86,7 @@ function render() {
     return `<article class="route-pick-card">
       <div class="route-pick-head"><div><h2>${esc(fixture.home?.name)} vs ${esc(fixture.away?.name)}</h2><p>${esc(fixture.league?.country || 'International')} · ${esc(fixture.league?.name || 'League')} · ${new Date(fixture.kickoff).toLocaleString([], { weekday:'short', hour:'2-digit', minute:'2-digit' })}</p></div><span class="decision-pill ${String(selection.decision || '').toLowerCase()}">${esc(selection.decision || engine.decision)}</span></div>
       <div class="route-market"><b>${esc(selection.label || selection.market)}</b><strong>${odd(selection.odds)}</strong></div>
+      ${dataBackedButton(engine.dataValidation || selection.dataValidation)}
       <p class="muted">${esc(engine.explanation || '')}</p>
       <div class="route-card-checks">${(candidate?.checks || []).map(check => `<span class="${check.pass ? 'pass' : 'fail'}">${check.pass ? '✓' : '×'} ${esc(check.label)} · ${esc(check.actual)}</span>`).join('')}</div>
     </article>`;

@@ -1,3 +1,4 @@
+import { dataBackedButton } from './data-backed-ui.js';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 
@@ -543,6 +544,34 @@ function setCrest(imageSelector, fallbackSelector, team, country = '') {
   image.src = logo;
 }
 
+
+function attachDataBacked(selector, engineOrValidation, text='Backed by data') {
+  const card = $(selector);
+  if (!card) return;
+  card.querySelector('.data-backed-inline')?.remove();
+  const validation = engineOrValidation?.dataValidation || engineOrValidation?.selection?.dataValidation || engineOrValidation || null;
+  const html = dataBackedButton(validation, text);
+  if (!html) return;
+  const holder = document.createElement('div');
+  holder.className = 'data-backed-inline';
+  holder.innerHTML = html;
+  const anchor = card.querySelector('.route-market, .route-result-head, .route-selection, h3');
+  if (anchor) anchor.insertAdjacentElement('afterend', holder);
+  else card.prepend(holder);
+}
+
+function attachAllDataBacked(payload={}) {
+  attachDataBacked('#routeResultCard', payload.engine);
+  attachDataBacked('#ppgResultCard', payload.ppgEngine);
+  attachDataBacked('#apexResultCard', payload.apexEngine);
+  attachDataBacked('#convergenceResultCard', payload.convergenceEngine);
+  attachDataBacked('#momentumResultCard', payload.momentumEngine);
+  attachDataBacked('#atlasResultCard', payload.streakValueEngine);
+  attachDataBacked('#htftResultCard', payload.htftEngine);
+  attachDataBacked('#zeusResultCard', payload.zeusEngine);
+  attachDataBacked('#consensusResultCard', payload.consensusEngine?.final?.dataValidation, 'Statistically backed');
+}
+
 function openMatch(id) {
   const fixture = state.fixtures.find(item => String(item.id) === String(id));
   if (!fixture) return;
@@ -568,7 +597,19 @@ function openMatch(id) {
   renderStreakValueEngine(state.streakValueByFixture.get(String(fixture.id)) || null);
   renderHtftEngine(state.htftByFixture.get(String(fixture.id)) || null);
   renderZeusEngine(state.zeusByFixture.get(String(fixture.id)) || null);
-  renderConsensusEngine(state.consensusByFixture.get(String(fixture.id)) || null);
+  const cachedPayload = {
+    engine: state.routeByFixture.get(String(fixture.id)) || null,
+    ppgEngine: state.ppgByFixture.get(String(fixture.id)) || null,
+    apexEngine: state.apexByFixture.get(String(fixture.id)) || null,
+    convergenceEngine: state.convergenceByFixture.get(String(fixture.id)) || null,
+    momentumEngine: state.momentumByFixture.get(String(fixture.id)) || null,
+    streakValueEngine: state.streakValueByFixture.get(String(fixture.id)) || null,
+    htftEngine: state.htftByFixture.get(String(fixture.id)) || null,
+    zeusEngine: state.zeusByFixture.get(String(fixture.id)) || null,
+    consensusEngine: state.consensusByFixture.get(String(fixture.id)) || null
+  };
+  renderConsensusEngine(cachedPayload.consensusEngine);
+  attachAllDataBacked(cachedPayload);
   renderVenueForm(null);
   $('#matchIntelDialog').showModal();
   document.body.classList.add('dialog-open');
@@ -607,6 +648,7 @@ async function loadIntelligence(fixture) {
   renderHtftEngine(payload.htftEngine);
   renderZeusEngine(payload.zeusEngine);
   renderConsensusEngine(payload.consensusEngine);
+  attachAllDataBacked(payload);
   renderVenueForm(payload.venueForm);
   renderList();
 }
@@ -986,8 +1028,8 @@ function renderConsensusEngine(engine) {
   }
   const final = engine.final || null;
   const classification = String(engine.classification || 'NO_SIGNAL');
-  $('#consensusSelection').textContent = final?.label || (classification === 'CONFLICT' ? 'No Banker — Engine Conflict' : classification === 'HOLD_MISSING_SHARED_PRICE' ? 'Agreement found — shared price missing' : classification === 'ZEUS_HOLD' ? 'Zeus hold — statistical edge not authorized' : 'No shared engine direction');
-  $('#consensusExplanation').textContent = (engine.reasons || [])[0] || (classification === 'CONFLICT' ? 'Opposing engine directions prevent a banker.' : classification === 'ZEUS_HOLD' ? (engine.zeus?.reason || 'Zeus found a material statistical contradiction.') : 'No compatible route agreement qualified.');
+  $('#consensusSelection').textContent = final?.label || (classification === 'CONFLICT' ? 'No Banker — Engine Conflict' : classification === 'HOLD_MISSING_SHARED_PRICE' ? 'Agreement found — shared price missing' : classification === 'HOLD_DATA_VALIDATION' ? 'Agreement found — validating shared market data' : classification === 'ZEUS_HOLD' ? 'Zeus hold — statistical edge not authorized' : 'No shared engine direction');
+  $('#consensusExplanation').textContent = (engine.reasons || [])[0] || (classification === 'CONFLICT' ? 'Opposing engine directions prevent a banker.' : classification === 'HOLD_DATA_VALIDATION' ? 'The exact shared market is waiting for independent statistical confirmation.' : classification === 'ZEUS_HOLD' ? (engine.zeus?.reason || 'Zeus found a material statistical contradiction.') : 'No compatible route agreement qualified.');
   $('#consensusDecision').textContent = classification.replaceAll('_', ' ');
   $('#consensusScore').textContent = Number(engine.score || 0) ? `${Number(engine.score).toFixed(0)}%` : '—';
   $('#consensusMarket').textContent = final?.label || 'No shared market';
