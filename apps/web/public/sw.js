@@ -1,20 +1,20 @@
-const CACHE = 'betynz-v5-1-1';
+const CACHE = 'betynz-v5-1-1-board-persistence-hotfix-1';
 const SHELL = [
-  '/', '/styles.css?v=5.1.1', '/motion.js?v=5.1.1', '/app.js?v=5.1.1', '/api-client.js',
-  '/picks.html', '/picks.js?v=5.1.1', '/engine-lab.html',
-  '/market-route.html', '/market-route.js?v=5.1.1',
-  '/ppg-route.html', '/ppg-route.js?v=5.1.1',
-  '/apex-intelligence.html', '/apex-intelligence.js?v=5.1.1',
-  '/convergence.html', '/convergence.js?v=5.1.1',
-  '/momentum-streak.html', '/momentum-streak.js?v=5.1.1',
-  '/streak-value.html', '/streak-value.js?v=5.1.1',
-  '/htft-momentum.html', '/htft-momentum.js?v=5.1.1',
-  '/zeus.html', '/zeus.js?v=5.1.1',
-  '/proof.html', '/proof.js?v=5.1.1',
-  '/performance.html', '/performance.js?v=5.1.1',
-  '/live.html', '/live.js?v=5.1.1',
-  '/odds-movement.html', '/odds-movement.js?v=5.1.1',
-  '/leagues.html', '/leagues.js?v=5.1.1',
+  '/', '/styles.css?v=5.1.1h1', '/motion.js?v=5.1.1h1', '/app.js?v=5.1.1h1', '/api-client.js?v=5.1.1h1',
+  '/picks.html', '/picks.js?v=5.1.1h1', '/engine-lab.html',
+  '/market-route.html', '/market-route.js?v=5.1.1h1',
+  '/ppg-route.html', '/ppg-route.js?v=5.1.1h1',
+  '/apex-intelligence.html', '/apex-intelligence.js?v=5.1.1h1',
+  '/convergence.html', '/convergence.js?v=5.1.1h1',
+  '/momentum-streak.html', '/momentum-streak.js?v=5.1.1h1',
+  '/streak-value.html', '/streak-value.js?v=5.1.1h1',
+  '/htft-momentum.html', '/htft-momentum.js?v=5.1.1h1',
+  '/zeus.html', '/zeus.js?v=5.1.1h1',
+  '/proof.html', '/proof.js?v=5.1.1h1',
+  '/performance.html', '/performance.js?v=5.1.1h1',
+  '/live.html', '/live.js?v=5.1.1h1',
+  '/odds-movement.html', '/odds-movement.js?v=5.1.1h1',
+  '/leagues.html', '/leagues.js?v=5.1.1h1',
   '/manifest.webmanifest', '/favicon.ico', '/assets/favicon-16x16.png', '/assets/favicon-32x32.png', '/assets/apple-touch-icon.png', '/assets/icon-192.png', '/assets/icon-512.png', '/assets/maskable-192.png', '/assets/maskable-512.png', '/assets/betynz-mark.png', '/assets/betynz-logo.png', '/assets/pwa-splash-portrait.png', '/assets/pwa-splash-landscape.png'
 ];
 self.addEventListener('install', event => event.waitUntil(

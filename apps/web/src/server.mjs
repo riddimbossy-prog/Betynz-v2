@@ -874,7 +874,39 @@ async function getStatsRouteBoards(date) {
     const fixtures = predictionPriority((board.fixtures || []).filter(Boolean));
     const eligibleFixtures = fixtures.filter(isUpcomingPredictionFixture);
     const total = eligibleFixtures.length;
-    let processed = 0;
+
+    // IMPORTANT: retries must resume the prior progressive snapshot instead of
+    // rebuilding every engine from WAITING. Rebuilding from zero was the cause
+    // of fired cards briefly appearing and then reverting to "analysis pending"
+    // when API-Football entered a cooldown or a background retry restarted.
+    const previousStats = statsRouteViewSnapshots.get(date) || {};
+    const previousMarket = cacheGet(`market-route-board:${date}`) || null;
+    const previousMaps = {
+      market: byFixtureId(previousMarket?.all || []),
+      ppg: byFixtureId(previousStats?.ppg?.all || []),
+      apex: byFixtureId(previousStats?.apex?.all || []),
+      convergence: byFixtureId(previousStats?.convergence?.all || []),
+      momentum: byFixtureId(previousStats?.momentum?.all || []),
+      htft: byFixtureId(previousStats?.htft?.all || [])
+    };
+
+    const oddsFingerprint = fixture => JSON.stringify(
+      Object.entries(fixture?.odds || {}).sort(([a], [b]) => a.localeCompare(b))
+    );
+    const seedItem = (fixture, analyser, previousItem) => {
+      const fresh = routeItem(fixture, null, analyser);
+      if (!fresh) return null;
+      const sameOdds = previousItem?.fixture
+        && oddsFingerprint(previousItem.fixture) === oddsFingerprint(fresh.fixture);
+      if (previousItem?.analysisReady && sameOdds) {
+        return {
+          ...previousItem,
+          fixture: fresh.fixture,
+          analysisReady: true
+        };
+      }
+      return { ...fresh, analysisReady: false };
+    };
 
     const marketMap = new Map();
     const ppgMap = new Map();
@@ -884,13 +916,24 @@ async function getStatsRouteBoards(date) {
     const htftMap = new Map();
     for (const fixture of fixtures) {
       const id = String(fixture.id);
-      marketMap.set(id, routeItem(fixture, null, analyzeMarketRoute));
-      ppgMap.set(id, routeItem(fixture, null, analyzePpgRoute));
-      apexMap.set(id, routeItem(fixture, null, analyzeApexIntelligence));
-      convergenceMap.set(id, routeItem(fixture, null, analyzeConvergence));
-      momentumMap.set(id, routeItem(fixture, null, analyzeMomentumStreak));
-      htftMap.set(id, routeItem(fixture, null, analyzeHtftMomentum));
+      marketMap.set(id, seedItem(fixture, analyzeMarketRoute, previousMaps.market.get(id)));
+      ppgMap.set(id, seedItem(fixture, analyzePpgRoute, previousMaps.ppg.get(id)));
+      apexMap.set(id, seedItem(fixture, analyzeApexIntelligence, previousMaps.apex.get(id)));
+      convergenceMap.set(id, seedItem(fixture, analyzeConvergence, previousMaps.convergence.get(id)));
+      momentumMap.set(id, seedItem(fixture, analyzeMomentumStreak, previousMaps.momentum.get(id)));
+      htftMap.set(id, seedItem(fixture, analyzeHtftMomentum, previousMaps.htft.get(id)));
     }
+
+    const previouslyReady = eligibleFixtures.filter(fixture => apexMap.get(String(fixture.id))?.analysisReady).length;
+    const previousProcessed = Math.max(
+      Number(previousStats?.ppg?.progress?.processed || 0),
+      Number(previousStats?.apex?.progress?.processed || 0),
+      Number(previousStats?.convergence?.progress?.processed || 0),
+      Number(previousStats?.momentum?.progress?.processed || 0),
+      Number(previousStats?.htft?.progress?.processed || 0)
+    );
+    let processed = Math.min(total, Math.max(previouslyReady, previousProcessed));
+    const remainingEligible = eligibleFixtures.filter(fixture => !apexMap.get(String(fixture.id))?.analysisReady);
 
     const publish = ({ complete = false, failed = false, warning = null, enrichmentSource = 'API_FOOTBALL_VENUE_HISTORY' } = {}) => {
       const market = progressiveEngineResponse({ date, engine: 'Market Route Engine', items: marketMap, processed, total, complete, failed, warning, enrichmentSource });
@@ -908,12 +951,13 @@ async function getStatsRouteBoards(date) {
       return { market, ...snapshot };
     };
 
-    // Publish an immediate snapshot before the first history request finishes.
+    // Publish the resumed snapshot immediately. Any already analysed fixture is
+    // retained, so public polling can only move forward and never back to zero.
     publish();
 
-    let enrichment = { fixtures: [], warning: null, enrichmentSource: 'API_FOOTBALL_VENUE_HISTORY' };
-    if (eligibleFixtures.length) {
-      enrichment = await enrichPrimaryStatsAndVisuals(date, eligibleFixtures, {
+    let enrichment = { fixtures: [], warning: null, enrichmentSource: 'API_FOOTBALL_VENUE_HISTORY', rateLimited: false };
+    if (remainingEligible.length) {
+      enrichment = await enrichPrimaryStatsAndVisuals(date, remainingEligible, {
         onFixture: result => {
           const deferred = Boolean(result?.enrichment?.deferred);
           const stats = result?.stats?.homeSplit || result?.stats?.awaySplit
@@ -921,14 +965,14 @@ async function getStatsRouteBoards(date) {
             : null;
           const id = String(result?.id || '');
           if (id && !deferred) {
-            marketMap.set(id, routeItem(result, stats, analyzeMarketRoute));
-            ppgMap.set(id, routeItem(result, stats, analyzePpgRoute));
-            apexMap.set(id, routeItem(result, stats, analyzeApexIntelligence));
-            convergenceMap.set(id, routeItem(result, stats, analyzeConvergence));
-            momentumMap.set(id, routeItem(result, stats, analyzeMomentumStreak));
-            htftMap.set(id, routeItem(result, stats, analyzeHtftMomentum));
+            marketMap.set(id, { ...routeItem(result, stats, analyzeMarketRoute), analysisReady: true });
+            ppgMap.set(id, { ...routeItem(result, stats, analyzePpgRoute), analysisReady: true });
+            apexMap.set(id, { ...routeItem(result, stats, analyzeApexIntelligence), analysisReady: true });
+            convergenceMap.set(id, { ...routeItem(result, stats, analyzeConvergence), analysisReady: true });
+            momentumMap.set(id, { ...routeItem(result, stats, analyzeMomentumStreak), analysisReady: true });
+            htftMap.set(id, { ...routeItem(result, stats, analyzeHtftMomentum), analysisReady: true });
+            processed = Math.min(total, processed + 1);
           }
-          if (!deferred) processed += 1;
           publish({
             warning: deferred
               ? 'API-Football minute-limit cooldown is active. Remaining fixtures are queued automatically.'
@@ -939,7 +983,7 @@ async function getStatsRouteBoards(date) {
       });
     }
 
-    const analysisComplete = !enrichment.rateLimited && !board.oddsPending;
+    const analysisComplete = !enrichment.rateLimited && !board.oddsPending && processed >= total;
     if (analysisComplete) processed = total;
     const result = publish({
       complete: analysisComplete,

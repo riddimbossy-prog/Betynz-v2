@@ -1,5 +1,5 @@
 import { dataBackedButton } from './data-backed-ui.js';
-import { fetchJson } from './api-client.js';
+import { fetchJson, mergeProgressiveBoard } from './api-client.js';
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const odd=v=>Number(v)>1?Number(v).toFixed(2):'—';
@@ -21,7 +21,7 @@ async function load({silent=false}={}){
   clearTimeout(pollTimer);
   if(!silent)$('#atlasGrid').innerHTML='<div class="route-empty apex-soft-pulse"><span class="apex-loader-dot" aria-hidden="true"></span><h3>Starting Atlas analysis…</h3><p>Qualified routes appear as soon as their evidence is complete.</p></div>';
   try{
-    payload=await fetchJson(`/api/streak-value-board?date=${encodeURIComponent(date)}`);
+    const data=await fetchJson(`/api/streak-value-board?date=${encodeURIComponent(date)}`);payload=mergeProgressiveBoard(payload,data);
     if(version!==requestVersion)return;
     $('#atlasFixtures').textContent=payload.summary?.fixtures||0;
     $('#atlasAnalysed').textContent=payload.summary?.analysed||payload.progress?.processed||0;
@@ -32,7 +32,7 @@ async function load({silent=false}={}){
   }catch(e){
     if(version!==requestVersion)return;
     const transient=e.transient||e.name==='AbortError';
-    if(transient){$('#atlasGrid').innerHTML='<div class="route-empty apex-soft-pulse"><span class="apex-loader-dot"></span><h3>Analysis service is recovering…</h3><p>A temporary gateway delay will be retried automatically.</p></div>';schedulePoll(date,version,3000);return}
+    if(transient){if(payload?.qualified?.length){render();schedulePoll(date,version,3000);return}$('#atlasGrid').innerHTML='<div class="route-empty apex-soft-pulse"><span class="apex-loader-dot"></span><h3>Analysis service is recovering…</h3><p>A temporary gateway delay will be retried automatically.</p></div>';schedulePoll(date,version,3000);return}
     payload=null;
     $('#atlasVisibleCount').textContent='0';
     $('#atlasGrid').innerHTML=`<div class="route-empty"><h3>Atlas analysis unavailable</h3><p>${esc(e.message||'Retry shortly.')}</p></div>`;

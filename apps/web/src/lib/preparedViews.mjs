@@ -32,6 +32,17 @@ function safeClone(value) {
 export function rememberPreparedView(viewKey, date, payload, { complete = true, generatedAt = new Date().toISOString() } = {}) {
   if (!viewKey || !date || payload == null) return null;
   const key = keyOf(viewKey, date);
+  const existing = memory.get(key) || null;
+
+  // A prepared view is the stable public fallback. Never replace a complete
+  // snapshot with a partial retry/cooldown snapshot: doing so makes already
+  // visible engine picks disappear until the background job catches up again.
+  if (existing?.complete && !complete) {
+    memory.delete(key);
+    memory.set(key, existing);
+    return existing;
+  }
+
   const record = {
     viewKey: String(viewKey).toUpperCase(),
     fixtureDate: date,

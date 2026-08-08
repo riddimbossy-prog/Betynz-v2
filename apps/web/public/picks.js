@@ -1,5 +1,5 @@
 import { dataBackedButton } from './data-backed-ui.js';
-import { fetchJson } from './api-client.js';
+import { fetchJson, mergeConsensusPayload } from './api-client.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -187,17 +187,17 @@ async function load({ silent = false, days = 1 } = {}) {
   try {
     const data = await fetchJson(`/api/consensus-picks?from=${encodeURIComponent(from)}&days=${days}`);
     if (version !== requestVersion) return;
-    payload = data;
-    $('#eliteCount').textContent = data.summary?.elite || 0;
-    $('#consensusCount').textContent = data.summary?.consensus || 0;
-    $('#singleCount').textContent = data.summary?.qualified || 0;
-    $('#saferCount').textContent = data.summary?.safer || 0;
-    $('#conflictCount').textContent = data.summary?.conflicts || 0;
+    payload = mergeConsensusPayload(payload, data);
+    $('#eliteCount').textContent = payload.summary?.elite || 0;
+    $('#consensusCount').textContent = payload.summary?.consensus || 0;
+    $('#singleCount').textContent = payload.summary?.qualified || 0;
+    $('#saferCount').textContent = payload.summary?.safer || 0;
+    $('#conflictCount').textContent = payload.summary?.conflicts || 0;
     populateFilters();
     render();
-    if (!data.complete && !data.failed) {
+    if (!payload.complete && !payload.failed) {
       schedulePoll(from, days, version);
-    } else if (data.complete && !data.failed && days === 1) {
+    } else if (payload.complete && !payload.failed && days === 1) {
       // The selected day is useful first. Expand to the remaining six dates only
       // after it has completed so the initial page is never blocked by a week scan.
       pollTimer = setTimeout(() => {
@@ -206,6 +206,11 @@ async function load({ silent = false, days = 1 } = {}) {
     }
   } catch (error) {
     if (version !== requestVersion) return;
+    if ((error?.transient || error?.name === 'AbortError') && (payload?.consensus?.all?.length || payload?.enginePicks?.length)) {
+      render();
+      schedulePoll(from, days, version);
+      return;
+    }
     payload = { complete: true, failed: true, error: error?.name === 'AbortError' ? 'The analysis request timed out.' : (error.message || 'Refresh to try again.'), consensus: { all: [] }, summary: {} };
     populateFilters();
     render();

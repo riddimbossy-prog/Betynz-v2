@@ -1,5 +1,5 @@
 import { dataBackedButton } from './data-backed-ui.js';
-import { fetchJson } from './api-client.js';
+import { fetchJson, mergeProgressiveBoard } from './api-client.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -41,7 +41,7 @@ async function load({ silent = false } = {}) {
   try {
     const data = await fetchJson(`/api/ppg-route-board?date=${encodeURIComponent(date)}`);
     if (version !== requestVersion) return;
-    payload = data;
+    payload = mergeProgressiveBoard(payload, data);
     $('#ppgFixtures').textContent = payload.summary?.fixtures || 0;
     $('#ppgAnalysed').textContent = payload.summary?.analysed || 0;
     $('#ppgFire').textContent = payload.summary?.fire || 0;
@@ -51,6 +51,7 @@ async function load({ silent = false } = {}) {
   } catch (error) {
     if (version !== requestVersion) return;
     if (error?.transient || error?.name === 'AbortError') {
+      if (payload?.qualified?.length) { render(); schedulePoll(date, version); return; }
       const grid = document.querySelector('[id$="Grid"]');
       if (grid) grid.innerHTML = '<div class="route-empty apex-soft-pulse"><span class="apex-loader-dot" aria-hidden="true"></span><h3>Analysis service is recovering…</h3><p>A temporary gateway delay was detected. Your analysis will retry automatically without losing completed picks.</p></div>';
       schedulePoll(date, version);

@@ -1,4 +1,5 @@
 import { dataBackedButton } from './data-backed-ui.js';
+import { mergeProgressiveBoard, mergeConsensusPayload } from './api-client.js';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 
@@ -22,6 +23,8 @@ const state = {
   filtered: [],
   selected: null,
   routeByFixture: new Map(),
+  routePayload: null,
+  homeConsensusPayload: null,
   ppgByFixture: new Map(),
   apexByFixture: new Map(),
   convergenceByFixture: new Map(),
@@ -137,6 +140,8 @@ async function loadDate(date, force = false) {
   state.fixtures = [];
   state.filtered = [];
   state.routeByFixture = new Map();
+  state.routePayload = null;
+  state.homeConsensusPayload = null;
   state.ppgByFixture = new Map();
   state.apexByFixture = new Map();
   state.convergenceByFixture = new Map();
@@ -459,8 +464,10 @@ function renderHomeBankers(payload) {
 async function loadHomeConsensus(date, attempt = 0, days = 1) {
   clearTimeout(state.consensusPollTimer);
   try {
-    const qualified = await fetchJson(`/api/consensus-picks?from=${encodeURIComponent(date)}&days=${days}`, { cache: 'no-store', timeoutMs: 20000 });
+    const incoming = await fetchJson(`/api/consensus-picks?from=${encodeURIComponent(date)}&days=${days}`, { cache: 'no-store', timeoutMs: 20000 });
     if (state.selectedDate !== date) return;
+    const qualified = mergeConsensusPayload(state.homeConsensusPayload, incoming);
+    state.homeConsensusPayload = qualified;
     renderHomeBankers(qualified);
     if (!qualified.complete && !qualified.failed && attempt < 120) {
       const delay = attempt < 16 ? 1500 : 4000;
@@ -473,14 +480,18 @@ async function loadHomeConsensus(date, attempt = 0, days = 1) {
       else setTimeout(expand, 5000);
     }
   } catch (error) {
-    if (state.selectedDate === date) setHomeSpotlightMessage('Engine analysis could not be completed.', error?.name === 'AbortError' ? 'The request timed out. Tap Refresh to retry.' : 'Tap Refresh to retry.');
+    if (state.selectedDate === date && !(state.homeConsensusPayload?.consensus?.all?.length || state.homeConsensusPayload?.enginePicks?.length)) {
+      setHomeSpotlightMessage('Engine analysis could not be completed.', error?.name === 'AbortError' ? 'The request timed out. Tap Refresh to retry.' : 'Tap Refresh to retry.');
+    }
   }
 }
 
 async function loadRouteSummary(date, attempt = 0) {
   clearTimeout(state.routePollTimer);
-  const payload = await fetchJson(`/api/market-route-board?date=${encodeURIComponent(date)}`, { cache: 'no-store', timeoutMs: 20000 });
+  const incoming = await fetchJson(`/api/market-route-board?date=${encodeURIComponent(date)}`, { cache: 'no-store', timeoutMs: 20000 });
   if (state.selectedDate !== date) return;
+  const payload = mergeProgressiveBoard(state.routePayload, incoming);
+  state.routePayload = payload;
   state.routeByFixture = new Map((payload.all || []).map(item => [String(item.fixture?.id), item.engine]));
   $('#routeTipCount').textContent = Number(payload.summary?.fire || 0) + Number(payload.summary?.safer || 0);
   renderList();

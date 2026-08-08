@@ -1,5 +1,5 @@
 import { dataBackedButton } from './data-backed-ui.js';
-import { fetchJson } from './api-client.js';
+import { fetchJson, mergeProgressiveBoard } from './api-client.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const odd = value => Number(value) > 1 ? Number(value).toFixed(2) : '—';
@@ -15,7 +15,7 @@ function schedule(date,v){clearTimeout(timer);timer=setTimeout(()=>{if(v===versi
 
 async function load({silent=false}={}){
  const date=$('#zeusDate').value||today,v=++version;clearTimeout(timer);if(!silent){polls=0;$('#zeusGrid').innerHTML='<div class="route-empty zeus-soft-pulse"><span class="zeus-loader"></span><h3>Zeus is assembling the statistical picture…</h3><p>Completed evidence appears while the seven underlying engines and Stats API finish.</p></div>';}
- try{const data=await fetchJson(`/api/zeus-board?date=${encodeURIComponent(date)}`);if(v!==version)return;payload=data;$('#zeusFixtures').textContent=data.summary?.fixtures||0;$('#zeusAnalysed').textContent=data.summary?.analysed||0;$('#zeusApproved').textContent=data.summary?.approved||0;$('#zeusVeto').textContent=(data.summary?.veto||0)+(data.summary?.noEdge||0);render();if(!data.complete&&!data.failed)schedule(date,v);}catch(error){if(v!==version)return;if(error?.transient||error?.name==='AbortError'){$('#zeusGrid').innerHTML='<div class="route-empty zeus-soft-pulse"><span class="zeus-loader"></span><h3>Zeus service is recovering…</h3><p>A temporary gateway delay was detected. Completed evidence is preserved and supervision will retry automatically.</p></div>';schedule(date,v);return;}$('#zeusGrid').innerHTML=`<div class="route-empty"><h3>Zeus could not complete supervision</h3><p>${esc(error.message||'Try again.')}</p></div>`;}
+ try{const data=await fetchJson(`/api/zeus-board?date=${encodeURIComponent(date)}`);if(v!==version)return;payload=mergeProgressiveBoard(payload,data);$('#zeusFixtures').textContent=payload.summary?.fixtures||0;$('#zeusAnalysed').textContent=payload.summary?.analysed||0;$('#zeusApproved').textContent=payload.summary?.approved||0;$('#zeusVeto').textContent=(payload.summary?.veto||0)+(payload.summary?.noEdge||0);render();if(!payload.complete&&!payload.failed)schedule(date,v);}catch(error){if(v!==version)return;if(error?.transient||error?.name==='AbortError'){if(payload?.qualified?.length){render();schedule(date,v);return}$('#zeusGrid').innerHTML='<div class="route-empty zeus-soft-pulse"><span class="zeus-loader"></span><h3>Zeus service is recovering…</h3><p>A temporary gateway delay was detected. Completed evidence is preserved and supervision will retry automatically.</p></div>';schedule(date,v);return;}$('#zeusGrid').innerHTML=`<div class="route-empty"><h3>Zeus could not complete supervision</h3><p>${esc(error.message||'Try again.')}</p></div>`;}
 }
 
 function badge(decision){const d=String(decision||'').toUpperCase();if(d==='FIRE')return'APPROVED';if(d==='SAFER')return'SAFER';if(d==='VETO'||d==='STAT_CONFLICT')return'VETO';if(d==='WAITING')return'WAITING';return'NO CLEAR EDGE';}
