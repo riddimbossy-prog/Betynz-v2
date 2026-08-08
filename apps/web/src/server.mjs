@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
@@ -22,7 +23,7 @@ import { statsApiConfigured, statsApiRateState, buildStatsApiFixtureEvidence, ad
 import { cacheGet, cacheSet, cacheStats, cachePrune, cacheDelete } from './lib/cache.mjs';
 import { safeDate, normalizeName } from './lib/utils.mjs';
 import { rememberFeatureSnapshot, persistFeatureSnapshots, loadFeatureSnapshot, featureStoreStats } from './lib/featureStore.mjs';
-import { PREPARED_VIEW_KEYS, rememberPreparedView, getPreparedView, persistPreparedViews, hydratePreparedViews, preparedFixtureCounts, preparedViewStats } from './lib/preparedViews.mjs';
+import { PREPARED_VIEW_KEYS, rememberPreparedView, getPreparedView, deletePreparedView, persistPreparedViews, hydratePreparedViews, preparedFixtureCounts, preparedViewStats } from './lib/preparedViews.mjs';
 import { consumeRateLimit, publicAnalysisDateState, requestGuardStats } from './lib/requestGuard.mjs';
 import { recordHttpRequest, recordRuntimeError, telemetrySnapshot } from './lib/telemetry.mjs';
 import {
@@ -37,6 +38,7 @@ import {
   getConsensusSnapshots,
   getConsensusCandidates,
   logPredictionLineage,
+  upsertPredictionLedger,
   supabaseConfigured
 } from './lib/supabase.mjs';
 import { clearSessionCookies, getAdminSession, sessionCookies, signInWithPassword, sameOriginRequest } from './lib/adminAuth.mjs';
@@ -44,6 +46,21 @@ import { buildLearningRecommendations, buildPerformance, proofData, settleDate }
 import { summarizeOddsSnapshots, closingLineValue } from './lib/oddsMovement.mjs';
 import { buildLeagueIntelligence } from './lib/leagueIntelligence.mjs';
 import { buildAgreementPerformance, buildCalibrationReport } from './lib/calibration.mjs';
+import {
+  persistenceCoreEnabled,
+  persistenceInstanceId,
+  acquireJobLock,
+  renewJobLock,
+  releaseJobLock,
+  checkpointJob,
+  loadJob,
+  checkpointFixtureStates,
+  loadFixtureStates,
+  checkpointBoard,
+  loadBoards,
+  dropFixtureCheckpoint,
+  persistenceOperationsSnapshot
+} from './lib/persistenceCore.mjs';
 import {
   apiFootballConfigured,
   apiFootballPublicConfig,
@@ -64,7 +81,7 @@ import {
 
 await loadLocalEnv();
 
-const APP_VERSION = '5.1.1';
+const APP_VERSION = '5.2.0';
 const MARKET_ROUTE_CODE = 'MARKET_ROUTE';
 const PPG_ROUTE_CODE = 'PPG_ROUTE';
 const APEX_INTELLIGENCE_CODE = 'APEX_INTELLIGENCE';
@@ -685,6 +702,11 @@ function predictionRows(date, items = [], engineCode = MARKET_ROUTE_CODE) {
   });
 }
 
+function predictionFingerprint(row = {}) {
+  const raw = [row.fixture_id, row.engine, row.market, row.selection_label, Number(row.odds || 0).toFixed(4), row.decision, row.grade].join('|');
+  return createHash('sha256').update(raw).digest('hex');
+}
+
 async function storePredictions(date, items, engineCode = MARKET_ROUTE_CODE) {
   const rows = predictionRows(date, items, engineCode);
   if (!rows.length) return;
@@ -718,14 +740,37 @@ async function storePredictions(date, items, engineCode = MARKET_ROUTE_CODE) {
     recovery_used: Boolean(row.payload?.lineage?.adaptiveRecovery?.recovered),
     lineage: row.payload?.lineage || {}
   }));
-  const [logged, frozen, lineageLogged] = await Promise.allSettled([
+  const ledgerRows = rows.map(row => ({
+    fixture_id: String(row.fixture_id),
+    fixture_date: row.fixture_date,
+    kickoff: row.kickoff,
+    country: row.country || null,
+    league_name: row.league_name || null,
+    home_team: row.home_team || null,
+    away_team: row.away_team || null,
+    engine: row.engine,
+    market: row.market,
+    selection_label: row.selection_label,
+    odds: row.odds,
+    engine_score: row.engine_score,
+    grade: row.grade,
+    decision: row.decision,
+    reasons: row.reasons || [],
+    odds_snapshot: row.odds_snapshot || {},
+    payload: row.payload || {},
+    fingerprint: predictionFingerprint(row),
+    last_seen_at: new Date().toISOString()
+  }));
+  const [logged, frozen, lineageLogged, ledgerLogged] = await Promise.allSettled([
     logEnginePredictions(liveRows),
     freezePredictionSnapshots(rows),
-    logPredictionLineage(lineageRows)
+    logPredictionLineage(lineageRows),
+    upsertPredictionLedger(ledgerRows)
   ]);
   if (logged.status === 'rejected') console.error('Engine prediction log failed:', logged.reason?.message || logged.reason);
   if (frozen.status === 'rejected') console.error('Prediction freeze failed:', frozen.reason?.message || frozen.reason);
   if (lineageLogged.status === 'rejected') console.error('Prediction lineage log failed:', lineageLogged.reason?.message || lineageLogged.reason);
+  if (ledgerLogged.status === 'rejected') console.error('Prediction ledger log failed:', ledgerLogged.reason?.message || ledgerLogged.reason);
 }
 
 async function enrichPrimaryStatsAndVisuals(date, fixtures = [], options = {}) {
@@ -890,6 +935,20 @@ async function getStatsRouteBoards(date) {
       htft: byFixtureId(previousStats?.htft?.all || [])
     };
 
+    // Restore per-fixture engine checkpoints written by an earlier process.
+    // This survives Render restarts and lets the stats job resume from only the
+    // fixtures whose odds changed or whose analysis never completed.
+    const persistedFixtureStates = await loadFixtureStates(date).catch(() => []);
+    for (const row of persistedFixtureStates) {
+      if (!row?.analysis_ready || !row?.payload) continue;
+      const id = String(row.fixture_id || '');
+      if (!id) continue;
+      for (const key of ['market','ppg','apex','convergence','momentum','htft']) {
+        const item = row.payload?.[key];
+        if (item?.fixture && !previousMaps[key].has(id)) previousMaps[key].set(id, { ...item, analysisReady: true });
+      }
+    }
+
     const oddsFingerprint = fixture => JSON.stringify(
       Object.entries(fixture?.odds || {}).sort(([a], [b]) => a.localeCompare(b))
     );
@@ -934,6 +993,17 @@ async function getStatsRouteBoards(date) {
     );
     let processed = Math.min(total, Math.max(previouslyReady, previousProcessed));
     const remainingEligible = eligibleFixtures.filter(fixture => !apexMap.get(String(fixture.id))?.analysisReady);
+    const pendingFixtureCheckpoints = [];
+    let checkpointWrite = Promise.resolve();
+    const flushFixtureCheckpoints = (force = false) => {
+      if (!pendingFixtureCheckpoints.length || (!force && pendingFixtureCheckpoints.length < 20)) return checkpointWrite;
+      const batch = pendingFixtureCheckpoints.splice(0, pendingFixtureCheckpoints.length);
+      checkpointWrite = checkpointWrite.then(() => checkpointFixtureStates(batch)).catch(error => {
+        recordRuntimeError('fixture_checkpoint', error);
+        return null;
+      });
+      return checkpointWrite;
+    };
 
     const publish = ({ complete = false, failed = false, warning = null, enrichmentSource = 'API_FOOTBALL_VENUE_HISTORY' } = {}) => {
       const market = progressiveEngineResponse({ date, engine: 'Market Route Engine', items: marketMap, processed, total, complete, failed, warning, enrichmentSource });
@@ -965,13 +1035,34 @@ async function getStatsRouteBoards(date) {
             : null;
           const id = String(result?.id || '');
           if (id && !deferred) {
+            const wasReady = Boolean(apexMap.get(id)?.analysisReady);
             marketMap.set(id, { ...routeItem(result, stats, analyzeMarketRoute), analysisReady: true });
             ppgMap.set(id, { ...routeItem(result, stats, analyzePpgRoute), analysisReady: true });
             apexMap.set(id, { ...routeItem(result, stats, analyzeApexIntelligence), analysisReady: true });
             convergenceMap.set(id, { ...routeItem(result, stats, analyzeConvergence), analysisReady: true });
             momentumMap.set(id, { ...routeItem(result, stats, analyzeMomentumStreak), analysisReady: true });
             htftMap.set(id, { ...routeItem(result, stats, analyzeHtftMomentum), analysisReady: true });
-            processed = Math.min(total, processed + 1);
+            if (!wasReady) processed = Math.min(total, processed + 1);
+            const nowIso = new Date().toISOString();
+            pendingFixtureCheckpoints.push({
+              fixture_date: date,
+              fixture_id: id,
+              source_fixture_id: result?.sourceId || result?.source_fixture_id || id,
+              kickoff: result?.kickoff || null,
+              odds_fingerprint: oddsFingerprint(result),
+              analysis_ready: true,
+              state: 'READY',
+              stage: 'VENUE_HISTORY_COMPLETE',
+              attempts: 1,
+              last_error: null,
+              payload: {
+                market: marketMap.get(id), ppg: ppgMap.get(id), apex: apexMap.get(id),
+                convergence: convergenceMap.get(id), momentum: momentumMap.get(id), htft: htftMap.get(id)
+              },
+              completed_at: nowIso,
+              updated_at: nowIso
+            });
+            flushFixtureCheckpoints(false);
           }
           publish({
             warning: deferred
@@ -990,6 +1081,16 @@ async function getStatsRouteBoards(date) {
       warning: enrichment.warning || board.warning || null,
       enrichmentSource: enrichment.enrichmentSource || 'API_FOOTBALL_VENUE_HISTORY'
     });
+    await flushFixtureCheckpoints(true);
+    checkpointBoard({
+      boardKey: 'STATS_BUNDLE_PROGRESS', date, complete: analysisComplete, processed, total,
+      generatedAt: result?.apex?.generatedAt || new Date().toISOString(),
+      payload: {
+        date, complete: analysisComplete, processed, total, oddsPending: Boolean(board.oddsPending),
+        remaining: Math.max(0, total - processed), warning: enrichment.warning || board.warning || null,
+        summaries: { market: result.market?.summary, ppg: result.ppg?.summary, apex: result.apex?.summary, convergence: result.convergence?.summary, momentum: result.momentum?.summary, htft: result.htft?.summary }
+      }
+    }).catch(() => null);
     if (analysisComplete) cacheSet(key, result, Number(process.env.STATS_ROUTE_CACHE_TTL_SECONDS || 1800));
 
     // Persistence is intentionally detached from the public response. The UI
@@ -1036,6 +1137,48 @@ async function getHtftMomentumBoard(date) {
 
 const statsRouteViewSnapshots = new Map();
 const statsRouteViewJobs = new Map();
+
+async function hydratePersistentStatsDate(date) {
+  if (!persistenceCoreEnabled() || !supabaseConfigured()) return { restored: 0, date };
+  const [rows, boardRows] = await Promise.all([
+    loadFixtureStates(date).catch(() => []),
+    loadBoards({ date, boardKey: 'STATS_BUNDLE_PROGRESS', limit: 1 }).catch(() => [])
+  ]);
+  const ready = rows.filter(row => row?.analysis_ready && row?.payload);
+  if (!ready.length) return { restored: 0, date };
+
+  const maps = { market: new Map(), ppg: new Map(), apex: new Map(), convergence: new Map(), momentum: new Map(), htft: new Map() };
+  for (const row of ready) {
+    const id = String(row.fixture_id || '');
+    if (!id) continue;
+    for (const key of Object.keys(maps)) {
+      const item = row.payload?.[key];
+      if (item?.fixture) maps[key].set(id, { ...item, analysisReady: true });
+    }
+  }
+  const persistedBoard = boardRows?.[0] || null;
+  const processed = Math.max(ready.length, Number(persistedBoard?.progress_processed || 0));
+  const total = Math.max(processed, Number(persistedBoard?.progress_total || processed));
+  const complete = Boolean(persistedBoard?.complete && processed >= total);
+  const warning = complete ? null : 'Restored completed engine cards after server restart. Remaining fixtures will resume in the background.';
+  const market = progressiveEngineResponse({ date, engine: 'Market Route Engine', items: maps.market, processed, total, complete, warning });
+  market.statisticsSource = complete ? 'API_FOOTBALL' : 'PERSISTED_CHECKPOINT';
+  const snapshot = {
+    ppg: progressiveEngineResponse({ date, engine: 'PPG Route Engine', items: maps.ppg, processed, total, complete, warning }),
+    apex: progressiveEngineResponse({ date, engine: 'Apex Intelligence Engine', items: maps.apex, processed, total, complete, warning }),
+    convergence: progressiveEngineResponse({ date, engine: 'Convergence Engine', items: maps.convergence, processed, total, complete, warning }),
+    momentum: progressiveEngineResponse({ date, engine: 'Momentum & Streak Engine', items: maps.momentum, processed, total, complete, warning }),
+    htft: progressiveEngineResponse({ date, engine: 'Chronos HT/FT Momentum Engine', items: maps.htft, processed, total, complete, warning })
+  };
+  for (const response of Object.values(snapshot)) {
+    response.cache = 'PERSISTED';
+    response.restored = true;
+    response.oddsPending = !complete;
+  }
+  boundedMapSet(statsRouteViewSnapshots, date, snapshot, Number(process.env.ANALYSIS_SNAPSHOT_MAX_DATES || 8));
+  cacheSet(`market-route-board:${date}`, { ...market, cache: 'PERSISTED', restored: true, oddsPending: !complete }, 120);
+  return { restored: ready.length, processed, total, complete, date };
+}
 
 function waitingStatsResponse(date, engine, fixtures = [], analyser, oddsPending = false) {
   const ordered = predictionPriority(fixtures || []);
@@ -1965,8 +2108,8 @@ async function apiRoute(req, res, url) {
     app: 'Betynz',
     version: APP_VERSION,
     engines: ENGINE_CODES,
-    systems: ['CONSENSUS_BANKERS', 'AUTOMATIC_CALIBRATION'],
-    configured: { apiFootball: apiFootballConfigured(), statsApi: statsApiConfigured(), supabase: supabaseConfigured() },
+    systems: ['CONSENSUS_BANKERS', 'AUTOMATIC_CALIBRATION', 'PERSISTENCE_CORE'],
+    configured: { apiFootball: apiFootballConfigured(), statsApi: statsApiConfigured(), supabase: supabaseConfigured(), persistenceCore: persistenceCoreEnabled() },
     providerQueue: apiFootballRateState(),
     statsProviderQueue: statsApiRateState(),
     runtime: runtimeMemory(),
@@ -1998,14 +2141,14 @@ async function apiRoute(req, res, url) {
     appName: process.env.APP_NAME || 'Betynz',
     version: APP_VERSION,
     engines: ['Market Route Engine', 'PPG Route Engine', 'Apex Intelligence Engine', 'Convergence Engine', 'Momentum & Streak Engine', 'Atlas Streak Value Engine', 'Chronos HT/FT Momentum Engine', 'Zeus Statistical Intelligence Engine'],
-    systems: ['Seven-Engine Consensus', 'Zeus Statistical Supervision', 'Settlement Calibration'],
+    systems: ['Seven-Engine Consensus', 'Zeus Statistical Supervision', 'Settlement Calibration', 'Persistence Core'],
     consensusFreezeMinutes: Math.max(5, Number(process.env.CONSENSUS_FREEZE_MINUTES || 30)),
     dataSources: { fixtures: 'API-Football', odds: 'API-Football', primaryStatistics: 'API-Football', streaksAndXg: 'Stats API', visuals: 'API-Football', live: 'API-Football', results: 'API-Football' },
     fixtureCoverage: { daily: 'ALL_RETURNED_FIXTURES', applicationCap: null },
     oddsGate: UNIVERSAL_ODDS_GATE,
     dataBackedPolicy: DATA_BACKED_POLICY,
     adaptiveRecoveryPolicy: ADAPTIVE_RECOVERY_POLICY,
-    weeklyPrecompute: { enabled: String(process.env.WEEKLY_PRECOMPUTE_ENABLED || 'true').toLowerCase() === 'true', horizonDays: Math.max(7, Math.min(14, Number(process.env.WEEKLY_PRECOMPUTE_DAYS || 7))), persistence: 'SUPABASE_PREPARED_VIEWS', nextWeekPrebuild: 'SUNDAY_UTC' },
+    weeklyPrecompute: { enabled: String(process.env.WEEKLY_PRECOMPUTE_ENABLED || 'true').toLowerCase() === 'true', horizonDays: Math.max(7, Math.min(14, Number(process.env.WEEKLY_PRECOMPUTE_DAYS || 7))), persistence: 'SUPABASE_CHECKPOINTS_AND_PREPARED_VIEWS', nextWeekPrebuild: 'SUNDAY_UTC' },
     responsiblePlay: 'Predictions are informational, not guarantees. Adults only.'
   });
 
@@ -2089,6 +2232,63 @@ async function apiRoute(req, res, url) {
         supabase: supabaseConfigured()
       }
     });
+  }
+
+  if (url.pathname === '/api/admin/operations') {
+    if (!await requireAdmin(req, res)) return;
+    const date = url.searchParams.get('date') || utcDateOffset(0);
+    if (!safeDate(date)) return json(res, 400, { error: 'date must be YYYY-MM-DD' });
+    const operations = await persistenceOperationsSnapshot({ date, ledgerFrom: addDays(date, -7), ledgerTo: date });
+    return json(res, 200, {
+      version: APP_VERSION,
+      date,
+      persistence: operations,
+      weeklyPrecompute: { ...weeklyPrecomputeStatus, dates: Object.fromEntries(Object.entries(weeklyPrecomputeStatus.dates).slice(-14)) },
+      providers: { apiFootball: apiFootballRateState(), statsApi: statsApiRateState() },
+      runtime: { ...runtimeMemory(), uptimeSeconds: Math.round(process.uptime()) },
+      caches: { core: cacheStats(), preparedViews: preparedViewStats(), featureStore: featureStoreStats() },
+      settlement: [...settlementState.entries()].map(([settlementDate, value]) => ({ date: settlementDate, finishedAt: value.finishedAt, result: value.result })).slice(-7),
+      time: new Date().toISOString()
+    });
+  }
+
+  if (url.pathname === '/api/admin/operations/refresh-date') {
+    if (!await requireAdmin(req, res)) return;
+    if (req.method !== 'POST') return json(res, 405, { error: 'POST required' });
+    if (!sameOriginRequest(req)) return json(res, 403, { error: 'Same-origin request required.' });
+    const body = await readJsonBody(req).catch(() => ({}));
+    const date = safeDate(body?.date) ? body.date : utcDateOffset(0);
+    queueMicrotask(() => precomputePreparedDate(date, { force: true }).catch(error => recordRuntimeError('admin_refresh_date', error)));
+    return json(res, 202, { accepted: true, action: 'REFRESH_DATE', date });
+  }
+
+  if (url.pathname === '/api/admin/operations/retry-failed') {
+    if (!await requireAdmin(req, res)) return;
+    if (req.method !== 'POST') return json(res, 405, { error: 'POST required' });
+    if (!sameOriginRequest(req)) return json(res, 403, { error: 'Same-origin request required.' });
+    const body = await readJsonBody(req).catch(() => ({}));
+    const date = safeDate(body?.date) ? body.date : null;
+    if (date) queueMicrotask(() => precomputePreparedDate(date, { force: true }).catch(error => recordRuntimeError('admin_retry_date', error)));
+    else queueMicrotask(() => precomputeWeek(utcDateOffset(0), { force: false, reason: 'ADMIN_RETRY_FAILED' }).catch(error => recordRuntimeError('admin_retry_week', error)));
+    return json(res, 202, { accepted: true, action: date ? 'RETRY_DATE' : 'RETRY_WEEK', date });
+  }
+
+  if (url.pathname === '/api/admin/operations/recompute-fixture') {
+    if (!await requireAdmin(req, res)) return;
+    if (req.method !== 'POST') return json(res, 405, { error: 'POST required' });
+    if (!sameOriginRequest(req)) return json(res, 403, { error: 'Same-origin request required.' });
+    const body = await readJsonBody(req).catch(() => ({}));
+    const date = safeDate(body?.date) ? body.date : null;
+    const fixtureId = String(body?.fixtureId || '').trim();
+    if (!date || !fixtureId) return json(res, 400, { error: 'date and fixtureId are required' });
+    await dropFixtureCheckpoint(date, fixtureId).catch(() => null);
+    deletePreparedView(PREPARED_VIEW_KEYS.STATS_BUNDLE, date);
+    deletePreparedView(PREPARED_VIEW_KEYS.MARKET_ROUTE, date);
+    deletePreparedView(PREPARED_VIEW_KEYS.ZEUS, date);
+    deletePreparedView(PREPARED_VIEW_KEYS.CONSENSUS_DAY, date);
+    invalidatePreparedRuntimeDate(date);
+    queueMicrotask(() => precomputePreparedDate(date, { force: true }).catch(error => recordRuntimeError('admin_recompute_fixture', error)));
+    return json(res, 202, { accepted: true, action: 'RECOMPUTE_FIXTURE', date, fixtureId });
   }
 
   if (url.pathname === '/api/admin/precompute-week') {
@@ -2710,20 +2910,40 @@ async function buildCompleteStatsBundle(date) {
 
 async function precomputePreparedDate(date, { force = false } = {}) {
   const refreshHours = Math.max(1, Number(process.env.WEEKLY_PRECOMPUTE_REFRESH_HOURS || 24));
+  const jobKey = `precompute-date:${date}`;
   if (!force && preparedDateComplete(date) && preparedDateAgeHours(date) < refreshHours) {
     weeklyPrecomputeStatus.dates[date] = { state: 'READY', skipped: true, preparedAgeHours: Number(preparedDateAgeHours(date).toFixed(2)) };
+    checkpointJob({ job_key: jobKey, job_kind: 'PRECOMPUTE_DATE', fixture_date: date, state: 'READY', phase: 'FRESH_PREPARED_VIEW', cursor_value: 1, total: 1, completed_count: 1, completed_at: new Date().toISOString(), payload: { skipped: true } }).catch(() => null);
     return { date, skipped: true, complete: true };
   }
 
+  const leaseSeconds = Math.max(300, Math.min(21600, Number(process.env.PERSISTENCE_DATE_LOCK_SECONDS || 10800)));
+  const lock = await acquireJobLock(jobKey, leaseSeconds);
+  if (!lock.acquired) {
+    weeklyPrecomputeStatus.dates[date] = { state: 'LOCKED', skipped: true, owner: 'ANOTHER_WORKER', at: new Date().toISOString() };
+    return { date, skipped: true, locked: true, complete: preparedDateComplete(date) };
+  }
+  const renewEvery = Math.max(60_000, Math.min(900_000, Math.floor(leaseSeconds * 1000 / 3)));
+  const leaseHeartbeat = setInterval(() => renewJobLock(jobKey, leaseSeconds).catch(() => null), renewEvery);
+  leaseHeartbeat.unref?.();
+
   weeklyPrecomputeDates.add(date);
   weeklyPrecomputeStatus.currentDate = date;
-  weeklyPrecomputeStatus.dates[date] = { state: 'RUNNING', startedAt: new Date().toISOString() };
+  weeklyPrecomputeStatus.dates[date] = { state: 'RUNNING', startedAt: new Date().toISOString(), resumable: true };
   invalidatePreparedRuntimeDate(date);
   const started = Date.now();
+  checkpointJob({ job_key: jobKey, job_kind: 'PRECOMPUTE_DATE', fixture_date: date, state: 'RUNNING', phase: 'FIXTURE_BOARD', cursor_value: 0, total: 6, completed_count: 0, attempts: 1, started_at: new Date().toISOString(), payload: { resumableFixtures: true } }).catch(() => null);
+
   try {
     const fixtureBoard = await buildFullPreparedFixtureBoard(date);
+    checkpointJob({ job_key: jobKey, job_kind: 'PRECOMPUTE_DATE', fixture_date: date, state: 'RUNNING', phase: 'MARKET_ROUTE', cursor_value: 1, total: 6, completed_count: 1, payload: { fixtures: fixtureBoard.fixtures?.length || 0 } }).catch(() => null);
+
     const marketInitial = await preparedReadContext.run({ bypassPrepared: true }, () => getMarketRouteBoard(date));
+    checkpointJob({ job_key: jobKey, job_kind: 'PRECOMPUTE_DATE', fixture_date: date, state: 'RUNNING', phase: 'STATS_BUNDLE', cursor_value: 2, total: 6, completed_count: 2, payload: { fixtures: fixtureBoard.fixtures?.length || 0 } }).catch(() => null);
+
     const statsBundle = await preparedReadContext.run({ bypassPrepared: true }, () => buildCompleteStatsBundle(date));
+    checkpointJob({ job_key: jobKey, job_kind: 'PRECOMPUTE_DATE', fixture_date: date, state: 'RUNNING', phase: 'ATLAS', cursor_value: 3, total: 6, completed_count: 3, payload: { statsComplete: statsBundleComplete(statsBundle) } }).catch(() => null);
+
     const atlas = await preparedReadContext.run({ bypassPrepared: true }, () => getStreakValueBoard(date));
     const marketFinal = cacheGet(`market-route-board:${date}`) || marketInitial;
     const zeus = composeZeusBoard(date, fixtureBoard, marketFinal, statsBundle || {}, atlas || {});
@@ -2732,6 +2952,8 @@ async function precomputePreparedDate(date, { force = false } = {}) {
       cacheSet(`zeus-board:${date}`, zeus, Math.max(1800, Number(process.env.PREPARED_VIEW_MEMORY_TTL_SECONDS || 86400)));
       await storePredictions(date, zeus.all || [], ZEUS_SUPERVISOR_CODE).catch(() => null);
     }
+    checkpointJob({ job_key: jobKey, job_kind: 'PRECOMPUTE_DATE', fixture_date: date, state: 'RUNNING', phase: 'CONSENSUS', cursor_value: 4, total: 6, completed_count: 4, payload: { zeusComplete: Boolean(zeus.complete) } }).catch(() => null);
+
     const consensusDay = await preparedReadContext.run({ bypassPrepared: true }, () => getQualifiedPicksWindow(date, 1));
     const consensusComplete = { ...consensusDay, complete: true, failed: false, progress: { stage: 'PRECOMPUTED_COMPLETE', processed: 1, total: 1, percent: 100 } };
 
@@ -2758,14 +2980,25 @@ async function precomputePreparedDate(date, { force = false } = {}) {
       enginePicks: consensusComplete.enginePicks?.length || 0,
       consensusPicks: consensusComplete.consensusPicks?.length || 0,
       generatedAt,
-      ms: Date.now() - started
+      ms: Date.now() - started,
+      persisted: supabaseConfigured()
     };
+    await checkpointJob({
+      job_key: jobKey, job_kind: 'PRECOMPUTE_DATE', fixture_date: date,
+      state: complete ? 'READY' : 'PARTIAL', phase: 'PERSISTED', cursor_value: 6, total: 6,
+      completed_count: complete ? 6 : 5, failed_count: complete ? 0 : 1,
+      completed_at: complete ? generatedAt : null,
+      payload: { fixtures: fixtureBoard.fixtures?.length || 0, enginePicks: consensusComplete.enginePicks?.length || 0, consensusPicks: consensusComplete.consensusPicks?.length || 0, generatedAt }
+    });
     return { date, complete, fixtures: fixtureBoard.fixtures?.length || 0, generatedAt };
   } catch (error) {
     weeklyPrecomputeStatus.dates[date] = { state: 'ERROR', error: error?.message || 'precompute_failed', at: new Date().toISOString() };
+    checkpointJob({ job_key: jobKey, job_kind: 'PRECOMPUTE_DATE', fixture_date: date, state: 'RETRYING', phase: 'ERROR', last_error: error?.message || 'precompute_failed', failed_count: 1, payload: { resumableFixtures: true } }).catch(() => null);
     recordRuntimeError('weekly_precompute_date', error);
     throw error;
   } finally {
+    clearInterval(leaseHeartbeat);
+    await releaseJobLock(jobKey).catch(() => null);
     weeklyPrecomputeDates.delete(date);
     weeklyPrecomputeStatus.currentDate = null;
   }
@@ -2774,8 +3007,26 @@ async function precomputePreparedDate(date, { force = false } = {}) {
 async function precomputeWeek(from = utcDateOffset(0), { force = false, reason = 'ROLLING_HORIZON' } = {}) {
   const days = Math.max(7, Math.min(14, Number(process.env.WEEKLY_PRECOMPUTE_DAYS || 7)));
   if (weeklyPrecomputeJob) return weeklyPrecomputeJob;
+
+  const globalLockKey = 'weekly-precompute';
+  const leaseSeconds = Math.max(900, Math.min(21600, Number(process.env.PERSISTENCE_WEEK_LOCK_SECONDS || 21600)));
+  const lock = await acquireJobLock(globalLockKey, leaseSeconds);
+  if (!lock.acquired) {
+    weeklyPrecomputeStatus.phase = 'LOCKED';
+    weeklyPrecomputeStatus.lockedByAnotherWorker = true;
+    return { ...weeklyPrecomputeStatus, locked: true };
+  }
+
+  const jobKey = `weekly:${from}:${days}`;
+  const previousJob = force ? null : await loadJob(jobKey).catch(() => null);
+  const resumedDates = new Set(Array.isArray(previousJob?.payload?.completedDates) ? previousJob.payload.completedDates : []);
+  const heartbeatEvery = Math.max(120_000, Math.min(1_200_000, Math.floor(leaseSeconds * 1000 / 3)));
+  const heartbeat = setInterval(() => renewJobLock(globalLockKey, leaseSeconds).catch(() => null), heartbeatEvery);
+  heartbeat.unref?.();
+
   const task = (async () => {
     weeklyPrecomputeStatus.running = true;
+    weeklyPrecomputeStatus.lockedByAnotherWorker = false;
     weeklyPrecomputeStatus.phase = reason;
     weeklyPrecomputeStatus.from = from;
     weeklyPrecomputeStatus.to = addDays(from, days - 1);
@@ -2783,10 +3034,16 @@ async function precomputeWeek(from = utcDateOffset(0), { force = false, reason =
     weeklyPrecomputeStatus.total = days;
     weeklyPrecomputeStatus.lastStartedAt = new Date().toISOString();
     weeklyPrecomputeStatus.lastError = null;
+    weeklyPrecomputeStatus.resumed = resumedDates.size > 0;
+    weeklyPrecomputeStatus.resumedDates = [...resumedDates];
 
-    // Discover the complete visible-week schedule before deep engine work. This
-    // is one lightweight API-Football range call and prevents a 1,000+ fixture
-    // current day from leaving every future date showing 0 while odds paginate.
+    await checkpointJob({
+      job_key: jobKey, job_kind: 'WEEKLY_PRECOMPUTE', state: 'RUNNING', phase: 'FIXTURE_DISCOVERY',
+      cursor_value: resumedDates.size, total: days, completed_count: resumedDates.size,
+      attempts: Math.max(1, Number(previousJob?.attempts || 0) + 1), started_at: previousJob?.started_at || new Date().toISOString(),
+      payload: { from, to: weeklyPrecomputeStatus.to, reason, completedDates: [...resumedDates], owner: persistenceInstanceId() }
+    });
+
     weeklyPrecomputeStatus.fixtureDiscovery = { state: 'RUNNING', counts: [], totalFixtures: 0, fetchedAt: null, error: null };
     try {
       const discovered = await getApiFootballFixtureCounts(from, days);
@@ -2805,25 +3062,49 @@ async function precomputeWeek(from = utcDateOffset(0), { force = false, reason =
       };
     }
 
-    // The selected/current day already has an on-demand board. Prepare future
-    // dates first so a huge today (for example 1,213 fixtures) cannot block the
-    // rest of the week at 0/7. Today is completed last and still receives the
-    // full engine/Zeus/Consensus precompute.
     const offsets = Array.from({ length: days }, (_, index) => index);
     const orderedOffsets = from === utcDateOffset(0) && days > 1 ? [...offsets.slice(1), 0] : offsets;
+    let processedCount = 0;
     for (let index = 0; index < orderedOffsets.length; index += 1) {
       const offset = orderedOffsets[index];
       const date = addDays(from, offset);
-      try { await precomputePreparedDate(date, { force }); }
-      catch (error) { weeklyPrecomputeStatus.lastError = error?.message || 'precompute_failed'; }
-      weeklyPrecomputeStatus.processed = index + 1;
+      const alreadyDurable = !force && resumedDates.has(date) && preparedDateComplete(date);
+      if (alreadyDurable) {
+        weeklyPrecomputeStatus.dates[date] = { state: 'READY', skipped: true, resumed: true };
+      } else {
+        try {
+          const result = await precomputePreparedDate(date, { force });
+          if (result?.complete) resumedDates.add(date);
+        } catch (error) {
+          weeklyPrecomputeStatus.lastError = error?.message || 'precompute_failed';
+        }
+      }
+      processedCount += 1;
+      weeklyPrecomputeStatus.processed = processedCount;
+      weeklyPrecomputeStatus.resumedDates = [...resumedDates];
+      await checkpointJob({
+        job_key: jobKey, job_kind: 'WEEKLY_PRECOMPUTE', state: 'RUNNING', phase: 'PRECOMPUTE_DATES',
+        cursor_value: processedCount, total: days, completed_count: resumedDates.size,
+        failed_count: Object.values(weeklyPrecomputeStatus.dates).filter(row => row?.state === 'ERROR').length,
+        payload: { from, to: weeklyPrecomputeStatus.to, reason, completedDates: [...resumedDates], currentDate: date, owner: persistenceInstanceId(), fixtureDiscovery: weeklyPrecomputeStatus.fixtureDiscovery }
+      });
       pruneRuntimeCaches();
     }
-    weeklyPrecomputeStatus.phase = 'READY';
+
+    const allReady = Array.from({ length: days }, (_, i) => addDays(from, i)).every(date => preparedDateComplete(date) || resumedDates.has(date));
+    weeklyPrecomputeStatus.phase = allReady ? 'READY' : 'PARTIAL';
     weeklyPrecomputeStatus.lastCompletedAt = new Date().toISOString();
-    console.log(JSON.stringify({ event: 'weekly_precompute_complete', from, to: weeklyPrecomputeStatus.to, days, prepared: preparedViewStats() }));
+    await checkpointJob({
+      job_key: jobKey, job_kind: 'WEEKLY_PRECOMPUTE', state: allReady ? 'READY' : 'PARTIAL', phase: weeklyPrecomputeStatus.phase,
+      cursor_value: days, total: days, completed_count: resumedDates.size,
+      failed_count: Math.max(0, days - resumedDates.size), completed_at: allReady ? weeklyPrecomputeStatus.lastCompletedAt : null,
+      payload: { from, to: weeklyPrecomputeStatus.to, reason, completedDates: [...resumedDates], owner: persistenceInstanceId(), fixtureDiscovery: weeklyPrecomputeStatus.fixtureDiscovery }
+    });
+    console.log(JSON.stringify({ event: 'weekly_precompute_complete', from, to: weeklyPrecomputeStatus.to, days, resumed: resumedDates.size, prepared: preparedViewStats() }));
     return { ...weeklyPrecomputeStatus };
-  })().finally(() => {
+  })().finally(async () => {
+    clearInterval(heartbeat);
+    await releaseJobLock(globalLockKey).catch(() => null);
     weeklyPrecomputeStatus.running = false;
     weeklyPrecomputeJob = null;
   });
@@ -2884,6 +3165,13 @@ process.on('uncaughtExceptionMonitor', error => { recordRuntimeError('uncaught_e
 
 await hydratePreparedHorizon(utcDateOffset(0), Math.max(14, Number(process.env.WEEKLY_PRECOMPUTE_HYDRATE_DAYS || 14))).catch(error => {
   recordRuntimeError('prepared_view_hydration', error);
+  return null;
+});
+
+// Restore today's per-fixture engine checkpoints before accepting traffic. If
+// Render restarted mid-analysis, already fired cards are visible immediately.
+await hydratePersistentStatsDate(utcDateOffset(0)).catch(error => {
+  recordRuntimeError('persistence_checkpoint_hydration', error);
   return null;
 });
 

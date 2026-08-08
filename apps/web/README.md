@@ -25,3 +25,6 @@ The web application contains the public/PWA interface, server API, provider adap
 - `api-client.js` — shared browser API transport/recovery behavior.
 
 Historical official predictions are never recomputed from current data. Use Proof for past dates.
+
+## v5.2.0 Persistence Core
+The web service persists per-fixture analysis, job progress, leases and engine firing history in Supabase. Apply `sql/019_persistence_core.sql`. Admin runtime control is available at `/admin-operations.html`.

@@ -185,6 +185,12 @@ services:
         value: "24"
       - key: WIN_CAROUSEL_CACHE_TTL_SECONDS
         value: "60"
+      - key: PERSISTENCE_CORE_ENABLED
+        value: "true"
+      - key: PERSISTENCE_DATE_LOCK_SECONDS
+        value: "10800"
+      - key: PERSISTENCE_WEEK_LOCK_SECONDS
+        value: "21600"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY

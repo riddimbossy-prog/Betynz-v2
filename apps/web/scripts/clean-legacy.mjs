@@ -37,7 +37,8 @@ const allowedTests = new Set([
   'adaptive-market-recovery.test.mjs',
   'foundation-intelligence.test.mjs',
   'weekly-precompute.test.mjs',
-  'board-state-persistence.test.mjs'
+  'board-state-persistence.test.mjs',
+  'persistence-core.test.mjs'
 ]);
 
 try {

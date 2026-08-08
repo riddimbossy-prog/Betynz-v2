@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#04111b">
+  <title>Betynz Operations</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="/styles.css?v=5.2.0">
+</head>
+<body class="cinematic-page">
+<div class="cinematic-sky" aria-hidden="true"><i></i><i></i><i></i></div>
+<main class="admin-grid-page operations-page">
+  <header class="insight-hero admin cinematic-hero">
+    <div>
+      <a href="/" class="back-link">← Dashboard</a>
+      <a href="/admin-engine-audit.html" class="back-link">⌁ Engine Audit</a>
+      <a href="/admin-calibration.html" class="back-link">◫ Calibration</a>
+      <small>V5.2.0 · PERSISTENCE CORE</small>
+      <h1>Operations Control</h1>
+      <p>Private runtime view for persistent engine checkpoints, scheduler leases, weekly preparation, API queues and prediction ledger activity.</p>
+    </div>
+    <div class="admin-hero-actions">
+      <label>Fixture date<input id="opsDate" type="date"></label>
+      <button id="refreshDate" type="button">Refresh date</button>
+      <button id="retryFailed" type="button">Retry failed</button>
+      <button id="opsRefresh" type="button">Reload status</button>
+    </div>
+  </header>
+
+  <section class="operations-banner" id="opsBanner">Loading persistence state…</section>
+  <section class="operations-kpis" id="opsKpis"><article><strong>—</strong><span>Loading</span></article></section>
+
+  <section class="operations-grid">
+    <article class="insight-panel operations-card">
+      <div class="insight-panel-head"><div><small>RESUMABLE PROCESSING</small><h2>Fixture checkpoints</h2></div><span id="fixtureState">—</span></div>
+      <div class="operations-progress"><div><i id="fixtureProgressBar"></i></div><b id="fixtureProgressText">—</b></div>
+      <div class="ops-state-grid" id="fixtureStates"></div>
+      <div class="ops-action-box">
+        <label>Fixture ID<input id="recomputeFixtureId" inputmode="numeric" placeholder="e.g. 1234567"></label>
+        <button id="recomputeFixture" type="button">Recompute fixture</button>
+        <small>Deletes only that fixture checkpoint. Other completed fixtures remain saved.</small>
+      </div>
+    </article>
+
+    <article class="insight-panel operations-card">
+      <div class="insight-panel-head"><div><small>PROVIDER HEALTH</small><h2>Queues & runtime</h2></div><span id="runtimeState">—</span></div>
+      <div class="ops-metric-list" id="providerMetrics"></div>
+    </article>
+  </section>
+
+  <section class="insight-panel operations-section">
+    <div class="insight-panel-head"><div><small>DISTRIBUTED NON-OVERLAP</small><h2>Active scheduler leases</h2></div><span id="lockCount">—</span></div>
+    <div class="data-table"><table><thead><tr><th>Lock</th><th>Owner</th><th>Lease until</th><th>Updated</th></tr></thead><tbody id="locksTable"></tbody></table></div>
+  </section>
+
+  <section class="insight-panel operations-section">
+    <div class="insight-panel-head"><div><small>RESUMABLE JOBS</small><h2>Job ledger</h2></div><span id="jobCount">—</span></div>
+    <div class="data-table"><table><thead><tr><th>Job</th><th>State</th><th>Phase</th><th>Progress</th><th>Updated</th></tr></thead><tbody id="jobsTable"></tbody></table></div>
+  </section>
+
+  <section class="insight-panel operations-section">
+    <div class="insight-panel-head"><div><small>WEEKLY INTELLIGENCE</small><h2>Prepared dates</h2></div><span id="weekState">—</span></div>
+    <div class="ops-week-grid" id="weekGrid"></div>
+  </section>
+
+  <section class="insight-panel operations-section">
+    <div class="insight-panel-head"><div><small>IMMUTABLE FIRING HISTORY</small><h2>Recent prediction ledger</h2></div><span id="ledgerCount">—</span></div>
+    <div class="data-table"><table><thead><tr><th>Time</th><th>Match</th><th>Engine</th><th>Selection</th><th>Odds</th><th>Status</th></tr></thead><tbody id="ledgerTable"></tbody></table></div>
+  </section>
+
+  <p class="responsible-note">Operations data is private. Prediction records are audit evidence, not guaranteed outcomes.</p>
+</main>
+<nav class="mobile-bottom-nav" aria-label="Mobile navigation"><a href="/">⌂<span>Board</span></a><a href="/picks.html">★<span>Picks</span></a><a href="/admin-engine-audit.html">⌁<span>Audit</span></a><a class="active" href="/admin-operations.html">⚙<span>Ops</span></a><a href="/admin-calibration.html">◫<span>Calibrate</span></a></nav>
+<script type="module" src="/motion.js?v=5.2.0"></script>
+<script type="module" src="/admin-operations.js?v=5.2.0"></script>
+</body>
+</html>

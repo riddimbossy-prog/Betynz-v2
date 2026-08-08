@@ -30,3 +30,6 @@ Open:
 `/api/health` should report version `5.1.1` and include `preparedViews` plus `weeklyPrecompute`.
 
 `/api/precompute-status` shows whether the visible week is ready, which date is currently building, and how many prepared day views are available.
+
+## v5.2.0 Persistence Core
+Run `sql/019_persistence_core.sql` in Supabase SQL Editor before the first production deployment. The protected operations dashboard is `/admin-operations.html`.

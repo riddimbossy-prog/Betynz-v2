@@ -6,6 +6,7 @@ import {
   getPendingConsensusSnapshots,
   updateSnapshotSettlement,
   updateConsensusSettlement,
+  updatePredictionLedgerSettlement,
   upsertMatchResults
 } from './supabase.mjs';
 
@@ -110,7 +111,8 @@ export async function settleDate(date) {
       if (outcome === 'REVIEW') reviews += 1;
       else if (consensus) consensusSettled += 1;
       else settled += 1;
-      await updater(prediction.id, {
+      const settledAt = new Date().toISOString();
+      const settlementPayload = {
         settlement_status: outcome,
         home_score: match.row.score?.home ?? null,
         away_score: match.row.score?.away ?? null,
@@ -118,10 +120,22 @@ export async function settleDate(date) {
         halftime_away_score: match.row.score?.htAway ?? null,
         result_source: match.row.source,
         result_match_confidence: Math.round(match.confidence * 100),
-        settled_at: new Date().toISOString(),
+        settled_at: settledAt,
         profit_units: profitForSettlement(outcome, prediction.odds, 1),
-        updated_at: new Date().toISOString()
-      });
+        updated_at: settledAt
+      };
+      await updater(prediction.id, settlementPayload);
+      if (!consensus) {
+        await updatePredictionLedgerSettlement(prediction, {
+          settlement_status: outcome,
+          settled_at: settledAt,
+          home_score: match.row.score?.home ?? null,
+          away_score: match.row.score?.away ?? null,
+          profit_units: profitForSettlement(outcome, prediction.odds, 1),
+          result_payload: { status: match.row.status, source: match.row.source, confidence: Math.round(match.confidence * 100) },
+          last_seen_at: settledAt
+        }).catch(() => null);
+      }
       matchRows.push({
         fixture_id: prediction.fixture_id,
         fixture_date: prediction.fixture_date,

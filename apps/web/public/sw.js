@@ -1,20 +1,20 @@
-const CACHE = 'betynz-v5-1-1-week-queue-hotfix-2';
+const CACHE = 'betynz-v5-2-0-persistence-core';
 const SHELL = [
-  '/', '/styles.css?v=5.1.1h2', '/motion.js?v=5.1.1h2', '/app.js?v=5.1.1h2', '/api-client.js?v=5.1.1h2',
-  '/picks.html', '/picks.js?v=5.1.1h2', '/engine-lab.html',
-  '/market-route.html', '/market-route.js?v=5.1.1h2',
-  '/ppg-route.html', '/ppg-route.js?v=5.1.1h2',
-  '/apex-intelligence.html', '/apex-intelligence.js?v=5.1.1h2',
-  '/convergence.html', '/convergence.js?v=5.1.1h2',
-  '/momentum-streak.html', '/momentum-streak.js?v=5.1.1h2',
-  '/streak-value.html', '/streak-value.js?v=5.1.1h2',
-  '/htft-momentum.html', '/htft-momentum.js?v=5.1.1h2',
-  '/zeus.html', '/zeus.js?v=5.1.1h2',
-  '/proof.html', '/proof.js?v=5.1.1h2',
-  '/performance.html', '/performance.js?v=5.1.1h2',
-  '/live.html', '/live.js?v=5.1.1h2',
-  '/odds-movement.html', '/odds-movement.js?v=5.1.1h2',
-  '/leagues.html', '/leagues.js?v=5.1.1h2',
+  '/', '/styles.css?v=5.2.0', '/motion.js?v=5.2.0', '/app.js?v=5.2.0', '/api-client.js?v=5.2.0',
+  '/picks.html', '/picks.js?v=5.2.0', '/engine-lab.html',
+  '/market-route.html', '/market-route.js?v=5.2.0',
+  '/ppg-route.html', '/ppg-route.js?v=5.2.0',
+  '/apex-intelligence.html', '/apex-intelligence.js?v=5.2.0',
+  '/convergence.html', '/convergence.js?v=5.2.0',
+  '/momentum-streak.html', '/momentum-streak.js?v=5.2.0',
+  '/streak-value.html', '/streak-value.js?v=5.2.0',
+  '/htft-momentum.html', '/htft-momentum.js?v=5.2.0',
+  '/zeus.html', '/zeus.js?v=5.2.0',
+  '/proof.html', '/proof.js?v=5.2.0',
+  '/performance.html', '/performance.js?v=5.2.0',
+  '/live.html', '/live.js?v=5.2.0',
+  '/odds-movement.html', '/odds-movement.js?v=5.2.0',
+  '/leagues.html', '/leagues.js?v=5.2.0',
   '/manifest.webmanifest', '/favicon.ico', '/assets/favicon-16x16.png', '/assets/favicon-32x32.png', '/assets/apple-touch-icon.png', '/assets/icon-192.png', '/assets/icon-512.png', '/assets/maskable-192.png', '/assets/maskable-512.png', '/assets/betynz-mark.png', '/assets/betynz-logo.png', '/assets/pwa-splash-portrait.png', '/assets/pwa-splash-landscape.png'
 ];
 self.addEventListener('install', event => event.waitUntil(

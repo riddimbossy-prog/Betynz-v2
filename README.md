@@ -34,3 +34,6 @@ API-Football core data + Stats API enrichment
 ## Deployment
 
 One repository, one `render.yaml`, one Render web service. Run SQL `017_foundation_intelligence.sql` on an existing Supabase project before deploying v5.1.1.
+
+## v5.2.0 durability
+Betynz now checkpoints completed engine analysis per fixture, records resumable scheduler jobs, uses distributed database leases, and keeps an immutable prediction firing ledger. Apply `apps/web/sql/019_persistence_core.sql` and use `/admin-operations.html` for private runtime control.

@@ -15,6 +15,21 @@ function headers(config, extra = {}) {
   };
 }
 
+
+async function rpc(functionName, payload = {}) {
+  const config = credentials();
+  if (!config) return { ok: false, configured: false, reason: 'not_configured', data: null };
+  const response = await fetch(`${config.url}/rest/v1/rpc/${encodeURIComponent(functionName)}`, {
+    method: 'POST',
+    headers: headers(config),
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) return { ok: false, configured: true, reason: `http_${response.status}`, detail: await response.text().catch(() => ''), data: null };
+  let data = null;
+  try { data = await response.json(); } catch {}
+  return { ok: true, configured: true, data };
+}
+
 async function upsert(table, rows, onConflict) {
   const config = credentials();
   if (!config || !rows?.length) return { stored: false, reason: 'not_configured' };
@@ -54,6 +69,18 @@ async function selectRows(table, params = {}) {
   const response = await fetch(`${config.url}/rest/v1/${table}?${query}`, { headers: headers(config) });
   if (!response.ok) return { rows: [], configured: true, error: `http_${response.status}` };
   return { rows: await response.json(), configured: true };
+}
+
+async function deleteRows(table, filters) {
+  const config = credentials();
+  if (!config) return { deleted: false, reason: 'not_configured' };
+  const query = new URLSearchParams(filters || {});
+  const response = await fetch(`${config.url}/rest/v1/${table}?${query}`, {
+    method: 'DELETE',
+    headers: headers(config, { prefer: 'return=minimal' })
+  });
+  if (!response.ok) return { deleted: false, reason: `http_${response.status}`, detail: await response.text().catch(() => '') };
+  return { deleted: true };
 }
 
 async function patchRows(table, filters, payload) {
@@ -211,4 +238,106 @@ export function getPreparedIntelligenceViews({ from, to, viewKey, date, limit = 
   if (date) filters.fixture_date = `eq.${date}`;
   if (viewKey) filters.view_key = `eq.${viewKey}`;
   return selectRows('prepared_intelligence_views', { filters, order: 'fixture_date.asc,view_key.asc', limit });
+}
+
+
+// v5.2.0 Persistence Core --------------------------------------------------
+
+export function upsertPredictionLedger(rows) {
+  return upsert('prediction_ledger', rows, 'fixture_id,engine,fingerprint');
+}
+
+export function getPredictionLedger({ from, to, engine, status, limit = 500 } = {}) {
+  const filters = {};
+  if (from && to) filters.and = `(fixture_date.gte.${from},fixture_date.lte.${to})`;
+  else if (from) filters.fixture_date = `gte.${from}`;
+  else if (to) filters.fixture_date = `lte.${to}`;
+  if (engine && engine !== 'ALL') filters.engine = `eq.${engine}`;
+  if (status && status !== 'ALL') filters.settlement_status = `eq.${status}`;
+  return selectRows('prediction_ledger', { filters, order: 'fixture_date.desc,kickoff.desc', limit });
+}
+
+export function upsertFixtureProcessingStates(rows) {
+  return upsert('fixture_processing_state', rows, 'fixture_date,fixture_id');
+}
+
+export function getFixtureProcessingStates({ date, state, limit = 5000 } = {}) {
+  const filters = {};
+  if (date) filters.fixture_date = `eq.${date}`;
+  if (state) filters.state = `eq.${state}`;
+  return selectRows('fixture_processing_state', { filters, order: 'updated_at.asc', limit });
+}
+
+export function upsertPersistenceJobRun(row) {
+  return upsert('persistence_job_runs', [row], 'job_key');
+}
+
+export function getPersistenceJobRuns({ jobKey, state, limit = 100 } = {}) {
+  const filters = {};
+  if (jobKey) filters.job_key = `eq.${jobKey}`;
+  if (state) filters.state = `eq.${state}`;
+  return selectRows('persistence_job_runs', { filters, order: 'updated_at.desc', limit });
+}
+
+export function getPersistenceLocks({ limit = 100 } = {}) {
+  return selectRows('persistence_job_locks', { order: 'updated_at.desc', limit });
+}
+
+export async function acquirePersistenceLock(lockKey, owner, leaseSeconds = 900) {
+  const result = await rpc('betynz_acquire_job_lock', { p_lock_key: lockKey, p_owner: owner, p_lease_seconds: leaseSeconds });
+  return { ...result, acquired: result.ok && result.data === true };
+}
+
+export async function renewPersistenceLock(lockKey, owner, leaseSeconds = 900) {
+  const result = await rpc('betynz_renew_job_lock', { p_lock_key: lockKey, p_owner: owner, p_lease_seconds: leaseSeconds });
+  return { ...result, renewed: result.ok && result.data === true };
+}
+
+export async function releasePersistenceLock(lockKey, owner) {
+  const result = await rpc('betynz_release_job_lock', { p_lock_key: lockKey, p_owner: owner });
+  return { ...result, released: result.ok && result.data === true };
+}
+
+export async function persistBoardSnapshot({ boardKey, date, complete = false, processed = 0, total = 0, payload = {}, generatedAt = null } = {}) {
+  const result = await rpc('betynz_upsert_board_snapshot', {
+    p_board_key: boardKey,
+    p_fixture_date: date,
+    p_complete: Boolean(complete),
+    p_progress_processed: Math.max(0, Number(processed) || 0),
+    p_progress_total: Math.max(0, Number(total) || 0),
+    p_payload: payload || {},
+    p_generated_at: generatedAt || new Date().toISOString()
+  });
+  return { ...result, stored: result.ok && result.data === true };
+}
+
+export function getBoardSnapshots({ from, to, date, boardKey, limit = 100 } = {}) {
+  const filters = {};
+  if (from && to) filters.and = `(fixture_date.gte.${from},fixture_date.lte.${to})`;
+  else if (date) filters.fixture_date = `eq.${date}`;
+  else if (from) filters.fixture_date = `gte.${from}`;
+  else if (to) filters.fixture_date = `lte.${to}`;
+  if (boardKey) filters.board_key = `eq.${boardKey}`;
+  return selectRows('board_snapshots', { filters, order: 'fixture_date.asc,updated_at.desc', limit });
+}
+
+export function deleteFixtureProcessingState(date, fixtureId) {
+  return deleteRows('fixture_processing_state', { fixture_date: `eq.${date}`, fixture_id: `eq.${fixtureId}` });
+}
+
+export function getFixtureProcessingSummary(date, limit = 5000) {
+  const filters = {};
+  if (date) filters.fixture_date = `eq.${date}`;
+  return selectRows('fixture_processing_state', {
+    select: 'fixture_id,fixture_date,state,stage,analysis_ready,attempts,last_error,completed_at,updated_at',
+    filters, order: 'updated_at.desc', limit
+  });
+}
+
+export function updatePredictionLedgerSettlement(prediction, payload) {
+  if (!prediction?.fixture_id || !prediction?.engine) return Promise.resolve({ updated: false, reason: 'missing_identity' });
+  const filters = { fixture_id: `eq.${prediction.fixture_id}`, engine: `eq.${prediction.engine}` };
+  if (prediction.market) filters.market = `eq.${prediction.market}`;
+  if (prediction.selection_label) filters.selection_label = `eq.${prediction.selection_label}`;
+  return patchRows('prediction_ledger', filters, payload);
 }
