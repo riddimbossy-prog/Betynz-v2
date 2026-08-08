@@ -1,5 +1,0 @@
-Betynz Web v3.8.0
-SportyBet custom API is the sole football-data connector.
-Dedicated fixtures, markets, live, events and results paths are configured.
-No Parse.bot, BetExplorer, API-Football or Odds API fallback is present.
-Run: npm run build
