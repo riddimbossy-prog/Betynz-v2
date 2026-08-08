@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#050505">
+  <title>Betynz Atlas Streak Value Engine</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <link rel="stylesheet" href="/styles.css?v=5.1.1h2">
+</head>
+<body>
+<main class="route-page atlas-page">
+  <header class="route-hero atlas-hero">
+    <div class="atlas-hero-copy">
+      <nav class="atlas-breadcrumbs" aria-label="Engine navigation">
+        <a class="back-link" href="/">← Dashboard</a>
+        <a class="back-link" href="/picks.html">★ Qualified Picks</a>
+      <a class="back-link" href="/zeus.html">⚡ Zeus</a>
+        <a class="back-link" href="/momentum-streak.html">↗ Momentum</a>
+        <a class="back-link" href="/htft-momentum.html">◫ HT/FT</a>
+      </nav>
+      <small>STATS API · STREAK VALUE ENGINE</small>
+      <h1>Atlas Streak Value Engine</h1>
+      <p>Best/worst form and ordered streaks open the route. Atlas then checks the offered market and uses xG/SOT as a confirmation layer for goal and team-total selections.</p>
+    </div>
+    <div class="route-controls atlas-controls">
+      <label><span>Date</span><input id="atlasDate" type="date"></label>
+      <label><span>Decision</span><select id="atlasDecisionFilter"><option value="ALL">All qualified picks</option><option value="FIRE">Direct picks</option><option value="SAFER">Safer picks</option></select></label>
+      <label><span>Market</span><select id="atlasMarketFilter"><option value="ALL">All markets</option><option value="TEAM_GOALS">Team goals</option><option value="MATCH_GOALS">Match goals</option><option value="RESULT">Result markets</option></select></label>
+      <button id="atlasRefresh">Analyse date</button>
+    </div>
+  </header>
+
+  <section class="route-summary atlas-summary" aria-label="Atlas summary">
+    <article><small>Daily coverage</small><strong id="atlasFixtures">0</strong><span>Fixtures checked</span></article>
+    <article><small>Deep evidence</small><strong id="atlasAnalysed">0</strong><span>Full Atlas profiles</span></article>
+    <article><small>Highest grade</small><strong id="atlasFire">0</strong><span>Direct picks</span></article>
+    <article><small>Protected route</small><strong id="atlasSafer">0</strong><span>Safer picks</span></article>
+  </section>
+
+  <section class="momentum-rules-strip atlas-rules-strip" aria-label="Atlas method">
+    <article><i>01</i><div><b>Best vs worst</b><span>Strong form against clear weakness creates the first directional signal.</span></div></article>
+    <article><i>02</i><div><b>Value-band gate</b><span>Only an offered result, total or team-total market inside Atlas's value band can qualify.</span></div></article>
+    <article><i>03</i><div><b>xG confirmation</b><span>Expected-goal pressure can strengthen or contradict goal routes.</span></div></article>
+    <article><i>04</i><div><b>SOT confirmation</b><span>Shots on target validates attacking pressure when coverage is available.</span></div></article>
+  </section>
+
+  <section class="atlas-toolbar" aria-label="Atlas quick filters">
+    <div><b id="atlasVisibleCount">0</b><span>picks shown</span></div>
+    <div class="atlas-filter-note">Sorted by decision strength, with direct selections first.</div>
+  </section>
+
+  <section class="route-grid atlas-grid" id="atlasGrid"><div class="route-empty">Choose a date and analyse Stats API streak value.</div></section>
+  <p class="responsible-note">Informational football analysis only. No outcome is guaranteed.</p>
+</main>
+<nav class="mobile-bottom-nav" aria-label="Mobile navigation"><a href="/">⌂<span>Board</span></a><a href="/picks.html">★<span>Picks</span></a><a href="/momentum-streak.html">↗<span>Momentum</span></a><a class="active" href="/streak-value.html">◆<span>Atlas</span></a><a href="/htft-momentum.html">◫<span>HT/FT</span></a></nav>
+<script type="module" src="/streak-value.js?v=5.1.1h2"></script><script type="module" src="/motion.js?v=5.1.1h2"></script>
+</body>
+</html>

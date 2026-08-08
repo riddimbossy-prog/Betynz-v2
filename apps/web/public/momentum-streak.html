@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#04111b">
+  <title>Betynz Momentum & Streak Engine</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Betynz">
+  <link rel="apple-touch-startup-image" href="/assets/pwa-splash-portrait.png" media="(orientation: portrait)">
+  <link rel="apple-touch-startup-image" href="/assets/pwa-splash-landscape.png" media="(orientation: landscape)">
+  <link rel="stylesheet" href="/styles.css?v=5.1.1h2">
+</head>
+<body>
+<main class="route-page momentum-page">
+  <header class="route-hero momentum-hero">
+    <div>
+      <a class="back-link" href="/">← Dashboard</a>
+      <a class="back-link" href="/picks.html">★ Qualified Picks</a>
+      <a class="back-link" href="/zeus.html">⚡ Zeus</a>
+      <a class="back-link" href="/ppg-route.html">◈ PPG Route</a>
+      <a class="back-link" href="/apex-intelligence.html">◈ Apex Intelligence</a>
+      <a class="back-link" href="/convergence.html">◎ Convergence</a>
+      <small>SEQUENCE & MOMENTUM ENGINE</small>
+      <h1>Momentum & Streak Engine</h1>
+      <p>Recent sequences are read in order—not only as averages. Winning, unbeaten, winless, scoring, conceding, BTTS and goal-line streak families must agree before a market can fire.</p>
+    </div>
+    <div class="route-controls">
+      <input id="momentumDate" type="date">
+      <select id="momentumDecisionFilter">
+        <option value="ALL">All qualified picks</option>
+        <option value="FIRE">Direct picks</option>
+        <option value="SAFER">Safer picks</option>
+      </select>
+      <button id="momentumRefresh">Analyse date</button>
+    </div>
+  </header>
+
+  <section class="route-summary">
+    <article><strong id="momentumFixtures">0</strong><span>Fixtures checked</span></article>
+    <article><strong id="momentumAnalysed">0</strong><span>Complete samples</span></article>
+    <article><strong id="momentumFire">0</strong><span>Direct picks</span></article>
+    <article><strong id="momentumSafer">0</strong><span>Safer picks</span></article>
+  </section>
+
+  <section class="momentum-rules-strip">
+    <article><b>Form sequence</b><span>Wins, losses, unbeaten and winless runs</span></article>
+    <article><b>Goal sequence</b><span>Scoring, conceding and total-goal continuation</span></article>
+    <article><b>Opposition pressure</b><span>Strong streak against a weak opposing streak</span></article>
+    <article><b>Market confirmation</b><span>The exact API-Football market must be available</span></article>
+  </section>
+
+  <section class="route-grid" id="momentumGrid"><div class="route-empty">Choose a date and analyse the momentum routes.</div></section>
+  <p class="responsible-note">Informational football analysis only. No outcome is guaranteed. Adults only.</p>
+</main>
+<nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+  <a href="/">⌂<span>Board</span></a>
+  <a href="/picks.html">★<span>Picks</span></a>
+  <a href="/market-route.html">◆<span>Market</span></a>
+  <a href="/convergence.html">◎<span>Converge</span></a>
+  <a class="active" href="/momentum-streak.html">↗<span>Momentum</span></a>
+</nav>
+<script type="module" src="/momentum-streak.js?v=5.1.1h2"></script>
+<script type="module" src="/motion.js?v=5.1.1h2"></script>
+</body>
+</html>
