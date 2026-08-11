@@ -1,1 +1,108 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#06111a"><title>Betynz — Golden Banker</title><link rel="icon" href="/assets/favicon-32x32.png"><link rel="stylesheet" href="/styles.css?v=6.0.0"></head><body><header><a class="brand" href="/"><img src="/assets/betynz-logo.png" alt="Betynz"><span>Golden Banker v4.3</span></a><button id="refresh">↻ Refresh</button></header><main><section class="hero"><span>MATHEMATICAL SPLIT-FORM EDITION</span><h1>One engine. Exact <em>5 + 5</em> form.</h1><p>Home team: last 5 home matches only. Away team: last 5 away matches only. Overall form is ignored.</p><div class="rules"><b>≥7/10 banker gate</b><b>2.0 PPG DNB gate</b><b>2.3 PPG win gate</b><b>Top 4 maximum</b></div></section><section class="week"><div id="days"></div><p id="state">Loading board…</p></section><section class="panel"><div class="head"><div><span>FINAL TOP BANKERS</span><h2>Top 4</h2></div><strong id="progress">0/0</strong></div><div class="top4" id="top4"><div class="empty">Analysing split form…</div></div></section><section class="panel"><div class="head"><div><span>FULL BOARD</span><h2 id="title">Today</h2></div><div class="filters"><select id="status"><option value="ALL">All</option><option>UPCOMING</option><option>LIVE</option><option>SETTLED</option><option>WAITING</option></select><input id="search" placeholder="Search team"></div></div><div id="matches" class="matches"><div class="empty">Loading fixtures…</div></div></section><p class="note">Statistical football analysis only. No outcome is guaranteed. Adults only.</p></main><dialog id="detail"><button id="close">×</button><div id="detailBody"></div></dialog><script type="module" src="/app.js?v=6.0.0"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#06111a">
+  <title>Betynz — Golden Banker</title>
+  <link rel="icon" href="/assets/favicon-32x32.png">
+  <link rel="stylesheet" href="/styles.css?v=6.1.0">
+</head>
+<body>
+<header>
+  <a class="brand" href="/">
+    <img src="/assets/betynz-logo.png" alt="Betynz">
+    <span>Golden Banker v4.3</span>
+  </a>
+  <button id="refresh" type="button">↻ Refresh</button>
+</header>
+
+<main>
+  <section class="hero">
+    <span>MATHEMATICAL SPLIT-FORM EDITION</span>
+    <h1>One engine. Exact <em>5 + 5</em> form.</h1>
+    <p>Home team: last 5 home matches only. Away team: last 5 away matches only. Overall form is ignored.</p>
+    <div class="rules">
+      <b>≥7/10 banker gate</b>
+      <b>2.0 PPG DNB gate</b>
+      <b>2.3 PPG win gate</b>
+      <b>Top 4 maximum</b>
+    </div>
+  </section>
+
+  <section class="week">
+    <div id="days"></div>
+    <p id="state">Loading board…</p>
+  </section>
+
+  <section class="panel banker-panel" id="bankerPanel">
+    <div class="head banker-head">
+      <div>
+        <span>FINAL TOP BANKERS</span>
+        <h2>Top 4</h2>
+        <p>Only selections clearing the Golden Banker 7/10 gate appear here.</p>
+      </div>
+      <div class="progress-wrap">
+        <strong id="progress">0/0</strong>
+        <small id="progressText">Analysing</small>
+      </div>
+    </div>
+    <div class="top4" id="top4"><div class="empty">Analysing split form…</div></div>
+  </section>
+
+  <section class="panel board-panel">
+    <div class="head board-head">
+      <div>
+        <span>MATCH CENTRE</span>
+        <h2 id="title">Today</h2>
+        <p id="boardSummary">Qualified picks first. Other fixtures stay collapsed until you need them.</p>
+      </div>
+      <div class="scope-tabs" id="scopeTabs" role="tablist" aria-label="Board view">
+        <button class="active" data-scope="QUALIFIED" type="button">Qualified <b id="qualifiedCount">0</b></button>
+        <button data-scope="ANALYSING" type="button">Analysing <b id="analysingCount">0</b></button>
+        <button data-scope="ALL" type="button">All <b id="allCount">0</b></button>
+      </div>
+    </div>
+
+    <div class="filters">
+      <select id="market" aria-label="Market filter">
+        <option value="ALL">All markets</option>
+        <option value="OVER25">Over 2.5</option>
+        <option value="BTTS">BTTS / GG</option>
+        <option value="WIN_DNB">Win / DNB</option>
+      </select>
+      <select id="confidence" aria-label="Confidence filter">
+        <option value="ALL">All confidence</option>
+        <option value="HIGH">High</option>
+        <option value="MEDIUM">Medium</option>
+        <option value="LOW">Low</option>
+      </select>
+      <select id="league" aria-label="League filter"><option value="ALL">All leagues</option></select>
+      <select id="status" aria-label="Match status filter">
+        <option value="ALL">All statuses</option>
+        <option value="UPCOMING">Upcoming</option>
+        <option value="LIVE">Live</option>
+        <option value="SETTLED">Settled</option>
+        <option value="WAITING">Waiting 5+5</option>
+      </select>
+      <input id="search" placeholder="Search team…" aria-label="Search team">
+    </div>
+
+    <div id="matches" class="matches"><div class="empty">Loading fixtures…</div></div>
+    <button id="otherToggle" class="other-toggle" type="button" hidden></button>
+  </section>
+
+  <p class="note">Statistical football analysis only. No outcome is guaranteed. Adults only.</p>
+</main>
+
+<dialog id="detail">
+  <div class="dialog-top">
+    <span>GOLDEN BANKER MATCH BREAKDOWN</span>
+    <button id="close" type="button" aria-label="Close">×</button>
+  </div>
+  <div id="detailBody"></div>
+</dialog>
+
+<script type="module" src="/app.js?v=6.1.0"></script>
+</body>
+</html>
