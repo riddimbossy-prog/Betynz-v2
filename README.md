@@ -1,39 +1,32 @@
-# Betynz v5.1.1 — Foundation Intelligence
+# Betynz v6 — Golden Banker Core
 
-Betynz is a football-intelligence platform built around seven specialist engines and Zeus statistical supervision. v5.1.1 is a foundation release: it keeps the existing football rules, the universal 1.20–2.00 publication gate, exact-market data validation and match-specific adaptive recovery, while strengthening how evidence is measured, stored, calibrated, mapped and served.
+Betynz now runs one prediction engine: **Golden Banker v4.3 (Mathematical Split-Form Edition)**.
 
-## Decision pipeline
+## Prediction contract
 
-```text
-API-Football core data + Stats API enrichment
-  → specialist engine proposal
-  → universal 1.20–2.00 odds gate
-  → exact-market data-backed validation
-  → match-specific adaptive recovery when needed
-  → correlation-aware seven-engine Consensus
-  → Zeus statistical supervision
-  → freeze → Proof → settlement → calibration
+- Home team: exactly the **last 5 HOME matches** before kickoff.
+- Away team: exactly the **last 5 AWAY matches** before kickoff.
+- Overall table form and older general form are not used by the engine.
+- Three systems are scored separately: **Over 2.5**, **BTTS/GG**, **Win/DNB**.
+- A primary market must score **7/10 or higher** to qualify.
+- The daily board publishes a maximum **Top 4**.
+- DNB hard gate: favourite split PPG >= 2.0 and opponent split PPG < 1.0.
+- Straight Win hard gate: favourite split PPG >= 2.3 and opponent split PPG < 1.0.
+- Defensive bleed trigger: average goals conceded > 2.30.
+
+## Runtime
+
+`API-Football fixtures -> exact 5/5 split histories -> Golden Banker -> durable checkpoint -> final Top 4 -> prediction ledger -> settlement`
+
+The app keeps the existing API-Football queue, Supabase persistence core and restart recovery. The old specialist/Consensus/Zeus prediction stack is not part of the runtime anymore.
+
+## Commands
+
+```bash
+npm run build
+npm start
 ```
 
-## v5.1.1 foundation upgrades
+## Required environment
 
-- Correlation-aware Consensus with effective independent-evidence units.
-- Brier score, log loss, market-implied baseline, calibration gap, Wilson intervals and CLV tracking.
-- Structured prediction lineage from original proposal through final publication.
-- Canonical API-Football ↔ Stats API fixture/team identity registry.
-- Strict historical integrity: past official analyses are read from Proof, not recomputed with future data.
-- Stats API histories are cutoff-aware as of the target fixture kickoff.
-- Precomputed feature store in memory + Supabase for faster match intelligence.
-- Bounded public API rate limits and deep-analysis date window.
-- Stronger automatic settlement identity requirements.
-- Admin page isolation, login throttling and same-origin protection on state-changing admin actions.
-- Runtime telemetry for latency, 5xx errors, event-loop lag, memory, caches and provider queues.
-- Simplified public navigation with a dedicated Engine Lab.
-- Shared browser API client and modular foundation services.
-
-## Deployment
-
-One repository, one `render.yaml`, one Render web service. Run SQL `017_foundation_intelligence.sql` on an existing Supabase project before deploying v5.1.1.
-
-## v5.2.0 durability
-Betynz now checkpoints completed engine analysis per fixture, records resumable scheduler jobs, uses distributed database leases, and keeps an immutable prediction firing ledger. Apply `apps/web/sql/019_persistence_core.sql` and use `/admin-operations.html` for private runtime control.
+Copy `.env.example` and configure the private API-Football and Supabase keys in Render. Never commit real keys.
