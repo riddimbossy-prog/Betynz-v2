@@ -8,8 +8,10 @@ const S = {
   g: null,
   map: new Map(),
   timer: null,
-  scope: 'QUALIFIED',
-  showOthers: false
+  scope: 'CANDIDATES',
+  centreOpen: false,
+  page: 1,
+  pageSize: 20
 };
 
 const off = n => { const d = new Date(); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); };
@@ -17,12 +19,21 @@ const time = v => { const d = new Date(v); return isNaN(d) ? 'TBA' : d.toLocaleT
 const shortDate = v => { const d = new Date(v); return isNaN(d) ? '—' : d.toLocaleDateString([],{day:'2-digit',month:'short'}); };
 const pct = v => Number.isFinite(Number(v)) ? `${Math.round(Number(v)*100)}%` : '—';
 const scoreText = v => Number.isFinite(Number(v)) ? `${Number(v).toFixed(1)}/10` : '—';
+const kickMs = f => { const n = new Date(f?.kickoff).getTime(); return Number.isFinite(n) ? n : Number.MAX_SAFE_INTEGER; };
 
 function group(f){
   if(/^(1H|HT|2H|ET|BT|P|LIVE|INT|INPLAY)$/i.test(f?.status)) return 'LIVE';
   if(/^(FT|AET|PEN|FINISHED|ENDED|COMPLETED)$/i.test(f?.status)) return 'SETTLED';
   if(/PST|CANC|ABD/i.test(f?.status)) return 'WAITING';
   return 'UPCOMING';
+}
+
+function finalBankerIds(){
+  return new Set((S.g?.topBankers||[]).map(x=>String(x?.fixture?.id||x?.analysis?.id||'')).filter(Boolean));
+}
+
+function isFinalBanker(f){
+  return finalBankerIds().has(String(f?.id||''));
 }
 
 function fixtureScore(f){
@@ -33,7 +44,7 @@ function fixtureScore(f){
 }
 
 function settledOutcome(f,a){
-  if(group(f)!=='SETTLED'||!a?.banker) return null;
+  if(group(f)!=='SETTLED'||!a?.banker||!isFinalBanker(f)) return null;
   const s=fixtureScore(f); if(!s) return null;
   const bet=String(a?.finalRecommendation?.primaryBet||'');
   if(bet==='Over 2.5') return s.h+s.a>=3?'WON':'LOST';
@@ -57,7 +68,7 @@ function stateFor(f,a){
   if(settled) return settled;
   if(a?.waiting) return 'WAITING FOR 5+5';
   if(!a) return 'ANALYSING';
-  if(a.banker) return 'BANKER';
+  if(a.banker) return isFinalBanker(f)?'BANKER':'CANDIDATE';
   return 'REJECTED';
 }
 
@@ -151,40 +162,53 @@ function renderMatch(f){
     </div>
     <footer>
       <em class="status-badge ${stateClass(label)}">${esc(label)}</em>
-      <div><small>${a?.banker?'SELECTION':'ENGINE'}</small><strong>${esc(pick)}</strong></div>
+      <div><small>${isFinalBanker(f)?'FINAL BANKER':a?.banker?'QUALIFIED CANDIDATE':'ENGINE'}</small><strong>${esc(pick)}</strong></div>
       <i>${scoreText(r.score)}</i>
     </footer>
   </button>`;
 }
 
+function setScopeButtons(){
+  $$('#scopeTabs [data-scope]').forEach(x=>x.classList.toggle('active',x.dataset.scope===S.scope));
+}
+
 function renderMatches(){
-  const base=baseFiltered(),qualified=base.filter(f=>S.map.get(String(f.id))?.banker),analysing=base.filter(f=>{const a=S.map.get(String(f.id));return !a||a.waiting;});
-  $('#qualifiedCount').textContent=qualified.length;
+  const base=baseFiltered(),finalIds=finalBankerIds();
+  const otherBase=base.filter(f=>!finalIds.has(String(f.id)));
+  const candidates=otherBase.filter(f=>S.map.get(String(f.id))?.banker)
+    .sort((a,b)=>Number(S.map.get(String(b.id))?.finalRecommendation?.score||0)-Number(S.map.get(String(a.id))?.finalRecommendation?.score||0)||kickMs(a)-kickMs(b));
+  const analysing=otherBase.filter(f=>{const a=S.map.get(String(f.id));return !a||a.waiting;}).sort((a,b)=>kickMs(a)-kickMs(b));
+  const all=otherBase.slice().sort((a,b)=>kickMs(a)-kickMs(b));
+
+  $('#candidateCount').textContent=candidates.length;
   $('#analysingCount').textContent=analysing.length;
-  $('#allCount').textContent=base.length;
+  $('#allCount').textContent=all.length;
 
-  let rows=[];
-  if(S.scope==='QUALIFIED') rows=qualified;
-  else if(S.scope==='ANALYSING') rows=analysing;
-  else rows=base;
+  const finalVisible=base.filter(f=>finalIds.has(String(f.id))).length;
+  $('#boardSummary').textContent=`${finalVisible} final banker${finalVisible===1?'':'s'} pinned above · ${candidates.length} other 7/10+ candidate${candidates.length===1?'':'s'} · ${all.length} other fixture${all.length===1?'':'s'}.`;
+  $('#matchCentreToggle').textContent=S.centreOpen?`Hide Match Centre ↑`:`Browse ${all.length} other match${all.length===1?'':'es'} ↓`;
+  $('#centreBody').hidden=!S.centreOpen;
 
-  const other=base.filter(f=>!S.map.get(String(f.id))?.banker);
-  if(S.scope==='QUALIFIED'&&S.showOthers) rows=[...qualified,...other];
+  if(!S.centreOpen){
+    $('#matches').innerHTML='';
+    $('#pagination').hidden=true;
+    return;
+  }
 
-  $('#matches').innerHTML=rows.length?rows.map(renderMatch).join(''):`<div class="empty">${S.scope==='QUALIFIED'?'No qualified bankers match these filters.':'No matches match this view.'}</div>`;
+  let rows=S.scope==='CANDIDATES'?candidates:S.scope==='ANALYSING'?analysing:all;
+  const pages=Math.max(1,Math.ceil(rows.length/S.pageSize));
+  S.page=Math.min(Math.max(1,S.page),pages);
+  const start=(S.page-1)*S.pageSize;
+  const pageRows=rows.slice(start,start+S.pageSize);
+
+  $('#matches').innerHTML=pageRows.length?pageRows.map(renderMatch).join(''):`<div class="empty">${S.scope==='CANDIDATES'?'No extra qualified candidates match these filters.':S.scope==='ANALYSING'?'No fixtures are currently waiting for analysis.':'No matches match this view.'}</div>`;
   $$('.match').forEach(b=>b.onclick=()=>open(b.dataset.id));
 
-  const toggle=$('#otherToggle');
-  if(S.scope==='QUALIFIED'&&other.length){
-    toggle.hidden=false;
-    toggle.textContent=S.showOthers?`Hide other matches ↑`:`Other matches — ${other.length} ↓`;
-  }else toggle.hidden=true;
-
-  $('#boardSummary').textContent=S.scope==='QUALIFIED'
-    ? `${qualified.length} qualified · ${other.length} other matches collapsed by default.`
-    : S.scope==='ANALYSING'
-      ? `${analysing.length} fixtures are still waiting for exact split data or analysis.`
-      : `${base.length} fixtures match the current filters.`;
+  const pagination=$('#pagination');
+  pagination.hidden=rows.length<=S.pageSize;
+  $('#pageInfo').textContent=`Page ${S.page} of ${pages} · ${rows.length} match${rows.length===1?'':'es'}`;
+  $('#pagePrev').disabled=S.page<=1;
+  $('#pageNext').disabled=S.page>=pages;
 }
 
 function render(){
@@ -194,7 +218,7 @@ function render(){
   $('#progressText').textContent=S.g?.complete?'Complete':`${p.percent||0}% analysed`;
   $('#state').textContent=S.g?.complete
     ? `Complete · ${S.g.topBankers?.length||0} final bankers`
-    : `Analysing ${p.processed||0}/${p.total||0} fixtures · existing bankers remain pinned`;
+    : `Analysing ${p.processed||0}/${p.total||0} fixtures · final bankers stay pinned`;
   updateLeagueFilter();
   renderTop();
   renderMatches();
@@ -241,9 +265,19 @@ function open(id){
   $('#detail').showModal();
 }
 
+function resetCentre(){
+  S.centreOpen=false;
+  S.scope='CANDIDATES';
+  S.page=1;
+  setScopeButtons();
+  $('#centreBody').hidden=true;
+}
+
 async function load(date=S.date){
   clearTimeout(S.timer);
-  S.date=date; S.showOthers=false; days();
+  S.date=date;
+  resetCentre();
+  days();
   $('#title').textContent=new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'});
   $('#state').textContent=S.fixtures.length?'Refreshing while keeping the last good board visible…':'Loading fixtures…';
   try{
@@ -264,15 +298,17 @@ function poll(){
 }
 
 $('#refresh').onclick=()=>load();
-['#status','#market','#confidence','#league'].forEach(id=>$(id).onchange=renderMatches);
-$('#search').oninput=renderMatches;
+['#status','#market','#confidence','#league'].forEach(id=>$(id).onchange=()=>{S.page=1;renderMatches();});
+$('#search').oninput=()=>{S.page=1;renderMatches();};
 $('#scopeTabs').onclick=e=>{
   const b=e.target.closest('[data-scope]'); if(!b)return;
-  S.scope=b.dataset.scope; S.showOthers=false;
-  $$('#scopeTabs [data-scope]').forEach(x=>x.classList.toggle('active',x===b));
+  S.scope=b.dataset.scope; S.page=1;
+  setScopeButtons();
   renderMatches();
 };
-$('#otherToggle').onclick=()=>{S.showOthers=!S.showOthers;renderMatches();};
+$('#matchCentreToggle').onclick=()=>{S.centreOpen=!S.centreOpen;S.page=1;renderMatches();};
+$('#pagePrev').onclick=()=>{if(S.page>1){S.page--;renderMatches();$('#centreBody').scrollIntoView({behavior:'smooth',block:'start'});}};
+$('#pageNext').onclick=()=>{S.page++;renderMatches();$('#centreBody').scrollIntoView({behavior:'smooth',block:'start'});};
 $('#close').onclick=()=>$('#detail').close();
 $('#detail').onclick=e=>{if(e.target===$('#detail'))$('#detail').close();};
 
