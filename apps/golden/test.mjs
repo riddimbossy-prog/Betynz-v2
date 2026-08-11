@@ -18,15 +18,24 @@ assert.ok(board.topBankers.length<=4);
 const html=readFileSync(new URL('./public/index.html',import.meta.url),'utf8');
 const js=readFileSync(new URL('./public/app.js',import.meta.url),'utf8');
 const css=readFileSync(new URL('./public/styles.css',import.meta.url),'utf8');
-assert.match(html,/data-scope="QUALIFIED"/);
+const compact=readFileSync(new URL('./public/compact-board.css',import.meta.url),'utf8');
+
+assert.match(html,/data-scope="CANDIDATES"/);
+assert.match(html,/id="matchCentreToggle"/);
+assert.match(html,/id="centreBody" hidden/);
+assert.match(html,/id="pagination"/);
 assert.match(html,/id="market"/);
 assert.match(html,/id="confidence"/);
 assert.match(html,/id="league"/);
-assert.match(html,/id="otherToggle"/);
+assert.match(js,/pageSize:\s*20/);
+assert.match(js,/CANDIDATE/);
+assert.match(js,/finalBankerIds/);
 assert.match(js,/WAITING FOR 5\+5/);
 assert.match(js,/Why this pick/);
 assert.match(js,/exact home results/);
 assert.match(js,/exact away results/);
+assert.match(compact,/\.status-badge\.candidate/);
+assert.match(compact,/@media\(max-width:540px\)/);
 assert.match(css,/@media\(max-width:620px\)/);
 
-console.log('Golden Banker v4.3 engine + UI tests passed');
+console.log('Golden Banker v4.3 engine + compact UI tests passed');
