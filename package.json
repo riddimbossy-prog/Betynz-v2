@@ -1,18 +1,1 @@
-{
-  "name": "betynz-api-football-only",
-  "version": "5.2.0",
-  "private": true,
-  "type": "module",
-  "description": "Betynz v5.2.0 weekly precomputed intelligence using API-Football core data and Stats API enrichment: seven specialist engines, Zeus supervision, correlation-aware Consensus, forward calibration, prediction lineage, provider identity registry, precomputed feature store, strict historical integrity, data-backed publication and match-specific adaptive recovery.",
-  "engines": {
-    "node": ">=20"
-  },
-  "scripts": {
-    "start": "node apps/web/src/server.mjs",
-    "build": "npm run clean:provider-reset && npm --prefix apps/web run build && npm run verify:single-render",
-    "test": "npm run build",
-    "test:integration": "node test/api-football-single-service-smoke.mjs",
-    "verify:single-render": "node scripts/verify-single-render.mjs",
-    "clean:provider-reset": "node scripts/clean-provider-reset.mjs"
-  }
-}
+{"name":"betynz-golden-banker","version":"6.0.0","private":true,"type":"module","engines":{"node":">=20"},"scripts":{"start":"node apps/golden/server.mjs","build":"npm --prefix apps/golden run build","test":"npm run build"}}

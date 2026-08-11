@@ -1,0 +1,17 @@
+name: Betynz CI
+on:
+  push:
+    branches: ['main', 'agent/**']
+  pull_request:
+    branches: ['main']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.18.0'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
