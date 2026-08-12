@@ -50,7 +50,8 @@ assert.match(client,/functions\/v1/);
 assert.match(client,/auth\/v1/);
 assert.match(client,/localStorage/);
 assert.match(client,/\/api\/auth\/me/);
-assert.match(client,/\/media\/team/);
+assert.match(client,/function rewriteCrest/);
+assert.match(client,/img\.src=`\$\{apiBase\}\$\{src\}`/);
 assert.match(runtimeConfig,/__SUPABASE_URL__/);
 assert.match(runtimeConfig,/__SUPABASE_ANON_KEY__/);
 
