@@ -1,0 +1,4 @@
+project_id = "betynz"
+
+[functions.betynz-api]
+verify_jwt = false
