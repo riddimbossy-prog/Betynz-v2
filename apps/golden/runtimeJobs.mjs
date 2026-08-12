@@ -6,6 +6,9 @@ const configuredLease=Number(process.env.GOLDEN_BANKER_DATE_LOCK_SECONDS||900);
 const ANALYSIS_LOCK_LEASE_SECONDS=Math.min(1800,Math.max(300,Number.isFinite(configuredLease)?configuredLease:900));
 const ANALYSIS_LOCK_RENEW_MS=240000;
 const ANALYSIS_RETRY_MS=15000;
+const PRELOAD_DAYS_AHEAD=6;
+const PRELOAD_SWEEP_MS=30*60*1000;
+let preloadTask=null;
 
 function lockKeyFor(date){return `golden:${ANALYSIS_LOCK_REVISION}:${date}`}
 function scheduleRetry(date,force=false){
@@ -84,12 +87,34 @@ async function analyseDate(date,{force=false}={}){
 }
 
 const kick=(date,force=false)=>{if(!jobs.has(date))queueMicrotask(()=>analyseDate(date,{force}).catch(()=>null))};
+
+async function preloadUpcomingWeek(){
+  if(preloadTask)return preloadTask;
+  preloadTask=(async()=>{
+    for(let n=0;n<=PRELOAD_DAYS_AHEAD;n++){
+      const date=utcDate(n);
+      const current=snapshots.get(date)||await hydrate(date).catch(()=>null);
+      if(current?.complete)continue;
+      await analyseDate(date).catch(()=>null);
+    }
+  })().finally(()=>{preloadTask=null});
+  return preloadTask;
+}
+
 function resultScore(f){const s=f?.score||{},h=Number.isFinite(Number(s.fulltimeHome))?Number(s.fulltimeHome):Number(s.home),a=Number.isFinite(Number(s.fulltimeAway))?Number(s.fulltimeAway):Number(s.away);return Number.isFinite(h)&&Number.isFinite(a)?{h,a}:null}
 function settle(m,h,a){if(m==='HOME_WIN')return h>a?'WON':'LOST';if(m==='AWAY_WIN')return a>h?'WON':'LOST';if(m==='HOME_DNB')return h>a?'WON':h===a?'PUSH':'LOST';if(m==='AWAY_DNB')return a>h?'WON':h===a?'PUSH':'LOST';if(m==='UNDER_3_5')return h+a<=3?'WON':'LOST';if(m==='OVER_2_5')return h+a>=3?'WON':'LOST';if(m==='BTTS_YES')return h>0&&a>0?'WON':'LOST';return'REVIEW'}
 export async function settleDate(date){if(!supabaseConfigured())return;const [results,ledger]=await Promise.all([getApiFootballResults(date),getPredictionLedger({from:date,to:date,engine:ENGINE,status:'PENDING',limit:100})]),map=new Map((results.fixtures||[]).map(f=>[String(f.id),f])),updates=[];for(const row of ledger.rows||[]){const f=map.get(String(row.fixture_id)),s=f&&resultScore(f);if(!s)continue;updates.push({...row,settlement_status:settle(String(row.market||''),s.h,s.a),settled_at:new Date().toISOString(),home_score:s.h,away_score:s.a,result_payload:{source:'API_FOOTBALL',score:{home:s.h,away:s.a}}})}if(updates.length)await upsertPredictionLedger(updates)}
-export function health(){return{ok:true,version:VERSION,engine:'Golden Banker v4.3',engineCode:ENGINE,apiFootball:apiFootballConfigured(),supabase:supabaseConfigured(),persistence:persistenceCoreEnabled(),providerQueue:apiFootballRateState(),analysisLockRevision:ANALYSIS_LOCK_REVISION,analysisLockLeaseSeconds:ANALYSIS_LOCK_LEASE_SECONDS}}
+export function health(){return{ok:true,version:VERSION,engine:'Golden Banker v4.3',engineCode:ENGINE,apiFootball:apiFootballConfigured(),supabase:supabaseConfigured(),persistence:persistenceCoreEnabled(),providerQueue:apiFootballRateState(),analysisLockRevision:ANALYSIS_LOCK_REVISION,analysisLockLeaseSeconds:ANALYSIS_LOCK_LEASE_SECONDS,preloadDaysAhead:PRELOAD_DAYS_AHEAD,preloadedDates:[...snapshots.entries()].filter(([,b])=>b?.complete).map(([date])=>date).sort()}}
 export async function fixtureBoard(date){const b=await getApiFootballFastFixtureBoard(date);return{...b,fixtures:(b.fixtures||[]).filter(f=>!isSrl(f)).map(publicFixture)}}
 export const weekCounts=from=>getApiFootballFixtureCounts(from,7),liveBoard=()=>getApiFootballLiveBoard();
 export async function proof(from,to){const l=await getPredictionLedger({from,to,engine:ENGINE,limit:500});return{from,to,rows:l.rows||[]}}
 export async function goldenBoard(date){let cur=snapshots.get(date)||await hydrate(date);if(isPast(date)){if(cur)return{...cur,historicalLock:true};const ledger=await getPredictionLedger({from:date,to:date,engine:ENGINE,limit:20});return{engine:'Golden Banker v4.3',engineCode:ENGINE,date,historicalLock:true,complete:true,all:[],topBankers:[],ledger:ledger.rows||[]}}if(!cur?.complete)kick(date);if(!cur){const b=await getApiFootballFastFixtureBoard(date);cur=makeBoard(date,b,[],{total:(b.fixtures||[]).filter(eligible).length});snapshots.set(date,cur)}return cur}
-export async function startRuntime(){await hydrate(utcDate()).catch(()=>null);if(!snapshots.get(utcDate())?.complete)kick(utcDate());const timer=setInterval(()=>{for(const n of[-2,-1,0])settleDate(utcDate(n)).catch(()=>null)},Math.max(5,Number(process.env.AUTO_SETTLEMENT_INTERVAL_MINUTES||10))*60000);timer.unref?.()}
+export async function startRuntime(){
+  for(let n=0;n<=PRELOAD_DAYS_AHEAD;n++)await hydrate(utcDate(n)).catch(()=>null);
+  if(!snapshots.get(utcDate())?.complete)kick(utcDate());
+  queueMicrotask(()=>preloadUpcomingWeek().catch(()=>null));
+  const preloadTimer=setInterval(()=>preloadUpcomingWeek().catch(()=>null),PRELOAD_SWEEP_MS);
+  preloadTimer.unref?.();
+  const timer=setInterval(()=>{for(const n of[-2,-1,0])settleDate(utcDate(n)).catch(()=>null)},Math.max(5,Number(process.env.AUTO_SETTLEMENT_INTERVAL_MINUTES||10))*60000);
+  timer.unref?.();
+}
