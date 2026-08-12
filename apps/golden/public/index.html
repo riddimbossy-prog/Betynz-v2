@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/buffed-ui.css?v=7.1.0">
   <link rel="stylesheet" href="/branding.css?v=7.2.0">
   <link rel="stylesheet" href="/glass-90.css?v=7.4.0">
+  <link rel="stylesheet" href="/account.css?v=8.0.0">
 </head>
 <body class="splash-active">
 <div id="boardSplash" class="board-splash" role="status" aria-live="polite" aria-label="Loading Betynz board">
@@ -34,7 +35,11 @@
   <a class="brand" href="/">
     <img src="/assets/betynz-logo.png" alt="Betynz">
   </a>
-  <button id="refresh" type="button">↻ Refresh</button>
+  <div class="header-actions">
+    <a class="account-link" data-account-login href="/login">Login</a>
+    <a class="create-account-link" data-account-create href="/create-account">Create Account</a>
+    <button id="refresh" type="button">↻ Refresh</button>
+  </div>
 </header>
 
 <main>
@@ -138,6 +143,7 @@
 <script type="module" src="/splash.js?v=6.9.0"></script>
 <script type="module" src="/app.js?v=7.3.0"></script>
 <script type="module" src="/rated-link.js?v=6.3.0"></script>
+<script type="module" src="/account.js?v=8.0.0"></script>
 <script type="module" src="/brand-cleanup.js?v=7.2.0"></script>
 </body>
 </html>
