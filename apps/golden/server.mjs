@@ -2,16 +2,58 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import p1 from './public/video/zeus-thunder.part01.js';
+import p2 from './public/video/zeus-thunder.part02.js';
+import p3 from './public/video/zeus-thunder.part03.js';
+import p4 from './public/video/zeus-thunder.part04.js';
+import p5 from './public/video/zeus-thunder.part05.js';
 import { VERSION, safeDate, utcDate, addDays, outOfRange, health, fixtureBoard, weekCounts, goldenBoard, liveBoard, proof, startRuntime } from './runtime.mjs';
 
 const PORT=Number(process.env.PORT||10000);
 const publicRoot=fileURLToPath(new URL('./public/',import.meta.url));
 const assetRoot=fileURLToPath(new URL('../web/public/assets/',import.meta.url));
 const mediaCache=new Map();
-const security=()=>({'x-content-type-options':'nosniff','x-frame-options':'DENY','referrer-policy':'strict-origin-when-cross-origin','content-security-policy':"default-src 'self'; img-src 'self' https: data:; style-src 'self'; script-src 'self'; connect-src 'self'"});
+const splashVideo=Buffer.from([p1,p2,p3,p4,p5].join(''),'base64');
+if(splashVideo.length<20000||splashVideo.toString('ascii',4,8)!=='ftyp')throw new Error('Invalid Zeus splash MP4 payload');
+
+const security=()=>({'x-content-type-options':'nosniff','x-frame-options':'DENY','referrer-policy':'strict-origin-when-cross-origin','content-security-policy':"default-src 'self'; img-src 'self' https: data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'"});
 const json=(res,status,body,cache='no-store')=>{res.writeHead(status,{...security(),'content-type':'application/json; charset=utf-8','cache-control':cache});res.end(JSON.stringify(body))};
 const send=(res,status,body,type='text/plain; charset=utf-8',cache='no-cache')=>{res.writeHead(status,{...security(),'content-type':type,'cache-control':cache});res.end(body)};
-async function serveFile(res,path){const name=normalize(path).replace(/^([.][.][/\\])+/,'').replace(/^[/\\]+/,'');const root=path.startsWith('assets/')?assetRoot:publicRoot,file=join(root,path.startsWith('assets/')?name.slice(7):name);if(!file.startsWith(root))return send(res,403,'Forbidden');try{const body=await readFile(file),type={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.ico':'image/x-icon'}[extname(file)]||'application/octet-stream';return send(res,200,body,type,path.startsWith('assets/')?'public, max-age=604800, immutable':'no-cache')}catch{return send(res,404,'Not found')}}
+async function serveFile(res,path){const name=normalize(path).replace(/^([.][.][/\\])+/,'').replace(/^[/\\]+/,'');const root=path.startsWith('assets/')?assetRoot:publicRoot,file=join(root,path.startsWith('assets/')?name.slice(7):name);if(!file.startsWith(root))return send(res,403,'Forbidden');try{const body=await readFile(file),type={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.mp4':'video/mp4','.ico':'image/x-icon'}[extname(file)]||'application/octet-stream';return send(res,200,body,type,path.startsWith('assets/')?'public, max-age=604800, immutable':'no-cache')}catch{return send(res,404,'Not found')}}
+
+function serveSplashVideo(req,res){
+  const total=splashVideo.length;
+  const common={...security(),'content-type':'video/mp4','cache-control':'public, max-age=604800, immutable','accept-ranges':'bytes','cross-origin-resource-policy':'same-origin'};
+  if(req.method==='HEAD'){
+    res.writeHead(200,{...common,'content-length':String(total)});
+    return res.end();
+  }
+  const range=String(req.headers.range||'').trim();
+  if(!range){
+    res.writeHead(200,{...common,'content-length':String(total)});
+    return res.end(splashVideo);
+  }
+  const match=/^bytes=(\d*)-(\d*)$/.exec(range);
+  if(!match){
+    res.writeHead(416,{...common,'content-range':`bytes */${total}`});
+    return res.end();
+  }
+  let start=match[1]?Number(match[1]):0;
+  let end=match[2]?Number(match[2]):total-1;
+  if(!match[1]&&match[2]){
+    const suffix=Math.min(Number(match[2]),total);
+    start=total-suffix;
+    end=total-1;
+  }
+  if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<start||start>=total){
+    res.writeHead(416,{...common,'content-range':`bytes */${total}`});
+    return res.end();
+  }
+  end=Math.min(end,total-1);
+  const body=splashVideo.subarray(start,end+1);
+  res.writeHead(206,{...common,'content-range':`bytes ${start}-${end}/${total}`,'content-length':String(body.length)});
+  return res.end(body);
+}
 
 function trimMediaCache(){
   while(mediaCache.size>512){
@@ -52,5 +94,5 @@ async function serveTeamCrest(res,id){
 }
 
 async function api(res,url){if(url.pathname==='/api/health')return json(res,200,health());if(url.pathname==='/api/fixtures'){const date=url.searchParams.get('date')||utcDate();if(!safeDate(date))return json(res,400,{error:'INVALID_DATE'});try{return json(res,200,await fixtureBoard(date),'public, max-age=20, stale-while-revalidate=120')}catch(e){return json(res,503,{error:'FEED_UNAVAILABLE',message:e.message,fixtures:[]})}}if(url.pathname==='/api/week-counts'){const from=url.searchParams.get('from')||utcDate();if(!safeDate(from))return json(res,400,{error:'INVALID_DATE'});return json(res,200,await weekCounts(from),'public, max-age=60')}if(url.pathname==='/api/golden-banker'){const date=url.searchParams.get('date')||utcDate();if(!safeDate(date))return json(res,400,{error:'INVALID_DATE'});if(outOfRange(date))return json(res,400,{error:'DATE_OUT_OF_RANGE'});return json(res,200,await goldenBoard(date))}if(url.pathname==='/api/live')return json(res,200,await liveBoard());if(url.pathname==='/api/proof'){const to=url.searchParams.get('to')||utcDate(),from=url.searchParams.get('from')||addDays(to,-14);if(!safeDate(from)||!safeDate(to))return json(res,400,{error:'INVALID_DATE'});return json(res,200,await proof(from,to))}return json(res,404,{error:'NOT_FOUND'})}
-const server=createServer(async(req,res)=>{try{const url=new URL(req.url||'/','http://localhost');const crest=url.pathname.match(/^\/media\/team\/(\d{1,10})\.png$/);if(crest)return await serveTeamCrest(res,crest[1]);if(url.pathname.startsWith('/api/'))return await api(res,url);if(url.pathname==='/')return serveFile(res,'index.html');return serveFile(res,url.pathname.slice(1))}catch(e){return json(res,500,{error:'INTERNAL_ERROR',message:process.env.NODE_ENV==='production'?'Internal server error':e.message})}});
+const server=createServer(async(req,res)=>{try{const url=new URL(req.url||'/','http://localhost');if(url.pathname==='/media/zeus-thunder.mp4')return serveSplashVideo(req,res);const crest=url.pathname.match(/^\/media\/team\/(\d{1,10})\.png$/);if(crest)return await serveTeamCrest(res,crest[1]);if(url.pathname.startsWith('/api/'))return await api(res,url);if(url.pathname==='/')return serveFile(res,'index.html');return serveFile(res,url.pathname.slice(1))}catch(e){return json(res,500,{error:'INTERNAL_ERROR',message:process.env.NODE_ENV==='production'?'Internal server error':e.message})}});
 await startRuntime();server.listen(PORT,()=>console.log(`Betynz ${VERSION} · Golden Banker v4.3 on :${PORT}`));
