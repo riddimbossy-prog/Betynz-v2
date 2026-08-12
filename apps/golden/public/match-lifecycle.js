@@ -49,6 +49,11 @@ function ensureStatus(host,f){
   const cls=`provider-match-status ${matchClass(f)}`;if(badge.className!==cls)badge.className=cls
   const sc=scoreOf(f),text=`${matchLabel(f)}${sc&&!SCHEDULED.has(statusOf(f))?` · ${sc.h}–${sc.a}`:''}`;if(badge.textContent!==text)badge.textContent=text
 }
+function reorder(root,cards,idOf){
+  const sorted=[...cards].sort((a,b)=>kickMs(fixtures.get(idOf(a)))-kickMs(fixtures.get(idOf(b))))
+  if(sorted.some((node,i)=>node!==cards[i]))sorted.forEach(node=>root.appendChild(node))
+  return sorted
+}
 function decorateTop(){
   const root=q('#top4');if(!root)return
   const cards=qa('#top4 .banker-card')
@@ -60,13 +65,13 @@ function decorateTop(){
     if(result&&!badge&&pick){badge=document.createElement('span');badge.className='provider-settlement';pick.appendChild(badge)}
     if(badge){badge.className=`provider-settlement ${String(result||'').toLowerCase()}`;badge.textContent=result||'';badge.hidden=!result}
   }
-  cards.sort((a,b)=>kickMs(fixtures.get(String(a.dataset.open||'')))-kickMs(fixtures.get(String(b.dataset.open||'')))).forEach(x=>root.appendChild(x))
+  reorder(root,cards,node=>String(node.dataset.open||'')).forEach((card,i)=>{const rank=card.querySelector('.banker-rank');if(rank&&rank.textContent!==`#${i+1}`)rank.textContent=`#${i+1}`})
 }
 function decorateMatches(){
   const root=q('#matches');if(!root)return
   const cards=qa('#matches .match')
   for(const card of cards){const f=fixtures.get(String(card.dataset.id||''));if(!f)continue;const meta=card.querySelector('.match-meta');if(meta)ensureStatus(meta,f)}
-  cards.sort((a,b)=>kickMs(fixtures.get(String(a.dataset.id||'')))-kickMs(fixtures.get(String(b.dataset.id||'')))).forEach(x=>root.appendChild(x))
+  reorder(root,cards,node=>String(node.dataset.id||''))
 }
 function defaultEarlyKickoffView(){
   const date=selectedDate();if(date===defaultedDate)return;defaultedDate=date
