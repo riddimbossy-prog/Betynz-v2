@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const require=createRequire(import.meta.url);
 const {calculateSplitStats,analyseMatch,analyseBoard}=require('./goldenBanker.cjs');
+const {applyLowWinUnder35ToAnalysis}=require('./goldenUnder35.cjs');
 
 const stats=calculateSplitStats([{gf:2,ga:0},{gf:1,ga:0},{gf:3,ga:1},{gf:2,ga:1},{gf:1,ga:0}]);
 assert.equal(stats.ppg,3);
@@ -27,6 +28,27 @@ assert.equal(forcedUnder.finalRecommendation.score,10);
 assert.equal(forcedUnder.finalRecommendation.hardOverride,true);
 assert.equal(forcedUnder.banker,true);
 assert.equal(forcedUnder.markets.over25.qualified,true,'Hard U3.5 must override even when the normal goals model strongly qualifies Over 2.5');
+
+const legacyForced={
+  ...forcedUnder,
+  markets:{over25:forcedUnder.markets.over25,btts:forcedUnder.markets.btts,winDnb:forcedUnder.markets.winDnb},
+  finalRecommendation:{primaryBet:'Over 2.5',score:9.4,confidence:'High',bankerStatus:'Banker',summary:'legacy pick'},
+  banker:true,
+};
+const migratedForced=applyLowWinUnder35ToAnalysis(legacyForced);
+assert.equal(migratedForced.markets.under35.forced,true);
+assert.equal(migratedForced.finalRecommendation.primaryBet,'Under 3.5');
+assert.equal(migratedForced.finalRecommendation.score,10);
+assert.equal(migratedForced.finalRecommendation.hardOverride,true);
+assert.equal(migratedForced.banker,true);
+
+const legacyNormal={
+  ...dnb,
+  markets:{over25:dnb.markets.over25,btts:dnb.markets.btts,winDnb:dnb.markets.winDnb},
+};
+const migratedNormal=applyLowWinUnder35ToAnalysis(legacyNormal);
+assert.equal(migratedNormal.markets.under35.forced,false);
+assert.equal(migratedNormal.finalRecommendation.primaryBet,dnb.finalRecommendation.primaryBet,'Non-triggering cached picks must keep their prior primary market');
 
 const exactTwenty=analyseMatch({
   league:'T',homeTeam:'20 Home',awayTeam:'0 Away',
@@ -136,11 +158,21 @@ assert.match(under35Source,/homeWinRate<0\.20/);
 assert.match(under35Source,/awayWinRate<0\.20/);
 assert.match(under35Source,/homeLowPPG=Number\(home\?\.ppg\)<1\.0/);
 assert.match(under35Source,/awayLowPPG=Number\(away\?\.ppg\)<1\.0/);
+assert.match(under35Source,/applyLowWinUnder35ToAnalysis/);
 assert.match(runtimeBoard,/UNDER_3_5/);
-assert.match(runtimeBoard,/markets\?\.under35/);
+assert.match(runtimeBoard,/upgradeAnalysisForCurrentRules/);
+assert.match(runtimeBoard,/applyLowWinUnder35ToAnalysis/);
+assert.doesNotMatch(runtimeBoard,/hasExactEvidence\(analysis\)[\s\S]{0,220}markets\?\.under35/);
+assert.match(runtimeBoard,/topRowsFromItems/);
 assert.match(runtimeBoard,/lowWinUnder35/);
 assert.match(runtimeJobs,/m==='UNDER_3_5'/);
 assert.match(runtimeJobs,/h\+a<=3\?'WON':'LOST'/);
+assert.match(runtimeJobs,/ANALYSIS_LOCK_REVISION='u35-cache-v2'/);
+assert.match(runtimeJobs,/ANALYSIS_LOCK_LEASE_SECONDS=Math\.min\(1800/);
+assert.match(runtimeJobs,/renewJobLock\(lockKey,ANALYSIS_LOCK_LEASE_SECONDS\)/);
+assert.match(runtimeJobs,/scheduleRetry\(date,force\)/);
+assert.match(runtimeJobs,/upgradeAnalysisForCurrentRules\(old\.payload\.analysis\)/);
+assert.match(runtimeConfig,/renewJobLock/);
 assert.match(serverSource,/zeus-thunder-original\.mp4/);
 assert.match(serverSource,/readFile\(splashVideoPath\)/);
 assert.match(serverSource,/function serveSplashVideo/);
@@ -170,4 +202,4 @@ assert.match(serverSource,/serveTeamCrest/);
 assert.match(serverSource,/image\/jpeg/);
 assert.match(serverSource,/max-age=604800, immutable/);
 
-console.log('Golden engine + strict low-win Under 3.5 override + glass orange UI + crest proxy + highly rated page + original-quality Zeus splash tests passed');
+console.log('Golden engine + U3.5 cache migration + stale-lock recovery + UI + Zeus splash tests passed');

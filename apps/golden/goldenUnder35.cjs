@@ -1,5 +1,5 @@
 "use strict";
-const {CONFIG,round1,round2}=require('./goldenCore.cjs');
+const {CONFIG,round2}=require('./goldenCore.cjs');
 
 function scoreLowWinUnder35(home,away){
   const homeWinRate=home?.sampleSize?home.wins/home.sampleSize:1;
@@ -32,4 +32,38 @@ function scoreLowWinUnder35(home,away){
   };
 }
 
-module.exports={scoreLowWinUnder35};
+function applyLowWinUnder35ToAnalysis(analysis){
+  if(!analysis||analysis.waiting)return analysis;
+  const home=analysis?.split?.home;
+  const away=analysis?.split?.away;
+  if(!home||!away)return analysis;
+
+  const under35=scoreLowWinUnder35(home,away);
+  const markets={...(analysis.markets||{}),under35};
+  const previous=analysis.finalRecommendation||{};
+
+  if(!under35.forced){
+    return {
+      ...analysis,
+      markets,
+      finalRecommendation:{...previous,hardOverride:false},
+    };
+  }
+
+  return {
+    ...analysis,
+    markets,
+    finalRecommendation:{
+      ...previous,
+      primaryBet:'Under 3.5',
+      score:10,
+      confidence:'High',
+      bankerStatus:'Banker',
+      summary:under35.reasons[0],
+      hardOverride:true,
+    },
+    banker:true,
+  };
+}
+
+module.exports={scoreLowWinUnder35,applyLowWinUnder35ToAnalysis};
