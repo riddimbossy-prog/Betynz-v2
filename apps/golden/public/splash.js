@@ -2,50 +2,83 @@ const splash=document.querySelector('#boardSplash');
 const state=document.querySelector('#state');
 const video=document.querySelector('#boardSplashVideo');
 const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+const FALLBACK_DURATION_MS=5200;
 let finished=false;
+let boardReady=false;
+let videoDone=Boolean(reduced||!video);
+let fallbackTimer=null;
+let observer=null;
+
+function stopVideo(){
+  if(video&&!video.paused)video.pause();
+}
+
+function finish(){
+  if(finished)return;
+  finished=true;
+  observer?.disconnect();
+  if(fallbackTimer)window.clearTimeout(fallbackTimer);
+  splash?.classList.add('is-hiding');
+  document.body.classList.remove('splash-active');
+  window.setTimeout(()=>{stopVideo();splash?.remove();},reduced?0:620);
+}
+
+function maybeFinish(){
+  if(boardReady&&videoDone)finish();
+}
+
+function markVideoDone(){
+  if(videoDone)return;
+  videoDone=true;
+  maybeFinish();
+}
+
+function scheduleStaticFallback(){
+  if(videoDone||fallbackTimer)return;
+  fallbackTimer=window.setTimeout(markVideoDone,FALLBACK_DURATION_MS);
+}
 
 function tryPlayVideo(){
-  if(!video||reduced||finished)return;
+  if(!video||reduced||finished||videoDone)return;
   video.muted=true;
   video.defaultMuted=true;
-  video.loop=true;
+  video.loop=false;
   video.playsInline=true;
-  const play=()=>video.play().catch(()=>{});
+  const play=()=>{
+    const promise=video.play();
+    if(promise?.catch)promise.catch(scheduleStaticFallback);
+  };
   if(video.readyState>=2)play();
   else video.addEventListener('canplay',play,{once:true});
 }
 
-function stopVideo(){
-  if(!video)return;
-  video.pause();
+if(video&&!reduced){
+  video.addEventListener('ended',markVideoDone,{once:true});
+  video.addEventListener('error',scheduleStaticFallback,{once:true});
+  if(video.ended)markVideoDone();
 }
 
 tryPlayVideo();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)tryPlayVideo();});
 
 if(splash&&state){
-  const started=performance.now();
-  let observer=null;
-
-  const ready=()=>/^(Complete|Analysing|Refresh failed)/i.test(String(state.textContent||'').trim());
-  const finish=()=>{
-    if(finished)return;
-    finished=true;
-    const elapsed=performance.now()-started;
-    const wait=reduced?0:Math.max(0,850-elapsed);
-    window.setTimeout(()=>{
-      splash.classList.add('is-hiding');
-      document.body.classList.remove('splash-active');
-      window.setTimeout(()=>{stopVideo();splash.remove();},reduced?0:620);
-    },wait);
-    observer?.disconnect();
+  const isBoardReady=()=>/^(Complete|Analysing|Refresh failed)/i.test(String(state.textContent||'').trim());
+  const checkBoard=()=>{
+    if(!isBoardReady())return;
+    boardReady=true;
+    maybeFinish();
   };
 
-  observer=new MutationObserver(()=>{if(ready())finish();});
+  observer=new MutationObserver(checkBoard);
   observer.observe(state,{childList:true,subtree:true,characterData:true});
-  window.addEventListener('load',()=>{tryPlayVideo();if(ready())finish();},{once:true});
-  if(ready())finish();
-  window.setTimeout(finish,15000);
+  window.addEventListener('load',()=>{tryPlayVideo();checkBoard();},{once:true});
+  checkBoard();
+
+  window.setTimeout(()=>{
+    boardReady=true;
+    videoDone=true;
+    finish();
+  },15000);
 }else{
   stopVideo();
 }
