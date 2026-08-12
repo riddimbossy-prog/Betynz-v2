@@ -172,6 +172,11 @@ assert.match(runtimeJobs,/ANALYSIS_LOCK_LEASE_SECONDS=Math\.min\(1800/);
 assert.match(runtimeJobs,/renewJobLock\(lockKey,ANALYSIS_LOCK_LEASE_SECONDS\)/);
 assert.match(runtimeJobs,/scheduleRetry\(date,force\)/);
 assert.match(runtimeJobs,/upgradeAnalysisForCurrentRules\(old\.payload\.analysis\)/);
+assert.match(runtimeJobs,/PRELOAD_DAYS_AHEAD=6/);
+assert.match(runtimeJobs,/async function preloadUpcomingWeek\(\)/);
+assert.match(runtimeJobs,/for\(let n=0;n<=PRELOAD_DAYS_AHEAD;n\+\+\)/);
+assert.match(runtimeJobs,/queueMicrotask\(\(\)=>preloadUpcomingWeek\(\)\.catch\(\(\)=>null\)\)/);
+assert.match(runtimeJobs,/preloadDaysAhead:PRELOAD_DAYS_AHEAD/);
 assert.match(runtimeConfig,/renewJobLock/);
 assert.match(serverSource,/zeus-thunder-original\.mp4/);
 assert.match(serverSource,/readFile\(splashVideoPath\)/);
@@ -202,4 +207,4 @@ assert.match(serverSource,/serveTeamCrest/);
 assert.match(serverSource,/image\/jpeg/);
 assert.match(serverSource,/max-age=604800, immutable/);
 
-console.log('Golden engine + U3.5 cache migration + stale-lock recovery + UI + Zeus splash tests passed');
+console.log('Golden engine + U3.5 cache migration + stale-lock recovery + seven-day preload + UI + Zeus splash tests passed');
