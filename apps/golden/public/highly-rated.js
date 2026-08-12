@@ -17,6 +17,7 @@ function crest(team){
 
 function marketType(a){
   const bet=String(a?.finalRecommendation?.primaryBet||'');
+  if(bet==='Under 3.5')return'UNDER35';
   if(bet==='Over 2.5')return'OVER25';
   if(bet==='BTTS Yes')return'BTTS';
   if(/DNB| Win$/.test(bet))return'WIN_DNB';
@@ -57,7 +58,7 @@ function card(x,i,topIds){
         <div class="rated-split"><h4>${esc(a.homeTeam||'Home')} · last 5 HOME</h4><div class="rated-metrics">${metric('PPG',h.ppg??'—')}${metric('GF',h.avgGF??'—')}${metric('GA',h.avgGA??'—')}${metric('O2.5',pct(h.over25Rate))}${metric('BTTS',pct(h.bttsRate))}${metric('Record',`${h.wins??0}W ${h.draws??0}D ${h.losses??0}L`)}</div></div>
         <div class="rated-split"><h4>${esc(a.awayTeam||'Away')} · last 5 AWAY</h4><div class="rated-metrics">${metric('PPG',w.ppg??'—')}${metric('GF',w.avgGF??'—')}${metric('GA',w.avgGA??'—')}${metric('O2.5',pct(w.over25Rate))}${metric('BTTS',pct(w.bttsRate))}${metric('Record',`${w.wins??0}W ${w.draws??0}D ${w.losses??0}L`)}</div></div>
       </div>
-      <div class="rated-systems">${metric('Over 2.5',score(a?.markets?.over25?.score))}${metric('BTTS / GG',score(a?.markets?.btts?.score))}${metric('Win / DNB',score(a?.markets?.winDnb?.score))}</div>
+      <div class="rated-systems">${metric('Under 3.5',score(a?.markets?.under35?.score))}${metric('Over 2.5',score(a?.markets?.over25?.score))}${metric('BTTS / GG',score(a?.markets?.btts?.score))}${metric('Win / DNB',score(a?.markets?.winDnb?.score))}</div>
     </details>
   </article>`;
 }

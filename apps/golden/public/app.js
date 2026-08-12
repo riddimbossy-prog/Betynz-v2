@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
-const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt',"'":'&#39;','"':'&quot;'}[c]));
 
 const S = {
   date: new Date().toISOString().slice(0,10),
@@ -47,6 +47,7 @@ function settledOutcome(f,a){
   if(group(f)!=='SETTLED'||!a?.banker||!isFinalBanker(f)) return null;
   const s=fixtureScore(f); if(!s) return null;
   const bet=String(a?.finalRecommendation?.primaryBet||'');
+  if(bet==='Under 3.5') return s.h+s.a<=3?'WON':'LOST';
   if(bet==='Over 2.5') return s.h+s.a>=3?'WON':'LOST';
   if(bet==='BTTS Yes') return s.h>0&&s.a>0?'WON':'LOST';
   if(/ DNB$/.test(bet)){
@@ -78,6 +79,7 @@ function stateClass(label){
 
 function marketType(a){
   const bet=String(a?.finalRecommendation?.primaryBet||'');
+  if(bet==='Under 3.5') return 'UNDER35';
   if(bet==='Over 2.5') return 'OVER25';
   if(bet==='BTTS Yes') return 'BTTS';
   if(/DNB| Win$/.test(bet)) return 'WIN_DNB';
@@ -128,10 +130,10 @@ function renderTop(){
       </div>
       <div class="banker-pick"><small>PRIMARY MARKET</small><strong>${esc(r.primaryBet||'—')}</strong></div>
       <div class="banker-metrics"><span><small>SCORE</small><b>${scoreText(r.score)}</b></span><span><small>CONFIDENCE</small><b>${esc(conf)}</b></span></div>
-      <p>${esc(r.summary||'Qualified by Golden Banker split-form rules.')}</p>
+      <p>${esc(r.summary||'Qualified by split-form rules.')}</p>
       <button class="why-btn" type="button" data-open="${esc(f.id)}">Why this pick →</button>
     </article>`;
-  }).join(''):`<div class="empty">${S.g?.complete?'No match cleared the 7/10 banker gates for this date.':'Golden Banker is still analysing the exact 5 + 5 samples.'}</div>`;
+  }).join(''):`<div class="empty">${S.g?.complete?'No match cleared the 7/10 banker gates for this date.':'The engine is still analysing the exact 5 + 5 samples.'}</div>`;
   $$('[data-open]').forEach(el=>el.onclick=e=>{e.stopPropagation();open(el.dataset.open);});
 }
 
@@ -248,7 +250,7 @@ function open(id){
   let html=`<div class="detail-hero"><div>${crest(f.home,'detail-crest')}<h2>${esc(f.home?.name||'Home')}</h2><small>HOME</small></div><span><b>${esc(time(f.kickoff))}</b><em>${esc(f.league?.name||'League')}</em></span><div>${crest(f.away,'detail-crest')}<h2>${esc(f.away?.name||'Away')}</h2><small>AWAY</small></div></div>`;
 
   if(!a||a.waiting){
-    html+=`<div class="empty detail-wait">${esc(a?.warning||'Still analysing. Golden Banker will not score this fixture until both exact 5-match venue samples are available.')}</div>`;
+    html+=`<div class="empty detail-wait">${esc(a?.warning||'Still analysing. The engine will not score this fixture until both exact 5-match venue samples are available.')}</div>`;
   }else{
     const h=a.split.home,w=a.split.away,r=a.finalRecommendation||{};
     html+=`<div class="decision"><div><small>PRIMARY RECOMMENDATION</small><b>${esc(r.primaryBet)}</b><span>${esc(r.confidence)} confidence</span></div><strong>${scoreText(r.score)}</strong></div>`;
@@ -256,7 +258,7 @@ function open(id){
       <article><div class="section-title"><h3>${esc(a.homeTeam)} · last 5 HOME</h3><span>5/5 verified</span></div><div class="metric-grid">${metric('PPG',h.ppg)}${metric('Avg GF',h.avgGF)}${metric('Avg GA',h.avgGA)}${metric('Scored',pct(h.scoreRate))}${metric('Conceded',pct(h.concedeRate))}${metric('O2.5',pct(h.over25Rate))}${metric('BTTS',pct(h.bttsRate))}${metric('Record',`${h.wins}W ${h.draws}D ${h.losses}L`)}</div></article>
       <article><div class="section-title"><h3>${esc(a.awayTeam)} · last 5 AWAY</h3><span>5/5 verified</span></div><div class="metric-grid">${metric('PPG',w.ppg)}${metric('Avg GF',w.avgGF)}${metric('Avg GA',w.avgGA)}${metric('Scored',pct(w.scoreRate))}${metric('Conceded',pct(w.concedeRate))}${metric('O2.5',pct(w.over25Rate))}${metric('BTTS',pct(w.bttsRate))}${metric('Record',`${w.wins}W ${w.draws}D ${w.losses}L`)}</div></article>
     </div>`;
-    html+=`<section class="market-breakdown"><div class="section-title"><h3>Three-system scorecard</h3><span>Banker gate ≥7/10</span></div><div class="scores">${marketCard('Over 2.5',a.markets.over25)}${marketCard('BTTS / GG',a.markets.btts)}${marketCard('Win / DNB',a.markets.winDnb)}</div></section>`;
+    html+=`<section class="market-breakdown"><div class="section-title"><h3>Four-system scorecard</h3><span>Banker gate ≥7/10</span></div><div class="scores">${marketCard('Under 3.5',a.markets.under35)}${marketCard('Over 2.5',a.markets.over25)}${marketCard('BTTS / GG',a.markets.btts)}${marketCard('Win / DNB',a.markets.winDnb)}</div></section>`;
     html+=evidenceTable(a.evidence?.homeLast5,`${a.homeTeam} — exact home results`);
     html+=evidenceTable(a.evidence?.awayLast5,`${a.awayTeam} — exact away results`);
     html+=`<section class="why-section"><div class="section-title"><h3>Why this pick</h3><span>${esc(stateFor(f,a))}</span></div><p>${esc(r.summary||'No summary available.')}</p></section>`;
