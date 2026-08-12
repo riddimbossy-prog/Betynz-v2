@@ -1,7 +1,8 @@
 const $=s=>document.querySelector(s);
 const loginTab=$('#loginTab'),signupTab=$('#signupTab'),loginForm=$('#loginForm'),signupForm=$('#signupForm'),message=$('#authMessage'),signedIn=$('#signedIn');
 const title=$('#authTitle'),subtitle=$('#authSubtitle');
-let mode=new URLSearchParams(location.search).get('mode')==='signup'?'signup':'login';
+const requestedMode=new URLSearchParams(location.search).get('mode');
+let mode=requestedMode==='signup'||location.pathname==='/create-account'?'signup':'login';
 
 function safeNext(){
   const next=new URLSearchParams(location.search).get('next')||'/';
@@ -37,7 +38,7 @@ async function acceptMagicSession(){
   const hash=new URLSearchParams(location.hash.replace(/^#/,''));
   const accessToken=hash.get('access_token'),refreshToken=hash.get('refresh_token');
   const error=hash.get('error_description')||hash.get('error');
-  if(error){history.replaceState(null,'',location.pathname+location.search);showMessage(decodeURIComponent(error),'error');return false}
+  if(error){history.replaceState(null,'',location.pathname+location.search);showMessage(error,'error');return false}
   if(!accessToken||!refreshToken)return false;
   showMessage('Securing your Betynz session…');
   try{
