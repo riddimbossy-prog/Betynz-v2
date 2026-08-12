@@ -1,0 +1,57 @@
+name: Betynz Board Worker
+
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: betynz-board-worker
+  cancel-in-progress: false
+
+jobs:
+  precompute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      NODE_ENV: production
+      API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+      API_FOOTBALL_BASE_URL: https://v3.football.api-sports.io
+      API_FOOTBALL_KEY_HEADER: x-apisports-key
+      API_FOOTBALL_TIMEOUT_MS: '20000'
+      API_FOOTBALL_RETRIES: '2'
+      API_FOOTBALL_HISTORY_LAST: '40'
+      API_FOOTBALL_ENGINE_LEAGUE_HISTORY: 'true'
+      API_FOOTBALL_ENGINE_HISTORY_TTL_SECONDS: '43200'
+      API_FOOTBALL_REQUEST_CONCURRENCY: '1'
+      API_FOOTBALL_REQUEST_MIN_INTERVAL_MS: '750'
+      API_FOOTBALL_REQUESTS_PER_MINUTE: '8'
+      API_FOOTBALL_RATE_LIMIT_RETRIES: '6'
+      API_FOOTBALL_RATE_LIMIT_COOLDOWN_MS: '65000'
+      API_FOOTBALL_RETRY_BASE_MS: '1000'
+      API_FOOTBALL_RETRY_MAX_MS: '30000'
+      API_FOOTBALL_TIMEZONE: UTC
+      API_FOOTBALL_MAX_ODDS_PAGES: '0'
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PERSISTENCE_CORE_ENABLED: 'true'
+      GOLDEN_BANKER_DATE_LOCK_SECONDS: '900'
+      PRECOMPUTE_MAX_RUN_MS: '18000000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.18.0'
+          cache: npm
+      - name: Validate worker secrets
+        run: |
+          set -euo pipefail
+          test -n "$API_FOOTBALL_KEY" || { echo 'Missing GitHub secret: API_FOOTBALL_KEY'; exit 1; }
+          test -n "$SUPABASE_URL" || { echo 'Missing GitHub secret: SUPABASE_URL'; exit 1; }
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo 'Missing GitHub secret: SUPABASE_SERVICE_ROLE_KEY'; exit 1; }
+      - run: npm ci
+      - name: Precompute and persist seven-day board
+        run: node apps/golden/precompute.mjs

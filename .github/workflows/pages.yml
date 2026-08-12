@@ -1,0 +1,60 @@
+name: Deploy Betynz Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/golden/public/**'
+      - 'apps/web/public/assets/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Build static Betynz site
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_URL" || { echo 'Missing GitHub secret: SUPABASE_URL'; exit 1; }
+          test -n "$SUPABASE_ANON_KEY" || { echo 'Missing GitHub secret: SUPABASE_ANON_KEY'; exit 1; }
+          rm -rf _site
+          mkdir -p _site/assets _site/media _site/login _site/create-account
+          cp -R apps/golden/public/. _site/
+          cp -R apps/web/public/assets/. _site/assets/
+          cp apps/web/public/assets/zeus-thunder-original.mp4 _site/media/zeus-thunder-original.mp4
+          cp _site/auth.html _site/login/index.html
+          cp _site/auth.html _site/create-account/index.html
+          printf '%s\n' 'betynz.com' > _site/CNAME
+          touch _site/.nojekyll
+          node - <<'NODE'
+          const fs=require('node:fs');
+          const url=String(process.env.SUPABASE_URL||'').replace(/\/$/,'');
+          const key=String(process.env.SUPABASE_ANON_KEY||'');
+          fs.writeFileSync('_site/runtime-config.js',`window.BETYNZ_CONFIG=Object.freeze({supabaseUrl:${JSON.stringify(url)},supabaseAnonKey:${JSON.stringify(key)},apiFunction:'betynz-api'});\n`);
+          NODE
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
