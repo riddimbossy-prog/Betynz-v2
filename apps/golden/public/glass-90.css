@@ -1,0 +1,263 @@
+:root{
+  --glass90-bg:rgba(8,10,13,.16);
+  --glass90-bg-strong:rgba(7,9,12,.24);
+  --glass90-bg-soft:rgba(255,255,255,.035);
+  --glass90-edge:rgba(255,255,255,.18);
+  --glass90-edge-soft:rgba(255,255,255,.095);
+  --glass90-orange:rgba(255,145,32,.58);
+  --glass90-orange-soft:rgba(255,121,0,.14);
+  --glass90-shadow:0 24px 70px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(255,255,255,.025);
+  --glass90-blur:36px;
+}
+
+html{background:#030405!important}
+body{
+  background:
+    radial-gradient(circle at 88% -6%,rgba(255,132,0,.30),transparent 28%),
+    radial-gradient(circle at 8% 18%,rgba(255,91,0,.15),transparent 26%),
+    radial-gradient(circle at 52% 108%,rgba(255,153,54,.12),transparent 35%),
+    linear-gradient(145deg,#020304 0%,#080706 52%,#040608 100%)!important;
+  background-attachment:fixed!important;
+}
+body:before{
+  background:
+    linear-gradient(115deg,transparent 0 39%,rgba(255,255,255,.035) 48%,transparent 57%),
+    radial-gradient(circle at 70% 22%,rgba(255,151,53,.08),transparent 19%),
+    radial-gradient(circle at 20% 75%,rgba(255,255,255,.025),transparent 23%)!important;
+}
+
+/* 90% frosted shell */
+header,
+.hero,.week,.panel,.rated-hero,.rated-filterbar,
+dialog{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.012) 38%,rgba(0,0,0,.08)),
+    var(--glass90-bg)!important;
+  border:1px solid var(--glass90-edge)!important;
+  box-shadow:var(--glass90-shadow)!important;
+  backdrop-filter:blur(var(--glass90-blur)) saturate(165%) contrast(108%)!important;
+  -webkit-backdrop-filter:blur(var(--glass90-blur)) saturate(165%) contrast(108%)!important;
+}
+header{
+  background:linear-gradient(180deg,rgba(5,7,10,.22),rgba(5,7,10,.10))!important;
+  border-left:0!important;
+  border-right:0!important;
+  border-top:0!important;
+  border-bottom-color:rgba(255,154,43,.24)!important;
+  box-shadow:0 14px 50px rgba(0,0,0,.24),inset 0 -1px 0 rgba(255,255,255,.07)!important;
+}
+
+.hero:before,.week:before,.panel:before,.rated-hero:before,.rated-filterbar:before{
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.018) 16%,transparent 38%),
+    radial-gradient(circle at 92% 5%,rgba(255,149,42,.20),transparent 25%),
+    linear-gradient(110deg,transparent 20%,rgba(255,255,255,.025) 50%,transparent 75%)!important;
+}
+.hero:after,.banker-panel:after,.rated-hero:after{
+  height:1px!important;
+  left:3%!important;
+  right:3%!important;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.40),rgba(255,165,64,.82),rgba(255,255,255,.26),transparent)!important;
+  box-shadow:0 0 18px rgba(255,141,29,.22)!important;
+}
+
+/* Pills, controls and progress */
+.rules b,
+.progress-wrap,
+.scope-tabs,
+.rated-controls label,.rated-summary,
+.filters select,.filters input,
+.rated-filterbar select,.rated-filterbar input,.rated-controls input,
+.pagination button,
+header button,.back-link,
+.why-btn,.centre-toggle,.more-rated,.more-rated-link{
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.018)),
+    rgba(8,10,13,.15)!important;
+  border:1px solid rgba(255,255,255,.15)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.13),0 10px 28px rgba(0,0,0,.20)!important;
+  backdrop-filter:blur(24px) saturate(150%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(150%)!important;
+}
+header button,.back-link,.why-btn,.centre-toggle,.more-rated,.more-rated-link,
+.progress-wrap{
+  border-color:rgba(255,157,50,.34)!important;
+  background:
+    linear-gradient(180deg,rgba(255,166,65,.12),rgba(255,91,0,.025)),
+    rgba(10,9,8,.13)!important;
+}
+.rules b:hover,.week button:hover,
+header button:hover,.back-link:hover,.why-btn:hover,.centre-toggle:hover,.more-rated:hover,.more-rated-link:hover{
+  border-color:rgba(255,176,83,.58)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.19),0 14px 36px rgba(0,0,0,.24),0 0 28px rgba(255,119,0,.12)!important;
+}
+
+/* Date rail */
+.week{background:rgba(7,9,12,.12)!important}
+.week button{
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.015)),
+    rgba(8,10,13,.13)!important;
+  border:1px solid rgba(255,255,255,.13)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.11),0 8px 22px rgba(0,0,0,.16)!important;
+  backdrop-filter:blur(25px) saturate(150%)!important;
+  -webkit-backdrop-filter:blur(25px) saturate(150%)!important;
+}
+.week button.on{
+  background:
+    linear-gradient(180deg,rgba(255,164,61,.18),rgba(255,91,0,.035)),
+    rgba(20,12,6,.16)!important;
+  border-color:rgba(255,166,67,.62)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.17),0 0 0 1px rgba(255,124,10,.08),0 12px 30px rgba(255,105,0,.12),0 0 30px rgba(255,119,0,.08)!important;
+}
+
+/* Main prediction cards */
+.banker-card,.match,.rated-card,
+.split-stat-grid>article,.market-score-card,.evidence-block,.why-section,
+.detail-hero,.decision,.rated-split,.rated-systems{
+  position:relative;
+  overflow:hidden;
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.065),rgba(255,255,255,.012) 42%,rgba(0,0,0,.065)),
+    rgba(8,10,13,.17)!important;
+  border:1px solid rgba(255,255,255,.14)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.13),0 14px 38px rgba(0,0,0,.22)!important;
+  backdrop-filter:blur(30px) saturate(155%)!important;
+  -webkit-backdrop-filter:blur(30px) saturate(155%)!important;
+}
+.banker-card,.rated-card.top-four{
+  border-color:rgba(255,157,52,.42)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 18px 46px rgba(0,0,0,.25),0 0 30px rgba(255,115,0,.085)!important;
+}
+.banker-card:before{
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),#ffb45f,#ff7900,transparent)!important;
+  box-shadow:0 0 18px rgba(255,133,20,.22)!important;
+}
+.banker-card:after{
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent)!important;
+  width:42%!important;
+}
+.match:before,.rated-card:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.08),transparent 22%)!important;
+}
+.match:hover,.rated-card:hover{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.09),rgba(255,255,255,.018) 45%,rgba(0,0,0,.07)),
+    rgba(10,12,15,.19)!important;
+  border-color:rgba(255,164,61,.34)!important;
+}
+
+/* Crests look like floating glass medallions */
+.banker-crest,.detail-crest,.crest,.rated-crest{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.10),rgba(255,255,255,.025)),
+    rgba(7,9,12,.16)!important;
+  border:1px solid rgba(255,255,255,.16)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 10px 24px rgba(0,0,0,.20),0 0 22px rgba(255,130,20,.04)!important;
+  backdrop-filter:blur(20px) saturate(150%)!important;
+  -webkit-backdrop-filter:blur(20px) saturate(150%)!important;
+}
+
+/* Metric tiles */
+.banker-metrics span,.metric-grid span,.rated-metrics span,.rated-systems span{
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.015))!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10)!important;
+}
+
+/* Tab glass */
+.scope-tabs{background:rgba(7,9,12,.13)!important}
+.scope-tabs button{
+  background:transparent!important;
+  border:1px solid transparent!important;
+}
+.scope-tabs button.active{
+  background:linear-gradient(180deg,rgba(255,161,55,.14),rgba(255,103,0,.025))!important;
+  border-color:rgba(255,163,58,.30)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 0 24px rgba(255,110,0,.07)!important;
+}
+.scope-tabs button b{background:rgba(255,255,255,.055)!important;border-color:rgba(255,255,255,.10)!important}
+
+/* Inputs retain transparent glass but keep menus readable */
+.filters select,.rated-filterbar select,.rated-controls input,
+.filters input,.rated-filterbar input{
+  color:#fbfbfc!important;
+}
+.filters select option,.rated-filterbar select option{background:#0c0e11;color:#fff}
+.filters select:focus,.filters input:focus,.rated-filterbar select:focus,.rated-filterbar input:focus,.rated-controls input:focus{
+  border-color:rgba(255,166,67,.58)!important;
+  box-shadow:0 0 0 3px rgba(255,122,0,.10),inset 0 1px 0 rgba(255,255,255,.16),0 0 26px rgba(255,116,0,.08)!important;
+}
+
+/* Dialog */
+dialog{
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.012)),
+    rgba(5,7,10,.23)!important;
+  border-color:rgba(255,162,58,.28)!important;
+  box-shadow:0 32px 90px rgba(0,0,0,.56),inset 0 1px 0 rgba(255,255,255,.18),0 0 50px rgba(255,112,0,.08)!important;
+}
+dialog::backdrop{
+  background:rgba(0,0,0,.42)!important;
+  backdrop-filter:blur(12px) saturate(115%);
+  -webkit-backdrop-filter:blur(12px) saturate(115%);
+}
+.dialog-top{
+  background:rgba(8,10,13,.12)!important;
+  border-bottom:1px solid rgba(255,255,255,.10)!important;
+  backdrop-filter:blur(22px)!important;
+  -webkit-backdrop-filter:blur(22px)!important;
+}
+
+/* Empty/loading rows also become glass */
+.empty,.rated-empty,.detail-wait{
+  background:rgba(255,255,255,.025)!important;
+  border-color:rgba(255,255,255,.10)!important;
+  backdrop-filter:blur(18px)!important;
+  -webkit-backdrop-filter:blur(18px)!important;
+}
+
+/* Keep text crisp on highly transparent surfaces */
+.hero h1,.head h2,.rated-hero h1,
+.banker-team strong,.banker-teams strong,.match-teams strong,.rated-team strong,
+.banker-pick strong,.decision b,.match footer strong,.rated-pick strong{
+  text-shadow:0 2px 10px rgba(0,0,0,.68)!important;
+}
+.hero p,.head p,.rated-hero p,.match-meta,.banker-league,.rated-meta{
+  text-shadow:0 1px 8px rgba(0,0,0,.56);
+}
+
+/* Fine orange glass glows */
+.progress-wrap strong,.banker-pick strong,.match-meta em,.match footer i,
+.rated-pick strong,.rated-score b,.hero h1 em,.rated-hero h1 em{
+  text-shadow:0 0 22px rgba(255,139,27,.24),0 2px 8px rgba(0,0,0,.45)!important;
+}
+
+@media(max-width:760px){
+  :root{--glass90-blur:28px}
+  header,.hero,.week,.panel,.rated-hero,.rated-filterbar,dialog{
+    backdrop-filter:blur(28px) saturate(155%)!important;
+    -webkit-backdrop-filter:blur(28px) saturate(155%)!important;
+  }
+  .banker-card,.match,.rated-card,.split-stat-grid>article,.market-score-card,.evidence-block,.why-section{
+    backdrop-filter:blur(24px) saturate(150%)!important;
+    -webkit-backdrop-filter:blur(24px) saturate(150%)!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .banker-card:after{display:none!important}
+}
+
+@media(prefers-reduced-transparency:reduce){
+  header,.hero,.week,.panel,.rated-hero,.rated-filterbar,dialog,
+  .banker-card,.match,.rated-card{
+    background:rgba(10,12,15,.88)!important;
+    backdrop-filter:none!important;
+    -webkit-backdrop-filter:none!important;
+  }
+}
