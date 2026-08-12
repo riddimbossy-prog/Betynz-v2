@@ -13,4 +13,23 @@ export const addDays=(date,o)=>{const d=new Date(`${date}T00:00:00Z`);d.setUTCDa
 export const isPast=d=>d<utcDate(),outOfRange=d=>d>utcDate(7);
 export const isSrl=f=>/(?:\bsrl\b|simulated reality|cyber|esoccer|e-soccer)/i.test([f?.league?.name,f?.home?.name,f?.away?.name].filter(Boolean).join(' '));
 export const eligible=f=>{const s=String(f?.status||'').toUpperCase();return !isSrl(f)&&!FINISHED.has(s)&&!LIVE.has(s)&&!/PST|POSTPONED|CANC|ABD/.test(s)};
-export const publicFixture=f=>({id:String(f?.id||''),sourceId:String(f?.sourceId||f?.id||''),kickoff:f?.kickoff||null,status:f?.status||'NS',minute:f?.minute??null,score:f?.score||null,league:f?.league||null,home:f?.home||null,away:f?.away||null,odds:f?.odds||{}});
+
+function publicTeam(team){
+  if(!team)return null;
+  const id=String(team?.id??'').trim();
+  const proxiedLogo=/^\d+$/.test(id)&&Number(id)>0?`/media/team/${id}.png`:(team?.logo||null);
+  return {...team,logo:proxiedLogo};
+}
+
+export const publicFixture=f=>({
+  id:String(f?.id||''),
+  sourceId:String(f?.sourceId||f?.id||''),
+  kickoff:f?.kickoff||null,
+  status:f?.status||'NS',
+  minute:f?.minute??null,
+  score:f?.score||null,
+  league:f?.league||null,
+  home:publicTeam(f?.home),
+  away:publicTeam(f?.away),
+  odds:f?.odds||{}
+});
