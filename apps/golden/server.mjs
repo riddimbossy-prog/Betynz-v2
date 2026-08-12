@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { VERSION, safeDate, utcDate, addDays, outOfRange, health, fixtureBoard, weekCounts, goldenBoard, liveBoard, proof, startRuntime } from './runtime.mjs';
+import { sendMagicLink,acceptSession,currentUser,signOutUser } from './auth.mjs';
 
 const PORT=Number(process.env.PORT||10000);
 const publicRoot=fileURLToPath(new URL('./public/',import.meta.url));
@@ -12,7 +13,7 @@ const mediaCache=new Map();
 let splashVideoPromise=null;
 
 const security=()=>({'x-content-type-options':'nosniff','x-frame-options':'DENY','referrer-policy':'strict-origin-when-cross-origin','content-security-policy':"default-src 'self'; img-src 'self' https: data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'"});
-const json=(res,status,body,cache='no-store')=>{res.writeHead(status,{...security(),'content-type':'application/json; charset=utf-8','cache-control':cache});res.end(JSON.stringify(body))};
+const json=(res,status,body,cache='no-store',extra={})=>{res.writeHead(status,{...security(),'content-type':'application/json; charset=utf-8','cache-control':cache,...extra});res.end(JSON.stringify(body))};
 const send=(res,status,body,type='text/plain; charset=utf-8',cache='no-cache')=>{res.writeHead(status,{...security(),'content-type':type,'cache-control':cache});res.end(body)};
 async function serveFile(res,path){const name=normalize(path).replace(/^([.][.][/\\])+/,'').replace(/^[/\\]+/,'');const root=path.startsWith('assets/')?assetRoot:publicRoot,file=join(root,path.startsWith('assets/')?name.slice(7):name);if(!file.startsWith(root))return send(res,403,'Forbidden');try{const body=await readFile(file),type={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.mp4':'video/mp4','.ico':'image/x-icon'}[extname(file)]||'application/octet-stream';return send(res,200,body,type,path.startsWith('assets/')?'public, max-age=604800, immutable':'no-cache')}catch{return send(res,404,'Not found')}}
 
@@ -102,6 +103,40 @@ async function serveTeamCrest(res,id){
   }
 }
 
-async function api(res,url){if(url.pathname==='/api/health')return json(res,200,health());if(url.pathname==='/api/fixtures'){const date=url.searchParams.get('date')||utcDate();if(!safeDate(date))return json(res,400,{error:'INVALID_DATE'});try{return json(res,200,await fixtureBoard(date),'public, max-age=20, stale-while-revalidate=120')}catch(e){return json(res,503,{error:'FEED_UNAVAILABLE',message:e.message,fixtures:[]})}}if(url.pathname==='/api/week-counts'){const from=url.searchParams.get('from')||utcDate();if(!safeDate(from))return json(res,400,{error:'INVALID_DATE'});return json(res,200,await weekCounts(from),'public, max-age=60')}if(url.pathname==='/api/golden-banker'){const date=url.searchParams.get('date')||utcDate();if(!safeDate(date))return json(res,400,{error:'INVALID_DATE'});if(outOfRange(date))return json(res,400,{error:'DATE_OUT_OF_RANGE'});return json(res,200,await goldenBoard(date))}if(url.pathname==='/api/live')return json(res,200,await liveBoard());if(url.pathname==='/api/proof'){const to=url.searchParams.get('to')||utcDate(),from=url.searchParams.get('from')||addDays(to,-14);if(!safeDate(from)||!safeDate(to))return json(res,400,{error:'INVALID_DATE'});return json(res,200,await proof(from,to))}return json(res,404,{error:'NOT_FOUND'})}
-const server=createServer(async(req,res)=>{try{const url=new URL(req.url||'/','http://localhost');if(url.pathname==='/media/zeus-thunder-original.mp4')return await serveSplashVideo(req,res);const crest=url.pathname.match(/^\/media\/team\/(\d{1,10})\.png$/);if(crest)return await serveTeamCrest(res,crest[1]);if(url.pathname.startsWith('/api/'))return await api(res,url);if(url.pathname==='/')return serveFile(res,'index.html');return serveFile(res,url.pathname.slice(1))}catch(e){return json(res,500,{error:'INTERNAL_ERROR',message:process.env.NODE_ENV==='production'?'Internal server error':e.message})}});
+async function authResponse(res,promise){
+  try{
+    const result=await promise;
+    const extra=result?.cookies?.length?{'set-cookie':result.cookies}:{};
+    return json(res,result?.status||200,result?.body||{ok:true},'no-store',extra);
+  }catch(e){
+    return json(res,Number(e?.status)||400,{ok:false,error:'AUTH_REQUEST_FAILED',message:Number(e?.status)===413?'Request is too large.':'Account request could not be completed.'});
+  }
+}
+
+async function api(req,res,url){
+  if(url.pathname==='/api/auth/login-link')return req.method==='POST'?authResponse(res,sendMagicLink(req,{createUser:false})):json(res,405,{error:'METHOD_NOT_ALLOWED'});
+  if(url.pathname==='/api/auth/signup-link')return req.method==='POST'?authResponse(res,sendMagicLink(req,{createUser:true})):json(res,405,{error:'METHOD_NOT_ALLOWED'});
+  if(url.pathname==='/api/auth/session')return req.method==='POST'?authResponse(res,acceptSession(req)):json(res,405,{error:'METHOD_NOT_ALLOWED'});
+  if(url.pathname==='/api/auth/me')return req.method==='GET'?authResponse(res,currentUser(req)):json(res,405,{error:'METHOD_NOT_ALLOWED'});
+  if(url.pathname==='/api/auth/logout')return req.method==='POST'?authResponse(res,signOutUser(req)):json(res,405,{error:'METHOD_NOT_ALLOWED'});
+  if(url.pathname==='/api/health')return json(res,200,health());
+  if(url.pathname==='/api/fixtures'){const date=url.searchParams.get('date')||utcDate();if(!safeDate(date))return json(res,400,{error:'INVALID_DATE'});try{return json(res,200,await fixtureBoard(date),'public, max-age=20, stale-while-revalidate=120')}catch(e){return json(res,503,{error:'FEED_UNAVAILABLE',message:e.message,fixtures:[]})}}
+  if(url.pathname==='/api/week-counts'){const from=url.searchParams.get('from')||utcDate();if(!safeDate(from))return json(res,400,{error:'INVALID_DATE'});return json(res,200,await weekCounts(from),'public, max-age=60')}
+  if(url.pathname==='/api/golden-banker'){const date=url.searchParams.get('date')||utcDate();if(!safeDate(date))return json(res,400,{error:'INVALID_DATE'});if(outOfRange(date))return json(res,400,{error:'DATE_OUT_OF_RANGE'});return json(res,200,await goldenBoard(date))}
+  if(url.pathname==='/api/live')return json(res,200,await liveBoard());
+  if(url.pathname==='/api/proof'){const to=url.searchParams.get('to')||utcDate(),from=url.searchParams.get('from')||addDays(to,-14);if(!safeDate(from)||!safeDate(to))return json(res,400,{error:'INVALID_DATE'});return json(res,200,await proof(from,to))}
+  return json(res,404,{error:'NOT_FOUND'});
+}
+
+const server=createServer(async(req,res)=>{
+  try{
+    const url=new URL(req.url||'/','http://localhost');
+    if(url.pathname==='/media/zeus-thunder-original.mp4')return await serveSplashVideo(req,res);
+    const crest=url.pathname.match(/^\/media\/team\/(\d{1,10})\.png$/);if(crest)return await serveTeamCrest(res,crest[1]);
+    if(url.pathname.startsWith('/api/'))return await api(req,res,url);
+    if(url.pathname==='/')return serveFile(res,'index.html');
+    if(url.pathname==='/login'||url.pathname==='/create-account')return serveFile(res,'auth.html');
+    return serveFile(res,url.pathname.slice(1));
+  }catch(e){return json(res,500,{error:'INTERNAL_ERROR',message:process.env.NODE_ENV==='production'?'Internal server error':e.message})}
+});
 await startRuntime();server.listen(PORT,()=>console.log(`Betynz ${VERSION} · Golden Banker v4.3 on :${PORT}`));
