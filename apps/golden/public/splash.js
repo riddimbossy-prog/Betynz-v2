@@ -9,6 +9,13 @@ let videoDone=Boolean(reduced||!video);
 let fallbackTimer=null;
 let observer=null;
 
+function syncVideoShape(){
+  if(!video||!video.videoWidth||!video.videoHeight)return;
+  const portrait=video.videoHeight>video.videoWidth;
+  video.classList.toggle('is-portrait',portrait);
+  video.classList.toggle('is-landscape',!portrait);
+}
+
 function stopVideo(){
   if(video&&!video.paused)video.pause();
 }
@@ -44,7 +51,9 @@ function tryPlayVideo(){
   video.defaultMuted=true;
   video.loop=false;
   video.playsInline=true;
+  syncVideoShape();
   const play=()=>{
+    syncVideoShape();
     const promise=video.play();
     if(promise?.catch)promise.catch(scheduleStaticFallback);
   };
@@ -53,8 +62,10 @@ function tryPlayVideo(){
 }
 
 if(video&&!reduced){
+  video.addEventListener('loadedmetadata',syncVideoShape,{once:true});
   video.addEventListener('ended',markVideoDone,{once:true});
   video.addEventListener('error',scheduleStaticFallback,{once:true});
+  if(video.readyState>=1)syncVideoShape();
   if(video.ended)markVideoDone();
 }
 

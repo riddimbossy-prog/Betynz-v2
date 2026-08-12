@@ -7,12 +7,17 @@
   <title>Betynz — Golden Banker</title>
   <link rel="icon" href="/assets/favicon-32x32.png">
   <link rel="preload" as="image" href="/assets/zeus-board-loading.jpg" fetchpriority="high">
-  <link rel="stylesheet" href="/splash.css?v=6.7.0">
+  <link rel="stylesheet" href="/splash.css?v=6.8.0">
   <link rel="stylesheet" href="/styles.css?v=6.3.0">
   <link rel="stylesheet" href="/compact-board.css?v=6.3.0">
   <link rel="stylesheet" href="/rated-link.css?v=6.3.0">
 </head>
 <body class="splash-active">
+<svg class="splash-defs" width="0" height="0" aria-hidden="true" focusable="false">
+  <filter id="splashSharpen" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+    <feConvolveMatrix order="3" kernelMatrix="0 -0.12 0 -0.12 1.48 -0.12 0 -0.12 0" preserveAlpha="true"/>
+  </filter>
+</svg>
 <div id="boardSplash" class="board-splash" role="status" aria-live="polite" aria-label="Loading Betynz board">
   <video id="boardSplashVideo" class="board-splash__video" src="/media/zeus-thunder.mp4" autoplay muted playsinline preload="auto" poster="/assets/zeus-board-loading.jpg" aria-hidden="true"></video>
   <div class="board-splash__content">
@@ -130,7 +135,7 @@
   <div id="detailBody"></div>
 </dialog>
 
-<script type="module" src="/splash.js?v=6.7.0"></script>
+<script type="module" src="/splash.js?v=6.8.0"></script>
 <script type="module" src="/app.js?v=6.3.0"></script>
 <script type="module" src="/rated-link.js?v=6.3.0"></script>
 </body>
