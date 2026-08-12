@@ -66,4 +66,18 @@ const fingerprint=(date,f,a)=>createHash('sha256').update([ENGINE,date,f?.id,mar
 function pickOdd(f,m){const o=f?.odds||{};if(m==='HOME_WIN')return Number(o.homeWin)||null;if(m==='AWAY_WIN')return Number(o.awayWin)||null;if(m==='OVER_2_5')return Number(o.over25)||null;if(m==='BTTS_YES')return Number(o.bttsYes)||null;return null}
 function reasons(a){const m=marketCode(a);if(m==='OVER_2_5')return a?.markets?.over25?.reasons||[];if(m==='BTTS_YES')return a?.markets?.btts?.reasons||[];if(/WIN|DNB/.test(m))return a?.markets?.winDnb?.reasons||[];return[]}
 export async function persistTop(date,rows){if(!supabaseConfigured()||!rows.length)return;await upsertPredictionLedger(rows.map(({fixture,analysis})=>({fixture_id:String(fixture.id),fixture_date:date,kickoff:fixture.kickoff||null,country:fixture?.league?.country||null,league_name:fixture?.league?.name||null,home_team:fixture?.home?.name||analysis.homeTeam,away_team:fixture?.away?.name||analysis.awayTeam,engine:ENGINE,market:marketCode(analysis),selection_label:analysis.finalRecommendation.primaryBet,odds:pickOdd(fixture,marketCode(analysis)),engine_score:Number(analysis.finalRecommendation.score||0),grade:Number(analysis.finalRecommendation.score||0)>=8.5?'A+':'A',decision:'BANKER',reasons:reasons(analysis),odds_snapshot:fixture.odds||{},payload:{analysis,engineVersion:'4.3.0'},fingerprint:fingerprint(date,fixture,analysis),settlement_status:'PENDING'})))}
-export async function hydrate(date){if(!supabaseConfigured()||!persistenceCoreEnabled())return null;const rows=await loadBoards({date,boardKey:ENGINE,limit:1}).catch(()=>[]),p=rows?.[0]?.payload;const evidenceReady=p?.engineCode===ENGINE&&(p?.all||[]).every(x=>hasExactEvidence(x?.analysis));if(evidenceReady){snapshots.set(date,p);return p}return null}
+
+function hydrateItem(item){
+  return item&&typeof item==='object'?{...item,fixture:publicFixture(item.fixture)}:item;
+}
+
+function hydrateBoard(payload){
+  return {
+    ...payload,
+    fixtures:Array.isArray(payload?.fixtures)?payload.fixtures.map(publicFixture):[],
+    all:Array.isArray(payload?.all)?payload.all.map(hydrateItem):[],
+    topBankers:Array.isArray(payload?.topBankers)?payload.topBankers.map(hydrateItem):[]
+  };
+}
+
+export async function hydrate(date){if(!supabaseConfigured()||!persistenceCoreEnabled())return null;const rows=await loadBoards({date,boardKey:ENGINE,limit:1}).catch(()=>[]),p=rows?.[0]?.payload;const evidenceReady=p?.engineCode===ENGINE&&(p?.all||[]).every(x=>hasExactEvidence(x?.analysis));if(evidenceReady){const normalized=hydrateBoard(p);snapshots.set(date,normalized);return normalized}return null}
