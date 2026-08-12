@@ -1,0 +1,3 @@
+.brand{gap:0!important}
+.brand img{width:142px!important;max-height:44px!important;object-fit:contain;transform:scale(1.02);transform-origin:left center}
+@media(max-width:620px){.brand img{width:132px!important;max-height:42px!important}}

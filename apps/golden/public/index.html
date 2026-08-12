@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#050607">
-  <title>Betynz — Golden Banker</title>
+  <title>Betynz</title>
   <link rel="icon" href="/assets/favicon-32x32.png">
   <link rel="preload" as="image" href="/assets/zeus-board-loading.jpg" fetchpriority="high">
   <link rel="preload" as="video" href="/media/zeus-thunder-original.mp4" type="video/mp4">
@@ -14,12 +14,13 @@
   <link rel="stylesheet" href="/rated-link.css?v=6.3.0">
   <link rel="stylesheet" href="/glass-orange.css?v=7.0.0">
   <link rel="stylesheet" href="/buffed-ui.css?v=7.1.0">
+  <link rel="stylesheet" href="/branding.css?v=7.2.0">
 </head>
 <body class="splash-active">
 <div id="boardSplash" class="board-splash" role="status" aria-live="polite" aria-label="Loading Betynz board">
   <video id="boardSplashVideo" class="board-splash__video" src="/media/zeus-thunder-original.mp4" autoplay muted playsinline preload="auto" poster="/assets/zeus-board-loading.jpg" aria-hidden="true"></video>
   <div class="board-splash__content">
-    <div class="board-splash__eyebrow">GOLDEN BANKER v4.3</div>
+    <div class="board-splash__eyebrow">BETYNZ</div>
     <strong class="board-splash__brand">BETYNZ</strong>
     <p class="board-splash__motto">LET THE GODS DECIDE</p>
     <div class="board-splash__loading"><span class="board-splash__bolt">ϟ</span><span>Loading Board…</span></div>
@@ -31,7 +32,6 @@
 <header>
   <a class="brand" href="/">
     <img src="/assets/betynz-logo.png" alt="Betynz">
-    <span>Golden Banker v4.3</span>
   </a>
   <button id="refresh" type="button">↻ Refresh</button>
 </header>
@@ -127,7 +127,7 @@
 
 <dialog id="detail">
   <div class="dialog-top">
-    <span>GOLDEN BANKER MATCH BREAKDOWN</span>
+    <span>MATCH BREAKDOWN</span>
     <button id="close" type="button" aria-label="Close">×</button>
   </div>
   <div id="detailBody"></div>
@@ -136,5 +136,6 @@
 <script type="module" src="/splash.js?v=6.9.0"></script>
 <script type="module" src="/app.js?v=6.3.0"></script>
 <script type="module" src="/rated-link.js?v=6.3.0"></script>
+<script type="module" src="/brand-cleanup.js?v=7.2.0"></script>
 </body>
 </html>

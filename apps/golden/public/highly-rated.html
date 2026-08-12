@@ -10,12 +10,12 @@
   <link rel="stylesheet" href="/highly-rated.css?v=6.3.0">
   <link rel="stylesheet" href="/glass-orange.css?v=7.0.0">
   <link rel="stylesheet" href="/buffed-ui.css?v=7.1.0">
+  <link rel="stylesheet" href="/branding.css?v=7.2.0">
 </head>
 <body>
 <header>
   <a class="brand" href="/">
     <img src="/assets/betynz-logo.png" alt="Betynz">
-    <span>Golden Banker v4.3</span>
   </a>
   <a class="back-link" id="backTop4" href="/">← Top 4</a>
 </header>
@@ -24,7 +24,7 @@
   <section class="rated-hero">
     <span>DAILY QUALIFIED BOARD</span>
     <h1>Highly Rated <em>Picks</em></h1>
-    <p>The first four are the day’s Final Top 4 Bankers. Every pick below them independently cleared the same Golden Banker qualification gate.</p>
+    <p>The first four are the day’s Final Top 4 Bankers. Every pick below them independently cleared the same qualification gate.</p>
     <div class="rated-controls">
       <label>Date <input id="ratedDate" type="date"></label>
       <div class="rated-summary"><strong id="ratedCount">0</strong><span>qualified</span></div>
@@ -50,12 +50,13 @@
   </section>
 
   <section id="ratedGrid" class="rated-grid">
-    <div class="rated-empty">Loading Golden Banker results…</div>
+    <div class="rated-empty">Loading results…</div>
   </section>
 
   <p class="note">Statistical football analysis only. No outcome is guaranteed.</p>
 </main>
 
 <script type="module" src="/highly-rated.js?v=6.3.0"></script>
+<script type="module" src="/brand-cleanup.js?v=7.2.0"></script>
 </body>
 </html>
