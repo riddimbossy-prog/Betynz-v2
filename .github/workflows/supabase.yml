@@ -1,0 +1,40 @@
+name: Deploy Supabase Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/supabase.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Validate deployment secrets
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo 'Missing GitHub secret: SUPABASE_ACCESS_TOKEN'; exit 1; }
+          test -n "$SUPABASE_PROJECT_REF" || { echo 'Missing GitHub secret: SUPABASE_PROJECT_REF'; exit 1; }
+          test -n "$API_FOOTBALL_KEY" || { echo 'Missing GitHub secret: API_FOOTBALL_KEY'; exit 1; }
+      - name: Sync private provider secret to Supabase
+        run: supabase secrets set API_FOOTBALL_KEY="$API_FOOTBALL_KEY" API_FOOTBALL_BASE_URL="https://v3.football.api-sports.io" --project-ref "$SUPABASE_PROJECT_REF"
+      - name: Deploy Betynz API
+        run: supabase functions deploy betynz-api --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
