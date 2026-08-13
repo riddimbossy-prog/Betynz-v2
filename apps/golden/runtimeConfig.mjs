@@ -4,7 +4,7 @@ import { persistenceCoreEnabled,acquireJobLock,renewJobLock,releaseJobLock,check
 import { supabaseConfigured,upsertPredictionLedger,getPredictionLedger } from '../web/src/lib/supabase.mjs';
 await loadLocalEnv();
 export {apiFootballConfigured,apiFootballRateState,getApiFootballFastFixtureBoard,getApiFootballFixtureCounts,getApiFootballIntelligence,getApiFootballLiveBoard,getApiFootballResults,persistenceCoreEnabled,acquireJobLock,renewJobLock,releaseJobLock,checkpointFixtureStates,loadFixtureStates,checkpointBoard,loadBoards,supabaseConfigured,upsertPredictionLedger,getPredictionLedger};
-export const VERSION='6.0.0',ENGINE='GOLDEN_BANKER_V4_3';
+export const VERSION='6.0.1',ENGINE='GOLDEN_BANKER_V4_3';
 export const snapshots=new Map(),jobs=new Map();
 const FINISHED=new Set(['FT','AET','PEN','FINISHED','ENDED','COMPLETED']),LIVE=new Set(['1H','HT','2H','ET','BT','P','LIVE','INT','INPLAY']);
 export const safeDate=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''));
@@ -21,6 +21,14 @@ function publicTeam(team){
   return {...team,logo:proxiedLogo};
 }
 
+function publicLeague(league){
+  if(!league)return null;
+  return {
+    ...league,
+    round:league?.round||league?.currentRound||league?.matchday||league?.week||null
+  };
+}
+
 export const publicFixture=f=>({
   id:String(f?.id||''),
   sourceId:String(f?.sourceId||f?.id||''),
@@ -28,7 +36,9 @@ export const publicFixture=f=>({
   status:f?.status||'NS',
   minute:f?.minute??null,
   score:f?.score||null,
-  league:f?.league||null,
+  league:publicLeague(f?.league),
+  round:f?.round||f?.fixture?.round||f?.league?.round||null,
+  seasonRound:f?.seasonRound||f?.league?.round||null,
   home:publicTeam(f?.home),
   away:publicTeam(f?.away),
   odds:f?.odds||{}
