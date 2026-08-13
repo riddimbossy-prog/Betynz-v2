@@ -86,6 +86,28 @@ function marketType(a){
   return 'NONE';
 }
 
+function earlySeasonInfo(f,a){
+  const values=[
+    f?.league?.round,f?.round,f?.fixture?.round,f?.seasonRound,
+    a?.round,a?.leagueRound,a?.seasonRound,a?.meta?.round
+  ];
+  let round=null;
+  for(const v of values){
+    if(v==null) continue;
+    const m=String(v).match(/(?:round|matchday|week)?\s*(\d{1,2})/i);
+    if(m){ round=Number(m[1]); break; }
+  }
+  if(!Number.isFinite(round)) return null;
+  if(round<=5) return {level:'high',label:'EARLY SEASON',text:`Round ${round}: form is still settling. Treat this tip with extra caution.`};
+  if(round<=8) return {level:'medium',label:'EARLY-SEASON CAUTION',text:`Round ${round}: season data is still developing, so confidence should be treated conservatively.`};
+  return null;
+}
+
+function earlySeasonBadge(f,a){
+  const info=earlySeasonInfo(f,a);
+  return info?`<div class="season-warning ${info.level}" title="${esc(info.text)}"><b>⚠ ${esc(info.label)}</b><span>${esc(info.text)}</span></div>`:'';
+}
+
 async function api(u){
   const r=await fetch(u,{cache:'no-store'}),b=await r.json().catch(()=>({}));
   if(!r.ok) throw new Error(b.message||b.error||`HTTP ${r.status}`);
@@ -123,6 +145,7 @@ function renderTop(){
     return `<article class="banker-card" data-open="${esc(f.id)}">
       <div class="banker-rank">#${i+1}</div>
       <div class="banker-league"><span>${esc(f?.league?.country||'')}</span><b>${esc(f?.league?.name||a.league||'League')}</b><em>${esc(time(f.kickoff))}</em></div>
+      ${earlySeasonBadge(f,a)}
       <div class="banker-teams">
         <div>${crest(f.home,'banker-crest')}<strong>${esc(a.homeTeam||f?.home?.name||'Home')}</strong></div>
         <span>VS</span>
@@ -157,6 +180,7 @@ function renderMatch(f){
   const liveScore=s?`${s.h} – ${s.a}`:g==='LIVE'?'LIVE':'VS';
   return `<button class="match" type="button" data-id="${esc(f.id)}">
     <div class="match-meta"><span>${esc(f?.league?.country||'')}</span><b>${esc(f?.league?.name||'League')}</b><em>${esc(time(f.kickoff))}</em></div>
+    ${earlySeasonBadge(f,a)}
     <div class="match-teams">
       <div>${crest(f.home)}<strong>${esc(f.home?.name||'Home')}</strong></div>
       <span>${esc(liveScore)}</span>
@@ -248,6 +272,7 @@ function open(id){
   const f=S.fixtures.find(x=>String(x.id)===String(id)),a=S.map.get(String(id));
   if(!f)return;
   let html=`<div class="detail-hero"><div>${crest(f.home,'detail-crest')}<h2>${esc(f.home?.name||'Home')}</h2><small>HOME</small></div><span><b>${esc(time(f.kickoff))}</b><em>${esc(f.league?.name||'League')}</em></span><div>${crest(f.away,'detail-crest')}<h2>${esc(f.away?.name||'Away')}</h2><small>AWAY</small></div></div>`;
+  html+=earlySeasonBadge(f,a);
 
   if(!a||a.waiting){
     html+=`<div class="empty detail-wait">${esc(a?.warning||'Still analysing. The engine will not score this fixture until both exact 5-match venue samples are available.')}</div>`;
@@ -258,61 +283,36 @@ function open(id){
       <article><div class="section-title"><h3>${esc(a.homeTeam)} · last 5 HOME</h3><span>5/5 verified</span></div><div class="metric-grid">${metric('PPG',h.ppg)}${metric('Avg GF',h.avgGF)}${metric('Avg GA',h.avgGA)}${metric('Scored',pct(h.scoreRate))}${metric('Conceded',pct(h.concedeRate))}${metric('O2.5',pct(h.over25Rate))}${metric('BTTS',pct(h.bttsRate))}${metric('Record',`${h.wins}W ${h.draws}D ${h.losses}L`)}</div></article>
       <article><div class="section-title"><h3>${esc(a.awayTeam)} · last 5 AWAY</h3><span>5/5 verified</span></div><div class="metric-grid">${metric('PPG',w.ppg)}${metric('Avg GF',w.avgGF)}${metric('Avg GA',w.avgGA)}${metric('Scored',pct(w.scoreRate))}${metric('Conceded',pct(w.concedeRate))}${metric('O2.5',pct(w.over25Rate))}${metric('BTTS',pct(w.bttsRate))}${metric('Record',`${w.wins}W ${w.draws}D ${w.losses}L`)}</div></article>
     </div>`;
-    html+=`<section class="market-breakdown"><div class="section-title"><h3>Four-system scorecard</h3><span>Banker gate ≥7/10</span></div><div class="scores">${marketCard('Under 3.5',a.markets.under35)}${marketCard('Over 2.5',a.markets.over25)}${marketCard('BTTS / GG',a.markets.btts)}${marketCard('Win / DNB',a.markets.winDnb)}</div></section>`;
-    html+=evidenceTable(a.evidence?.homeLast5,`${a.homeTeam} — exact home results`);
-    html+=evidenceTable(a.evidence?.awayLast5,`${a.awayTeam} — exact away results`);
-    html+=`<section class="why-section"><div class="section-title"><h3>Why this pick</h3><span>${esc(stateFor(f,a))}</span></div><p>${esc(r.summary||'No summary available.')}</p></section>`;
+    html+=`<section class="market-breakdown"><div class="section-title"><h3>Market scores</h3><span>Banker gate ≥7/10</span></div><div class="scores">${marketCard('Under 3.5',a.markets?.under35)}${marketCard('Over 2.5',a.markets?.over25)}${marketCard('BTTS / GG',a.markets?.btts)}${marketCard('Win / DNB',a.markets?.winDnb)}</div></section>`;
+    html+=evidenceTable(a.evidence?.home||[],'Exact home results');
+    html+=evidenceTable(a.evidence?.away||[],'Exact away results');
+    html+=`<section class="why-section"><div class="section-title"><h3>Why this pick</h3><span>${esc(r.confidence||'')}</span></div><p>${esc(r.summary||'Qualified by the exact split-form rules.')}</p></section>`;
   }
+
   $('#detailBody').innerHTML=html;
   $('#detail').showModal();
 }
 
-function resetCentre(){
-  S.centreOpen=false;
-  S.scope='CANDIDATES';
-  S.page=1;
-  setScopeButtons();
-  $('#centreBody').hidden=true;
-}
-
 async function load(date=S.date){
-  clearTimeout(S.timer);
-  S.date=date;
-  resetCentre();
-  days();
-  $('#title').textContent=new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'});
-  $('#state').textContent=S.fixtures.length?'Refreshing while keeping the last good board visible…':'Loading fixtures…';
+  S.date=date; S.page=1; days();
+  $('#state').textContent='Loading board…';
   try{
-    const [f,g]=await Promise.all([api(`/api/fixtures?date=${date}`),api(`/api/golden-banker?date=${date}`)]);
-    S.fixtures=f.fixtures||[]; S.g=g; render();
-    if(!g.complete&&!g.historicalLock)poll();
+    const [fixtures,g]=await Promise.all([api(`/api/fixtures?date=${date}`),api(`/api/golden?date=${date}`)]);
+    S.fixtures=fixtures.fixtures||fixtures.data||[];
+    S.g=g;
+    render();
   }catch(e){
-    $('#state').textContent=`Refresh failed · keeping last good board · ${e.message}`;
+    $('#state').textContent=`Refresh failed · ${e.message}`;
   }
 }
 
-function poll(){
-  clearTimeout(S.timer);
-  S.timer=setTimeout(async()=>{
-    try{S.g=await api(`/api/golden-banker?date=${S.date}`);render();}catch{}
-    if(!S.g?.complete)poll();
-  },3500);
-}
-
-$('#refresh').onclick=()=>load();
-['#status','#market','#confidence','#league'].forEach(id=>$(id).onchange=()=>{S.page=1;renderMatches();});
-$('#search').oninput=()=>{S.page=1;renderMatches();};
-$('#scopeTabs').onclick=e=>{
-  const b=e.target.closest('[data-scope]'); if(!b)return;
-  S.scope=b.dataset.scope; S.page=1;
-  setScopeButtons();
-  renderMatches();
-};
-$('#matchCentreToggle').onclick=()=>{S.centreOpen=!S.centreOpen;S.page=1;renderMatches();};
-$('#pagePrev').onclick=()=>{if(S.page>1){S.page--;renderMatches();$('#centreBody').scrollIntoView({behavior:'smooth',block:'start'});}};
-$('#pageNext').onclick=()=>{S.page++;renderMatches();$('#centreBody').scrollIntoView({behavior:'smooth',block:'start'});};
+$('#refresh').onclick=()=>load(S.date);
 $('#close').onclick=()=>$('#detail').close();
-$('#detail').onclick=e=>{if(e.target===$('#detail'))$('#detail').close();};
+$('#market').onchange=$('#confidence').onchange=$('#league').onchange=$('#status').onchange=$('#search').oninput=()=>{S.page=1;renderMatches();};
+$('#matchCentreToggle').onclick=()=>{S.centreOpen=!S.centreOpen;S.page=1;renderMatches();};
+$$('#scopeTabs [data-scope]').forEach(b=>b.onclick=()=>{S.scope=b.dataset.scope;S.page=1;setScopeButtons();renderMatches();});
+$('#pagePrev').onclick=()=>{if(S.page>1){S.page--;renderMatches();}};
+$('#pageNext').onclick=()=>{S.page++;renderMatches();};
 
 days();
 load();
