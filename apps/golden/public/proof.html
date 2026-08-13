@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#050607">
+  <title>Betynz Proof</title>
+  <link rel="stylesheet" href="/styles.css?v=6.4.0">
+  <link rel="stylesheet" href="/proof.css?v=1.0.0">
+</head>
+<body>
+<header>
+  <a class="brand" href="/"><img src="/assets/betynz-logo.png" alt="Betynz"></a>
+  <a class="proof-home" href="/">Back to board</a>
+</header>
+<main class="proof-shell">
+  <section class="proof-hero">
+    <span>LOCKED PICKS · AUTO SETTLEMENT</span>
+    <h1>Betynz Proof</h1>
+    <p>Published banker picks are written to the prediction ledger before kickoff and settled from official results. Pushes are excluded from win-rate calculations.</p>
+    <div class="proof-range">
+      <label>From <input id="from" type="date"></label>
+      <label>To <input id="to" type="date"></label>
+      <button id="load" type="button">Load proof</button>
+    </div>
+  </section>
+  <section class="proof-summary" id="summary"><div class="proof-empty">Loading proof…</div></section>
+  <section class="proof-panel">
+    <div class="proof-head"><div><span>PUBLIC LEDGER</span><h2>Published selections</h2></div><div id="state">Loading…</div></div>
+    <div class="proof-table-wrap"><table><thead><tr><th>Date</th><th>Fixture</th><th>Pick</th><th>Score</th><th>Result</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </section>
+</main>
+<script type="module" src="/proof.js?v=1.0.0"></script>
+</body>
+</html>
