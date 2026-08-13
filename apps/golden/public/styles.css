@@ -53,6 +53,11 @@ main{width:min(1420px,calc(100% - 24px));margin:auto;padding:22px 0 60px}
 .banker-league{display:flex;gap:6px;align-items:center;padding-right:40px;color:var(--muted);font-size:10px;min-height:28px}
 .banker-league b{color:#dce7ee;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .banker-league em{margin-left:auto;font-style:normal;color:var(--gold)}
+.season-warning{display:flex;align-items:flex-start;gap:8px;margin:8px 0 2px;padding:9px 10px;border-radius:10px;border:1px solid rgba(246,184,90,.28);background:rgba(246,184,90,.08);color:#f7d79a;text-align:left}
+.season-warning b{font-size:9px;line-height:1.25;letter-spacing:.05em;white-space:nowrap}
+.season-warning span{font-size:9px;line-height:1.35;color:#e7c27a}
+.season-warning.high{border-color:rgba(255,111,117,.34);background:rgba(255,111,117,.08);color:#ffb0b4}
+.season-warning.high span{color:#efb4b7}
 .banker-teams{display:grid;grid-template-columns:1fr 34px 1fr;gap:8px;align-items:center;margin:17px 0}
 .banker-teams>div{display:flex;min-width:0;flex-direction:column;align-items:center;gap:8px;text-align:center}
 .banker-teams>div strong{font-size:14px;line-height:1.25}
@@ -79,6 +84,7 @@ main{width:min(1420px,calc(100% - 24px));margin:auto;padding:22px 0 60px}
 .matches{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
 .match{width:100%;text-align:left;background:rgba(255,255,255,.025);border:1px solid var(--line);color:var(--text);border-radius:14px;padding:13px;transition:.15s ease}
 .match:hover{border-color:rgba(244,196,84,.28);background:rgba(255,255,255,.04)}
+.match .season-warning{margin:8px 0 0}
 .match-meta{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:10px;min-width:0}
 .match-meta b{color:#dce7ee;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .match-meta em{font-style:normal;color:var(--gold);margin-left:auto;white-space:nowrap}
@@ -182,6 +188,8 @@ dialog::backdrop{background:rgba(0,0,0,.76);backdrop-filter:blur(3px)}
   .banker-crest{width:62px;height:62px}
   .banker-teams>div strong{font-size:15px}
   .banker-pick strong{font-size:22px}
+  .season-warning{flex-direction:column;gap:3px;padding:8px 9px}
+  .season-warning b,.season-warning span{font-size:8px;white-space:normal}
   .filters{grid-template-columns:1fr}
   .scope-tabs{display:grid;grid-template-columns:repeat(3,1fr)}
   .scope-tabs button{padding:9px 5px;font-size:10px}
