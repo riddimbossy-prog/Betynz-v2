@@ -1,59 +1,61 @@
 const splash=document.querySelector('#boardSplash');
+const media=document.querySelector('#boardSplashMedia');
 const state=document.querySelector('#state');
-const video=document.querySelector('#boardSplashVideo');
 let finished=false;
 let boardReady=false;
-let videoDone=!video;
-const MAX_SPLASH_MS=5200;
+let mediaDone=false;
+const MAX_SPLASH_MS=3600;
 
 function finish(){
- if(finished)return;
- finished=true;
- splash?.classList.add('is-hiding');
- document.body.classList.remove('splash-active');
- setTimeout(()=>splash?.remove(),460);
+  if(finished)return;
+  finished=true;
+  splash?.classList.add('is-hiding');
+  document.body.classList.remove('splash-active');
+  setTimeout(()=>splash?.remove(),460);
 }
 
 function maybeFinish(){
- if(boardReady&&videoDone) finish();
+  if(boardReady&&mediaDone)finish();
 }
 
-if(video){
- video.muted=true;
- video.defaultMuted=true;
- video.playsInline=true;
- video.loop=false;
- video.controls=false;
- video.removeAttribute('controls');
- video.setAttribute('playsinline','');
- video.setAttribute('webkit-playsinline','');
- video.setAttribute('disablepictureinpicture','');
- video.style.pointerEvents='none';
- video.addEventListener('contextmenu',e=>e.preventDefault());
- video.addEventListener('loadedmetadata',()=>{
-  try{video.currentTime=0.001}catch{}
-  video.play().catch(()=>{videoDone=true;maybeFinish()});
- },{once:true});
- video.addEventListener('playing',()=>{video.classList.add('is-playing')},{once:true});
- video.addEventListener('ended',()=>{videoDone=true;maybeFinish()},{once:true});
- video.addEventListener('error',()=>{videoDone=true;maybeFinish()},{once:true});
- if(video.readyState>=1){
-  try{video.currentTime=0.001}catch{}
-  video.play().catch(()=>{videoDone=true;maybeFinish()});
- }
+function startMedia(){
+  if(!media||finished){mediaDone=true;maybeFinish();return;}
+  const v=document.createElement('video');
+  v.className='board-splash__video';
+  v.muted=true;
+  v.defaultMuted=true;
+  v.controls=false;
+  v.playsInline=true;
+  v.loop=false;
+  v.preload='auto';
+  v.setAttribute('playsinline','');
+  v.setAttribute('webkit-playsinline','');
+  v.setAttribute('disablepictureinpicture','');
+  v.setAttribute('controlslist','nodownload noplaybackrate nofullscreen');
+  v.setAttribute('aria-hidden','true');
+  v.style.pointerEvents='none';
+  v.addEventListener('playing',()=>v.classList.add('is-playing'),{once:true});
+  v.addEventListener('ended',()=>{mediaDone=true;maybeFinish()},{once:true});
+  v.addEventListener('error',()=>{mediaDone=true;maybeFinish()},{once:true});
+  v.addEventListener('loadeddata',()=>{
+    try{v.currentTime=.06}catch{}
+    v.play().catch(()=>{mediaDone=true;maybeFinish()});
+  },{once:true});
+  media.appendChild(v);
+  setTimeout(()=>{v.src='/media/zeus-thunder-original.mp4';v.load()},80);
 }
 
 if(state){
- const markReady=()=>{
-  const text=state.textContent.trim();
-  if(/^(Complete|Analysing|Refresh failed)/i.test(text)){
-   boardReady=true;
-   maybeFinish();
-  }
- };
- const observer=new MutationObserver(markReady);
- observer.observe(state,{childList:true,subtree:true,characterData:true});
- markReady();
+  const markReady=()=>{
+    if(/^(Complete|Analysing|Refresh failed)/i.test(state.textContent.trim())){
+      boardReady=true;
+      maybeFinish();
+    }
+  };
+  const observer=new MutationObserver(markReady);
+  observer.observe(state,{childList:true,subtree:true,characterData:true});
+  markReady();
 }
 
-setTimeout(()=>{boardReady=true;videoDone=true;finish()},MAX_SPLASH_MS);
+requestAnimationFrame(()=>requestAnimationFrame(startMedia));
+setTimeout(()=>{mediaDone=true;boardReady=true;finish()},MAX_SPLASH_MS);
