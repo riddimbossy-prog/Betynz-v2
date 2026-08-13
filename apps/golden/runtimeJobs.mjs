@@ -73,7 +73,19 @@ async function analyseDate(date,{force=false}={}){
 const kick=(date,force=false)=>{if(!jobs.has(date))queueMicrotask(()=>analyseDate(date,{force}).catch(()=>null))};
 async function preloadUpcomingWeek(){
   if(preloadTask)return preloadTask;
-  preloadTask=(async()=>{await preloadFixtureLists();for(let n=0;n<=PRELOAD_DAYS_AHEAD;n++){const date=utcDate(n),current=snapshots.get(date)||await hydrate(date).catch(()=>null);if(current?.complete)continue;await analyseDate(date).catch(()=>null)}})().finally(()=>{preloadTask=null});
+  preloadTask=(async()=>{
+    const today=utcDate();
+    await seedFixtureDate(today).catch(()=>null);
+    const current=snapshots.get(today)||await hydrate(today).catch(()=>null);
+    if(!current?.complete)await analyseDate(today).catch(()=>null);
+
+    await preloadFixtureLists();
+    for(let n=1;n<=PRELOAD_DAYS_AHEAD;n++){
+      const date=utcDate(n),existing=snapshots.get(date)||await hydrate(date).catch(()=>null);
+      if(existing?.complete)continue;
+      await analyseDate(date).catch(()=>null);
+    }
+  })().finally(()=>{preloadTask=null});
   return preloadTask;
 }
 
