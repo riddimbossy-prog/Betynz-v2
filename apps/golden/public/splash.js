@@ -3,9 +3,10 @@ const state=document.querySelector('#state');
 const video=document.querySelector('#boardSplashVideo');
 const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 const FALLBACK_DURATION_MS=5200;
+const DOMAIN_ONLY_SPLASH=true;
 let finished=false;
 let boardReady=false;
-let videoDone=Boolean(reduced||!video);
+let videoDone=Boolean(DOMAIN_ONLY_SPLASH||reduced||!video);
 let fallbackTimer=null;
 let observer=null;
 
@@ -27,7 +28,7 @@ function finish(){
   if(fallbackTimer)window.clearTimeout(fallbackTimer);
   splash?.classList.add('is-hiding');
   document.body.classList.remove('splash-active');
-  window.setTimeout(()=>{stopVideo();splash?.remove();},reduced?0:620);
+  window.setTimeout(()=>{stopVideo();splash?.remove();},reduced?0:460);
 }
 
 function maybeFinish(){
@@ -46,7 +47,7 @@ function scheduleStaticFallback(){
 }
 
 function tryPlayVideo(){
-  if(!video||reduced||finished||videoDone)return;
+  if(DOMAIN_ONLY_SPLASH||!video||reduced||finished||videoDone)return;
   video.muted=true;
   video.defaultMuted=true;
   video.loop=false;
@@ -61,7 +62,7 @@ function tryPlayVideo(){
   else video.addEventListener('canplay',play,{once:true});
 }
 
-if(video&&!reduced){
+if(video&&!reduced&&!DOMAIN_ONLY_SPLASH){
   video.addEventListener('loadedmetadata',syncVideoShape,{once:true});
   video.addEventListener('ended',markVideoDone,{once:true});
   video.addEventListener('error',scheduleStaticFallback,{once:true});
