@@ -5,9 +5,9 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@drawable/betynz_mark"
         android:label="@string/app_name"
-        android:roundIcon="@drawable/ic_launcher"
+        android:roundIcon="@drawable/betynz_mark"
         android:supportsRtl="true"
         android:theme="@style/Theme.Betynz"
         android:usesCleartextTraffic="false">

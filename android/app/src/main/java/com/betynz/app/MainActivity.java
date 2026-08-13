@@ -7,12 +7,14 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Base64;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -20,9 +22,16 @@ import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import java.io.ByteArrayInputStream;
+
 public class MainActivity extends Activity {
     private static final String HOME_URL = "https://betynz.com/";
+    private static final String OLD_SPLASH_PATH = "/assets/zeus-board-loading.jpg";
     private static final int FILE_CHOOSER_REQUEST = 4107;
+    private static final byte[] TRANSPARENT_PIXEL = Base64.decode(
+            "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+            Base64.DEFAULT
+    );
 
     private WebView webView;
     private ProgressBar progressBar;
@@ -34,10 +43,10 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.rgb(8, 10, 13));
+        root.setBackgroundColor(Color.BLACK);
 
         webView = new WebView(this);
-        webView.setBackgroundColor(Color.rgb(8, 10, 13));
+        webView.setBackgroundColor(Color.BLACK);
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
         FrameLayout.LayoutParams webParams = new FrameLayout.LayoutParams(
@@ -64,11 +73,16 @@ public class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSafeBrowsingEnabled(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " BetynzAndroid/1.0");
+        settings.setUserAgentString(settings.getUserAgentString() + " BetynzAndroid/1.0.1");
 
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, false);
+
+        if (!getPreferences(MODE_PRIVATE).getBoolean("static_splash_removed_101", false)) {
+            webView.clearCache(true);
+            getPreferences(MODE_PRIVATE).edit().putBoolean("static_splash_removed_101", true).apply();
+        }
 
         webView.setWebViewClient(new BetynzWebViewClient());
         webView.setWebChromeClient(new WebChromeClient() {
@@ -209,6 +223,19 @@ public class MainActivity extends Activity {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             return routeUri(request.getUrl());
+        }
+
+        @Override
+        public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+            Uri uri = request.getUrl();
+            if (isBetynzUri(uri) && OLD_SPLASH_PATH.equals(uri.getPath())) {
+                return new WebResourceResponse(
+                        "image/gif",
+                        null,
+                        new ByteArrayInputStream(TRANSPARENT_PIXEL)
+                );
+            }
+            return super.shouldInterceptRequest(view, request);
         }
 
         @Override
