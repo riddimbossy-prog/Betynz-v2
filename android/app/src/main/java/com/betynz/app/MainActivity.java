@@ -73,15 +73,17 @@ public class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSafeBrowsingEnabled(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " BetynzAndroid/1.0.1");
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setUserAgentString(settings.getUserAgentString() + " BetynzAndroid/1.0.9");
 
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, false);
 
-        if (!getPreferences(MODE_PRIVATE).getBoolean("static_splash_removed_101", false)) {
+        if (!getPreferences(MODE_PRIVATE).getBoolean("webview_cache_reset_109", false)) {
             webView.clearCache(true);
-            getPreferences(MODE_PRIVATE).edit().putBoolean("static_splash_removed_101", true).apply();
+            webView.clearHistory();
+            getPreferences(MODE_PRIVATE).edit().putBoolean("webview_cache_reset_109", true).apply();
         }
 
         webView.setWebViewClient(new BetynzWebViewClient());
