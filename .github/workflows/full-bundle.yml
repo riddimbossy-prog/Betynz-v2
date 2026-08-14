@@ -1,0 +1,70 @@
+name: Full Betynz Bundle
+
+on:
+  push:
+    branches:
+      - agent/straight-win-candidates
+    paths:
+      - '**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.18.0'
+          cache: npm
+
+      - name: Install and test web engine
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Build Android APK
+        working-directory: android
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Build full source bundle
+        run: |
+          rm -rf _bundle
+          mkdir -p _bundle/Betynz-v2
+          git archive HEAD | tar -x -C _bundle/Betynz-v2
+          mkdir -p _bundle/Betynz-v2/release
+          cp android/app/build/outputs/apk/debug/app-debug.apk _bundle/Betynz-v2/release/Betynz-Android-v1.0.9-debug.apk
+          cat > _bundle/Betynz-v2/BUILD_INFO.txt <<EOF
+          Betynz full project bundle
+          Branch: ${GITHUB_REF_NAME}
+          Commit: ${GITHUB_SHA}
+          Includes: Golden Banker, Bangers Over 2.5 engine/page, Android v1.0.9 source and APK, splash/logo fixes, split-form team-strength profiles, tests and workflows.
+          Generated: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          EOF
+          cd _bundle
+          zip -qr ../Betynz-FULL-All-Changes.zip Betynz-v2
+
+      - name: Upload full ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: betynz-full-all-changes-${{ github.sha }}
+          path: Betynz-FULL-All-Changes.zip
+          retention-days: 14
+          if-no-files-found: error
