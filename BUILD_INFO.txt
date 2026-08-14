@@ -1,0 +1,5 @@
+Betynz full project bundle
+Branch: agent/straight-win-candidates
+Commit: 884aab1f22021249653c794977a260ca77b449c2
+Includes: Golden Banker, Bangers Over 2.5 engine/page, Android v1.0.9 source and APK, splash/logo fixes, split-form team-strength profiles, tests and workflows.
+Generated: 2026-08-14T22:12:10Z

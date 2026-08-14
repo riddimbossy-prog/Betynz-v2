@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#050607">
+  <title>Bangers · Betynz</title>
+  <link rel="icon" href="/assets/favicon-32x32.png">
+  <link rel="stylesheet" href="/styles.css?v=6.4.0">
+  <link rel="stylesheet" href="/branding.css?v=7.2.0">
+  <link rel="stylesheet" href="/bangers.css?v=1.0.0">
+</head>
+<body class="bangers-page">
+<header>
+  <a class="brand" href="/"><img src="/assets/betynz-logo.png" alt="Betynz"></a>
+  <div class="header-actions">
+    <a class="proof-link" href="/">Board</a>
+    <a class="proof-link" href="/proof">Proof</a>
+  </div>
+</header>
+
+<main class="bangers-main">
+  <section class="bangers-hero">
+    <div>
+      <span>STRICT OVER 2.5 FINDER</span>
+      <h1>Bangers</h1>
+      <p>No soft scores. Every rule must agree before a game appears here.</p>
+    </div>
+    <div class="bangers-badge">O2.5</div>
+  </section>
+
+  <section class="banger-rules" aria-label="Banger rules">
+    <b>Odds 1.20–1.55</b>
+    <b>Both leak ≥1.90</b>
+    <b>Both PPG &gt;1.50</b>
+    <b>Both score ≥1.88</b>
+    <b>Reject both Top 5</b>
+    <b>One side Top 3 / Bottom 2</b>
+    <b>Exact 5 HOME + 5 AWAY</b>
+  </section>
+
+  <section class="bangers-week">
+    <div id="bangerDays"></div>
+    <div class="bangers-tools">
+      <select id="bangerLeague" aria-label="League filter"><option value="ALL">All leagues</option></select>
+      <button id="bangerRefresh" type="button">↻ Refresh</button>
+    </div>
+    <p id="bangerState">Loading Bangers…</p>
+  </section>
+
+  <section class="bangers-panel">
+    <div class="bangers-head">
+      <div><span>QUALIFIED ONLY</span><h2 id="bangerTitle">Today’s Bangers</h2></div>
+      <strong id="bangerCount">0</strong>
+    </div>
+    <div id="bangerList" class="banger-list"><div class="banger-empty">Scanning the strict gates…</div></div>
+  </section>
+
+  <p class="note">Statistical football analysis only. No outcome is guaranteed.</p>
+</main>
+
+<script src="/runtime-config.js?v=9.0.0"></script>
+<script src="/runtime-client.js?v=9.0.0"></script>
+<script type="module" src="/bangers.js?v=1.0.0"></script>
+</body>
+</html>

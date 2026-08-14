@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#050607">
+  <title>Betynz — Highly Rated Picks</title>
+  <link rel="icon" href="/assets/favicon-32x32.png">
+  <link rel="stylesheet" href="/styles.css?v=6.3.0">
+  <link rel="stylesheet" href="/highly-rated.css?v=6.3.0">
+  <link rel="stylesheet" href="/glass-orange.css?v=7.0.0">
+  <link rel="stylesheet" href="/buffed-ui.css?v=7.1.0">
+  <link rel="stylesheet" href="/branding.css?v=7.2.0">
+  <link rel="stylesheet" href="/glass-90.css?v=7.4.0">
+  <link rel="stylesheet" href="/account.css?v=8.0.0">
+</head>
+<body>
+<header>
+  <a class="brand" href="/">
+    <img src="/assets/betynz-logo.png" alt="Betynz">
+  </a>
+  <div class="header-actions">
+    <a class="account-link" data-account-login href="/login">Login</a>
+    <a class="create-account-link" data-account-create href="/create-account">Create Account</a>
+    <a class="back-link" id="backTop4" href="/">← Top 4</a>
+  </div>
+</header>
+
+<main class="rated-main">
+  <section class="rated-hero">
+    <span>DAILY QUALIFIED BOARD</span>
+    <h1>Highly Rated <em>Picks</em></h1>
+    <p>The first four are the day’s Final Top 4 Bankers. Every pick below them independently cleared the same qualification gate.</p>
+    <div class="rated-controls">
+      <label>Date <input id="ratedDate" type="date"></label>
+      <div class="rated-summary"><strong id="ratedCount">0</strong><span>qualified</span></div>
+      <div class="rated-summary"><strong id="ratedProgress">0/0</strong><span>analysed</span></div>
+    </div>
+    <p class="rated-state" id="ratedState">Loading qualified picks…</p>
+  </section>
+
+  <section class="rated-filterbar">
+    <select id="ratedMarket" aria-label="Market filter">
+      <option value="ALL">All markets</option>
+      <option value="UNDER35">Under 3.5</option>
+      <option value="OVER25">Over 2.5</option>
+      <option value="BTTS">BTTS / GG</option>
+      <option value="WIN_DNB">Win / DNB</option>
+    </select>
+    <select id="ratedConfidence" aria-label="Confidence filter">
+      <option value="ALL">All confidence</option>
+      <option value="HIGH">High confidence</option>
+      <option value="MEDIUM">Medium confidence</option>
+      <option value="LOW">Low confidence</option>
+    </select>
+    <input id="ratedSearch" type="search" placeholder="Search team…" aria-label="Search team">
+  </section>
+
+  <section id="ratedGrid" class="rated-grid">
+    <div class="rated-empty">Loading results…</div>
+  </section>
+
+  <p class="note">Statistical football analysis only. No outcome is guaranteed.</p>
+</main>
+
+<script src="/runtime-config.js?v=9.0.0"></script>
+<script src="/runtime-client.js?v=9.0.0"></script>
+<script type="module" src="/highly-rated.js?v=7.3.0"></script>
+<script type="module" src="/account.js?v=8.0.0"></script>
+<script type="module" src="/brand-cleanup.js?v=7.2.0"></script>
+</body>
+</html>

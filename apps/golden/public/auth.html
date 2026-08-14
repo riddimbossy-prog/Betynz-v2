@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#050607">
+  <title>Betynz — Account</title>
+  <link rel="icon" href="/assets/favicon-32x32.png">
+  <link rel="preload" as="image" href="/assets/zeus-board-loading.jpg" fetchpriority="high">
+  <link rel="stylesheet" href="/auth.css?v=8.0.0">
+</head>
+<body class="auth-page">
+  <div class="auth-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div>
+  <header class="auth-header">
+    <a class="auth-logo" href="/" aria-label="Betynz home"><img src="/assets/betynz-logo.png" alt="Betynz"></a>
+    <a class="auth-back" href="/">← Back to board</a>
+  </header>
+
+  <main class="auth-shell">
+    <section class="zeus-stage" aria-label="Betynz account">
+      <div class="zeus-stage__image" aria-hidden="true"></div>
+      <div class="zeus-stage__veil" aria-hidden="true"></div>
+      <div class="zeus-stage__copy">
+        <span class="zeus-kicker">⚡ BETYNZ MEMBER ACCESS</span>
+        <h1>Enter the <em>realm.</em></h1>
+        <p>Your account is the gateway to a more personal Betynz experience.</p>
+        <div class="zeus-rule"><i></i><b>LET THE GODS DECIDE</b><i></i></div>
+      </div>
+    </section>
+
+    <section class="auth-card" aria-labelledby="authTitle">
+      <div class="auth-card__glint" aria-hidden="true"></div>
+      <div class="auth-icon" aria-hidden="true">ϟ</div>
+      <span class="auth-eyebrow">THE GATES OF OLYMPUS</span>
+      <h2 id="authTitle">Welcome back</h2>
+      <p class="auth-subtitle" id="authSubtitle">We’ll email you a secure sign-in link.</p>
+
+      <div class="auth-tabs" role="tablist" aria-label="Account action">
+        <button id="loginTab" class="active" type="button" role="tab" aria-selected="true">Login</button>
+        <button id="signupTab" type="button" role="tab" aria-selected="false">Create Account</button>
+      </div>
+
+      <div id="authMessage" class="auth-message" role="status" aria-live="polite" hidden></div>
+
+      <form id="loginForm" class="auth-form" autocomplete="on">
+        <label>Email
+          <span class="auth-input"><i aria-hidden="true">@</i><input id="loginEmail" name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required></span>
+        </label>
+        <button class="auth-submit" type="submit"><span>Send Secure Login Link</span><b aria-hidden="true">ϟ</b></button>
+        <p class="auth-helper">No password needed. Open the link from your email to complete sign-in.</p>
+        <p class="auth-switch">New here? <button type="button" data-mode="signup">Create an account</button></p>
+      </form>
+
+      <form id="signupForm" class="auth-form" autocomplete="on" hidden>
+        <label>Display name
+          <span class="auth-input"><i aria-hidden="true">◇</i><input id="signupName" name="displayName" type="text" autocomplete="name" placeholder="How should we call you?" minlength="2" maxlength="40" required></span>
+        </label>
+        <label>Email
+          <span class="auth-input"><i aria-hidden="true">@</i><input id="signupEmail" name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required></span>
+        </label>
+        <button class="auth-submit" type="submit"><span>Create Account</span><b aria-hidden="true">ϟ</b></button>
+        <p class="auth-helper">We’ll send a secure confirmation link to finish setting up your account.</p>
+        <p class="auth-switch">Already a member? <button type="button" data-mode="login">Login</button></p>
+      </form>
+
+      <section id="signedIn" class="signed-in" hidden>
+        <div class="signed-avatar" id="signedAvatar">B</div>
+        <span>YOU ARE SIGNED IN</span>
+        <h3 id="signedName">Member</h3>
+        <p id="signedEmail"></p>
+        <a class="auth-submit signed-continue" id="continueBoard" href="/">Continue to board <b aria-hidden="true">→</b></a>
+        <button id="logoutButton" class="auth-logout" type="button">Sign out</button>
+      </section>
+
+      <footer class="auth-security"><span aria-hidden="true">◆</span><p><b>Secure Supabase session</b><br>Your account session is handled directly by Supabase Auth in this browser.</p></footer>
+    </section>
+  </main>
+
+  <script src="/runtime-config.js?v=9.0.0"></script>
+  <script src="/runtime-client.js?v=9.0.0"></script>
+  <script type="module" src="/auth.js?v=8.0.0"></script>
+</body>
+</html>
