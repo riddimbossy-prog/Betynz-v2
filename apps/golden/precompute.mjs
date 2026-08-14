@@ -1,5 +1,7 @@
 import { utcDate, fixtureBoard, goldenBoard } from './runtime.mjs';
 import { settleDate } from './runtimeJobs.mjs';
+import { ENGINE,snapshots,checkpointBoard,getApiFootballFastFixtureBoard } from './runtimeConfig.mjs';
+import { scanBangers,BANGER_RULES } from './bangersScan.mjs';
 
 const DAYS=7;
 const POLL_MS=Math.max(2000,Number(process.env.PRECOMPUTE_POLL_MS||5000));
@@ -9,6 +11,54 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 function ensureBudget(){
   if(Date.now()-started>MAX_RUN_MS)throw new Error(`Precompute time budget exceeded after ${Math.round((Date.now()-started)/60000)} minutes.`);
+}
+
+async function attachBangers(date,board){
+  let scanBoard=board;
+  try{
+    const fresh=await getApiFootballFastFixtureBoard(date);
+    if(Array.isArray(fresh?.fixtures)&&fresh.fixtures.length){
+      const byId=new Map(fresh.fixtures.map(f=>[String(f?.id||''),f]));
+      scanBoard={
+        ...board,
+        fixtures:fresh.fixtures,
+        all:(board?.all||[]).map(item=>({...item,fixture:byId.get(String(item?.fixture?.id||item?.analysis?.id||''))||item?.fixture}))
+      };
+    }
+  }catch{}
+
+  try{
+    const bangers=await scanBangers(scanBoard);
+    const augmented={
+      ...scanBoard,
+      bangers,
+      bangersReady:true,
+      bangersWarning:null,
+      bangersGeneratedAt:new Date().toISOString(),
+      bangerRules:BANGER_RULES,
+      summary:{...(scanBoard?.summary||{}),bangersFound:bangers.length},
+      generatedAt:new Date().toISOString()
+    };
+    snapshots.set(date,augmented);
+    await checkpointBoard({
+      boardKey:ENGINE,
+      date,
+      complete:Boolean(augmented.complete),
+      processed:Number(augmented?.progress?.processed||0),
+      total:Number(augmented?.progress?.total||0),
+      payload:augmented,
+      generatedAt:augmented.generatedAt
+    });
+    console.log(`[bangers] ${date}: ${bangers.length} strict Over 2.5 qualifier${bangers.length===1?'':'s'}`);
+    return augmented;
+  }catch(error){
+    const warning=String(error?.message||error||'Bangers scan failed');
+    const augmented={...scanBoard,bangers:[],bangersReady:false,bangersWarning:warning,bangerRules:BANGER_RULES};
+    snapshots.set(date,augmented);
+    await checkpointBoard({boardKey:ENGINE,date,complete:Boolean(augmented.complete),processed:Number(augmented?.progress?.processed||0),total:Number(augmented?.progress?.total||0),payload:augmented,generatedAt:augmented.generatedAt||new Date().toISOString()}).catch(()=>null);
+    console.warn(`[bangers] ${date}: ${warning}`);
+    return augmented;
+  }
 }
 
 console.log(`Betynz precompute worker starting for ${DAYS} days.`);
@@ -25,8 +75,8 @@ for(let n=0;n<DAYS;n++){
   }
 }
 
-// Run the existing production engine one date at a time. Saved fixture states in
-// Supabase are restored, so repeated Actions runs continue instead of starting over.
+// Run the production Golden Banker engine one date at a time, then attach the
+// strict Bangers scan to the same persisted board payload.
 for(let n=0;n<DAYS;n++){
   ensureBudget();
   const date=utcDate(n);
@@ -37,7 +87,7 @@ for(let n=0;n<DAYS;n++){
     const p=board?.progress||{};
     const state=`${Number(p.processed||0)}/${Number(p.total||0)}`;
     if(state!==last){console.log(`[analyse] ${date}: ${state}${board?.complete?' complete':''}`);last=state;}
-    if(board?.complete)break;
+    if(board?.complete){await attachBangers(date,board);break;}
     await sleep(POLL_MS);
   }
 }
