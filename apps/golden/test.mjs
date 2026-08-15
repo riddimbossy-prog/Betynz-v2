@@ -15,19 +15,31 @@ const dnb=analyseMatch({league:'T',homeTeam:'H',awayTeam:'A',homeLast5:[{gf:2,ga
 assert.equal(dnb.markets.winDnb.dnbEligible,true);
 assert.equal(dnb.markets.winDnb.straightWinEligible,false);
 
-const forcedUnder=analyseMatch({
+// Low win rate can no longer force an Under when the actual goal evidence is wild.
+const rejectedLegacyUnder=analyseMatch({
   league:'T',homeTeam:'Low Home',awayTeam:'Low Away',
   homeLast5:[{gf:3,ga:3},{gf:4,ga:5},{gf:2,ga:2},{gf:3,ga:4},{gf:5,ga:6}],
   awayLast5:[{gf:2,ga:2},{gf:3,ga:4},{gf:4,ga:4},{gf:2,ga:5},{gf:3,ga:6}]
 });
-assert.equal(forcedUnder.markets.under35.forced,true);
-assert.equal(forcedUnder.finalRecommendation.primaryBet,'Under 3.5');
-assert.equal(forcedUnder.finalRecommendation.score,10);
-assert.equal(forcedUnder.finalRecommendation.hardOverride,true);
+assert.equal(rejectedLegacyUnder.markets.under35.qualified,false);
+assert.equal(rejectedLegacyUnder.markets.under35.forced,false);
+assert.notEqual(rejectedLegacyUnder.finalRecommendation.primaryBet,'Under 3.5');
+assert.equal(rejectedLegacyUnder.finalRecommendation.hardOverride,false);
 
-const legacyForced={...forcedUnder,markets:{over25:forcedUnder.markets.over25,btts:forcedUnder.markets.btts,winDnb:forcedUnder.markets.winDnb},finalRecommendation:{primaryBet:'Over 2.5',score:9.4,confidence:'High',bankerStatus:'Banker',summary:'legacy pick'},banker:true};
+// Under 3.5 must now have independent low-goal confirmation.
+const confirmedUnder=analyseMatch({
+  league:'T',homeTeam:'Quiet Home',awayTeam:'Quiet Away',
+  homeLast5:[{gf:0,ga:0},{gf:0,ga:1},{gf:1,ga:1},{gf:0,ga:0},{gf:1,ga:1}],
+  awayLast5:[{gf:0,ga:0},{gf:0,ga:1},{gf:1,ga:1},{gf:0,ga:0},{gf:1,ga:1}]
+});
+assert.equal(confirmedUnder.markets.under35.qualified,true);
+assert.equal(confirmedUnder.finalRecommendation.primaryBet,'Under 3.5');
+assert.equal(confirmedUnder.finalRecommendation.hardOverride,false);
+
+const legacyForced={...rejectedLegacyUnder,markets:{...rejectedLegacyUnder.markets},finalRecommendation:{primaryBet:'Under 3.5',score:10,confidence:'High',bankerStatus:'Banker',summary:'legacy forced pick',hardOverride:true},banker:true};
 const migratedForced=applyLowWinUnder35ToAnalysis(legacyForced);
-assert.equal(migratedForced.finalRecommendation.primaryBet,'Under 3.5');
+assert.equal(migratedForced.finalRecommendation.primaryBet,'Skip');
+assert.equal(migratedForced.banker,false);
 
 const board=analyseBoard(new Array(6).fill(0).map((_,i)=>({id:`m${i}`,league:'T',homeTeam:`H${i}`,awayTeam:`A${i}`,homeLast5:[{gf:3,ga:0},{gf:2,ga:0},{gf:3,ga:1},{gf:2,ga:1},{gf:3,ga:0}],awayLast5:[{gf:0,ga:3},{gf:0,ga:2},{gf:1,ga:4},{gf:0,ga:3},{gf:1,ga:4}]})));
 assert.ok(board.topBankers.length<=4);
