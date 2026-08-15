@@ -49,7 +49,9 @@ assert.equal(banger.qualified,true);
 assert.equal(banger.score,10);
 banger=evaluateBanger({home:strong,away:strong,over25Odd:1.40,positions:{home:2,away:4,homeTableSize:18,awayTableSize:18}});
 assert.equal(banger.qualified,false,'Both Top 5 must be rejected');
-banger=evaluateBanger({home:strong,away:strong,over25Odd:1.56,positions:{home:2,away:8,homeTableSize:18,awayTableSize:18}});
+banger=evaluateBanger({home:strong,away:strong,over25Odd:1.40,positions:{home:6,away:8,homeTableSize:18,awayTableSize:18}});
+assert.equal(banger.qualified,true,'Bangers no longer requires either team to be Top 3 or Bottom 2');
+banger=evaluateBanger({home:strong,away:strong,over25Odd:1.56,positions:{home:6,away:8,homeTableSize:18,awayTableSize:18}});
 assert.equal(banger.qualified,false,'Odds above 1.55 must be rejected');
 
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
@@ -94,15 +96,18 @@ assert.match(splashJs,/v\.src='\/media\/zeus-thunder-original\.mp4'/);
 assert.equal(existsSync(splashAsset),false,'Legacy Zeus loading poster must remain removed');
 
 // Bangers product page and exact rule contract.
-for(const pattern of[/STRICT OVER 2\.5 FINDER/,/Odds 1\.20–1\.55/,/One side leaks ≥1\.90/,/Both PPG &gt;1\.50/,/One side scores ≥1\.90/,/Reject both Top 5/,/Top 3 \/ Bottom 2/])assert.match(bangersHtml,pattern);
+for(const pattern of[/STRICT OVER 2\.5 FINDER/,/Odds 1\.20–1\.55/,/One side leaks ≥1\.90/,/Both PPG &gt;1\.50/,/One side scores ≥1\.90/,/Reject both Top 5/])assert.match(bangersHtml,pattern);
+assert.doesNotMatch(bangersHtml,/Top 3 \/ Bottom 2/,'Removed extreme-rank requirement must not appear in the public Bangers rules');
 assert.match(bangersJs,/board\?\.bangers/);
 assert.match(bangersJs,/BANGER MARKET/);
 assert.match(bangersJs,/Split rank/);
 assert.match(bangersCss,/\.banger-card/);
-for(const pattern of[/over25OddMin:1\.20/,/over25OddMax:1\.55/,/minLeakAvgGA:1\.90/,/minPPGExclusive:1\.50/,/minAttackAvgGF:1\.90/,/oneLeak/,/oneAttack/,/notBothTopFive/,/extremeRank/])assert.match(bangersSource,pattern);
+for(const pattern of[/over25OddMin:1\.20/,/over25OddMax:1\.55/,/minLeakAvgGA:1\.90/,/minPPGExclusive:1\.50/,/minAttackAvgGF:1\.90/,/oneLeak/,/oneAttack/,/notBothTopFive/])assert.match(bangersSource,pattern);
+assert.doesNotMatch(bangersSource,/extremeRank/,'Removed extreme-rank gate must not remain in Bangers engine logic');
 assert.match(bangersScan,/calculateSplitTables/);
 assert.match(bangersScan,/league:leagueId,season,status:'FT'/);
 assert.match(bangersScan,/scanBangers/);
+assert.doesNotMatch(bangersScan,/require at least one Top 3 or Bottom 2/i);
 assert.match(precompute,/attachBangers/);
 assert.match(precompute,/bangersReady:true/);
 assert.match(precompute,/bangersFound:bangers\.length/);
