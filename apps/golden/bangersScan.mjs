@@ -92,6 +92,6 @@ export const BANGER_RULES=Object.freeze({
   leak:'At least one team ≥1.90 conceded per relevant split match',
   ppg:'Both teams >1.50 PPG in relevant split',
   attack:'At least one team ≥1.90 goals scored per relevant split match',
-  rank:'Reject if both are Top 5; require at least one Top 3 or Bottom 2 in the home/away split table',
+  rank:'Reject only when both teams are Top 5 in their relevant home/away split tables',
   sample:'Exact last 5 home for home team + exact last 5 away for away team'
 });

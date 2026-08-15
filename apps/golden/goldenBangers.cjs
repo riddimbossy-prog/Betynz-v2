@@ -35,7 +35,6 @@ function evaluateBanger({home,away,over25Odd,positions={}}={}){
   const ranksAvailable=validRank(hp,hs)&&validRank(ap,as);
   const homeBand=splitBand(hp,hs),awayBand=splitBand(ap,as);
   const bothTopFive=ranksAvailable&&hp<=LIMITS.topFive&&ap<=LIMITS.topFive;
-  const extremeRank=ranksAvailable&&(homeBand==='Top 3'||homeBand==='Bottom 2'||awayBand==='Top 3'||awayBand==='Bottom 2');
   const signals={
     homeLeak:finite(h.avgGA)&&n(h.avgGA)>=LIMITS.minLeakAvgGA,
     awayLeak:finite(a.avgGA)&&n(a.avgGA)>=LIMITS.minLeakAvgGA,
@@ -51,7 +50,6 @@ function evaluateBanger({home,away,over25Odd,positions={}}={}){
     oneAttack:signals.homeAttack||signals.awayAttack,
     splitRanks:ranksAvailable,
     notBothTopFive:ranksAvailable&&!bothTopFive,
-    extremeRank:ranksAvailable&&extremeRank,
   };
 
   const qualified=Object.values(gates).every(Boolean);
@@ -69,8 +67,6 @@ function evaluateBanger({home,away,over25Odd,positions={}}={}){
     reasons.push(`Split ranks: home ${hp}/${hs} (${homeBand}), away ${ap}/${as} (${awayBand}).`);
     if(bothTopFive)failures.push('Both teams are Top 5 in their relevant split tables, so the match is rejected as a top-vs-top trap.');
     else reasons.push('The two teams are not both Top 5, avoiding the top-vs-top trap.');
-    if(extremeRank)reasons.push('At least one side is Top 3 or Bottom 2 in its relevant split table.');
-    else failures.push('At least one team must be Top 3 or Bottom 2 in its relevant split table.');
   }
 
   return{
@@ -82,7 +78,7 @@ function evaluateBanger({home,away,over25Odd,positions={}}={}){
     limits:LIMITS,
     gates,
     signals,
-    ranks:{home:validRank(hp,hs)?hp:null,away:validRank(ap,as)?ap:null,homeTableSize:finite(hs)?hs:null,awayTableSize:finite(as)?as:null,homeBand,awayBand,bothTopFive,extremeRank},
+    ranks:{home:validRank(hp,hs)?hp:null,away:validRank(ap,as)?ap:null,homeTableSize:finite(hs)?hs:null,awayTableSize:finite(as)?as:null,homeBand,awayBand,bothTopFive},
     stats:{home:{ppg:finite(h.ppg)?r2(h.ppg):null,avgGF:finite(h.avgGF)?r2(h.avgGF):null,avgGA:finite(h.avgGA)?r2(h.avgGA):null},away:{ppg:finite(a.ppg)?r2(a.ppg):null,avgGF:finite(a.avgGF)?r2(a.avgGF):null,avgGA:finite(a.avgGA)?r2(a.avgGA):null}},
     reasons,
     failures,
