@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#050607">
+  <title>GG / BTTS · Betynz</title>
+  <link rel="icon" href="/assets/favicon-32x32.png">
+  <link rel="stylesheet" href="/styles.css?v=6.4.0">
+  <link rel="stylesheet" href="/branding.css?v=7.2.0">
+  <link rel="stylesheet" href="/bangers.css?v=1.1.0">
+  <link rel="stylesheet" href="/season-ui.css?v=1.0.0">
+</head>
+<body class="bangers-page">
+<header>
+  <a class="brand" href="/"><img src="/assets/betynz-logo.png" alt="Betynz"></a>
+  <div class="header-actions">
+    <a class="proof-link" href="/">Board</a>
+    <a class="proof-link" href="/bangers.html">Bangers</a>
+    <a class="proof-link" href="/proof">Proof</a>
+  </div>
+</header>
+
+<main class="bangers-main">
+  <section class="bangers-hero">
+    <div>
+      <span>GG / BTTS STATISTICAL PROFILE</span>
+      <h1>GG</h1>
+      <p>Season, venue, scoring, conceding, clean-sheet, recent-form and league BTTS signals must all agree.</p>
+    </div>
+    <div class="bangers-badge">GG</div>
+  </section>
+
+  <section class="banger-rules" aria-label="GG BTTS rules">
+    <b>Season: 68% + 68% or 80% + 62%</b>
+    <b>Home BTTS ≥72%</b>
+    <b>Away BTTS ≥68%</b>
+    <b>Both score ≥72%</b>
+    <b>Both concede ≥68%</b>
+    <b>Clean sheets ≤28%</b>
+    <b>Last 6: both 4+ or either 5+</b>
+    <b>League BTTS ≥54%</b>
+    <b>Both teams 10+ matches</b>
+  </section>
+
+  <section class="bangers-week">
+    <div id="ggDays"></div>
+    <div class="bangers-tools">
+      <select id="ggLeague" aria-label="League filter"><option value="ALL">All leagues</option></select>
+      <select id="ggSeason" aria-label="Season maturity filter">
+        <option value="ALL">All season stages</option>
+        <option value="EARLY">🚩 Early Season · R1–R8</option>
+        <option value="SOLID">Solid Season · R9+</option>
+      </select>
+      <button id="ggRefresh" type="button">↻ Refresh</button>
+    </div>
+    <p id="ggState">Loading GG profiles…</p>
+  </section>
+
+  <section class="bangers-panel">
+    <div class="bangers-head">
+      <div><span>PROFILE MATCHES ONLY</span><h2 id="ggTitle">Today’s GG Profiles</h2></div>
+      <strong id="ggCount">0</strong>
+    </div>
+    <div id="ggList" class="banger-list"><div class="banger-empty">Scanning the statistical gates…</div></div>
+  </section>
+
+  <p class="note">Statistical football analysis only. No outcome is guaranteed.</p>
+</main>
+
+<script src="/runtime-config.js?v=9.0.0"></script>
+<script src="/runtime-client.js?v=9.0.1"></script>
+<script type="module" src="/gg.js?v=1.0.0"></script>
+</body>
+</html>
