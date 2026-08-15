@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="/account.css?v=8.0.0">
   <link rel="stylesheet" href="/match-lifecycle.css?v=8.1.0">
   <link rel="stylesheet" href="/season-ui.css?v=1.0.0">
+  <link rel="stylesheet" href="/engine-hub.css?v=1.0.0">
 </head>
 <body class="splash-active">
 <div id="boardSplash" class="board-splash" role="status" aria-live="polite" aria-label="Loading Betynz.com">
@@ -31,9 +32,7 @@
     <img src="/assets/betynz-logo.png" alt="Betynz">
   </a>
   <div class="header-actions">
-    <a class="proof-link" href="/bangers.html">Bangers</a>
-    <a class="proof-link" href="/gg.html">GG</a>
-    <a class="proof-link" href="/proof">Proof</a>
+    <a class="engine-nav-link" href="#engineHub">Engines</a>
     <a class="account-link" data-account-login href="/login">Login</a>
     <a class="create-account-link" data-account-create href="/create-account">Create Account</a>
     <button id="refresh" type="button">↻ Refresh</button>
@@ -43,15 +42,78 @@
 <main>
   <section class="hero">
     <span>MATHEMATICAL SPLIT-FORM EDITION</span>
-    <h1>One engine. Exact <em>5 + 5</em> form.</h1>
-    <p>Home team: last 5 home matches only. Away team: last 5 away matches only. Overall form is ignored.</p>
+    <h1>One board. <em>Specialist engines.</em></h1>
+    <p>Golden Banker ranks the exact 5 + 5 split-form board. Bangers and GG run their own specialist statistical profiles, while Zeus supervises published banker routes.</p>
     <div class="rules">
+      <b>Exact 5 HOME + 5 AWAY</b>
       <b>≥7/10 banker gate</b>
-      <b>2.0 PPG DNB gate</b>
-      <b>2.3 PPG win gate</b>
+      <b>Specialist goals profiles</b>
       <b>Top 4 maximum</b>
       <b>Zeus supervisor active</b>
       <b>Published picks locked</b>
+    </div>
+  </section>
+
+  <section class="engine-hub" id="engineHub" aria-labelledby="engineHubTitle">
+    <div class="engine-hub-head">
+      <div>
+        <span>BETYNZ ENGINE HUB</span>
+        <h2 id="engineHubTitle">Choose the analysis view</h2>
+        <p>Each view has a defined job. The homepage no longer mixes specialist systems into one small navigation row.</p>
+      </div>
+      <span class="engine-hub-live">● Engines online</span>
+    </div>
+
+    <div class="engine-hub-grid">
+      <a class="engine-card engine-card--banker" href="#bankerPanel">
+        <div class="engine-icon">♛</div>
+        <div class="engine-card-copy">
+          <small>PRIMARY SUPERVISED BOARD</small>
+          <strong>Golden Banker</strong>
+          <p>Top 4 selections from exact 5 HOME + 5 AWAY maths, with Zeus protection.</p>
+        </div>
+        <div class="engine-card-meta"><b>TOP 4</b><span>Final board</span></div>
+      </a>
+
+      <a class="engine-card engine-card--rated" href="/highly-rated.html">
+        <div class="engine-icon">◆</div>
+        <div class="engine-card-copy">
+          <small>ALL QUALIFIED MARKETS</small>
+          <strong>Highly Rated</strong>
+          <p>See every qualified 7/10+ Golden result, not only the final Top 4.</p>
+        </div>
+        <div class="engine-card-meta"><b>7+/10</b><span>Qualified</span></div>
+      </a>
+
+      <a class="engine-card engine-card--bangers" href="/bangers.html">
+        <div class="engine-icon">⚡</div>
+        <div class="engine-card-copy">
+          <small>HIGH-SCORING PROFILE</small>
+          <strong>Bangers</strong>
+          <p>Season, venue, recent scoring and league environment combined into a specialist goals profile.</p>
+        </div>
+        <div class="engine-card-meta"><b>O2.5</b><span>Specialist</span></div>
+      </a>
+
+      <a class="engine-card engine-card--gg" href="/gg.html">
+        <div class="engine-icon">GG</div>
+        <div class="engine-card-copy">
+          <small>BOTH-TEAMS-SCORE PROFILE</small>
+          <strong>GG / BTTS</strong>
+          <p>Dedicated BTTS validation using season strength, venue splits, scoring, conceding and league context.</p>
+        </div>
+        <div class="engine-card-meta"><b>GG</b><span>Specialist</span></div>
+      </a>
+
+      <a class="engine-card engine-card--proof" href="/proof">
+        <div class="engine-icon">✓</div>
+        <div class="engine-card-copy">
+          <small>PUBLISHED HISTORY</small>
+          <strong>Proof</strong>
+          <p>Review locked published selections and their settlement record separately from live analysis.</p>
+        </div>
+        <div class="engine-card-meta"><b>LOG</b><span>Results</span></div>
+      </a>
     </div>
   </section>
 
@@ -64,8 +126,8 @@
     <div class="head banker-head">
       <div>
         <span>FINAL TOP BANKERS</span>
-        <h2>Top 4</h2>
-        <p>Only the four strongest qualified selections are promoted after Zeus supervision.</p>
+        <h2>Golden Banker · Top 4</h2>
+        <p>Only the strongest qualified selections are promoted after the current market rules and Zeus supervision.</p>
       </div>
       <div class="progress-wrap">
         <strong id="progress">0/0</strong>
@@ -74,7 +136,7 @@
     </div>
     <div class="top4" id="top4"><div class="empty">Loading latest bankers…</div></div>
     <div class="more-rated-wrap">
-      <a id="moreHighlyRated" class="more-rated" href="/highly-rated.html" hidden>More Highly Rated Picks →</a>
+      <a id="moreHighlyRated" class="more-rated" href="/highly-rated.html" hidden>View all Highly Rated →</a>
     </div>
   </section>
 
@@ -148,7 +210,7 @@
 <script src="/runtime-config.js?v=9.0.0"></script>
 <script src="/runtime-client.js?v=9.0.1"></script>
 <script type="module" src="/splash.js?v=7.3.0"></script>
-<script type="module" src="/app.js?v=7.6.0"></script>
+<script type="module" src="/app.js?v=7.7.0"></script>
 <script type="module" src="/match-lifecycle.js?v=8.1.0"></script>
 <script type="module" src="/rated-link.js?v=6.3.0"></script>
 <script type="module" src="/account.js?v=8.0.0"></script>

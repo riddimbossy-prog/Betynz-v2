@@ -1,0 +1,77 @@
+/* Betynz homepage engine hub v1.0 */
+.engine-nav-link{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 14px;border:1px solid rgba(244,196,84,.26);border-radius:11px;background:rgba(244,196,84,.08);color:#f4c454;text-decoration:none;font-size:13px;font-weight:900}
+.engine-nav-link:hover{background:rgba(244,196,84,.14);border-color:rgba(244,196,84,.46)}
+
+.engine-hub{position:relative;margin:0 0 16px;padding:20px;border:1px solid rgba(255,255,255,.09);border-radius:18px;background:linear-gradient(145deg,rgba(12,29,43,.98),rgba(6,17,26,.98));overflow:hidden}
+.engine-hub:before{content:"";position:absolute;inset:-160px -120px auto auto;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(244,196,84,.12),transparent 68%);pointer-events:none}
+.engine-hub-head{position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:15px}
+.engine-hub-head>div>span{color:#f4c454;font-size:10px;font-weight:950;letter-spacing:.16em}
+.engine-hub-head h2{margin:4px 0 0;font-size:clamp(24px,3vw,34px);font-weight:950;letter-spacing:-.03em}
+.engine-hub-head p{max-width:760px;margin:7px 0 0;color:#8fa4b5;line-height:1.55}
+.engine-hub-live{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid rgba(75,211,156,.24);border-radius:999px;background:rgba(75,211,156,.07);color:#76ddb6;font-size:10px;font-weight:900;letter-spacing:.04em}
+
+.engine-hub-grid{position:relative;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px}
+.engine-card{grid-column:span 4;min-width:0;display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:12px;align-items:center;min-height:132px;padding:15px;border:1px solid rgba(255,255,255,.09);border-radius:16px;background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.015));color:#f6f8fb;text-decoration:none;transition:transform .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease}
+.engine-card:hover{transform:translateY(-2px);border-color:rgba(244,196,84,.34);background:linear-gradient(145deg,rgba(244,196,84,.07),rgba(255,255,255,.02));box-shadow:0 16px 34px rgba(0,0,0,.16)}
+.engine-card--banker,.engine-card--rated{grid-column:span 6;min-height:142px}
+.engine-card--banker{border-color:rgba(244,196,84,.27);background:linear-gradient(145deg,rgba(244,196,84,.09),rgba(255,255,255,.018))}
+.engine-card--gg{border-color:rgba(75,211,156,.18)}
+.engine-card--bangers{border-color:rgba(246,184,90,.19)}
+.engine-card--proof{border-color:rgba(101,184,255,.18)}
+
+.engine-icon{width:52px;height:52px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.1);border-radius:15px;background:#102635;color:#f4c454;font-size:20px;font-weight:950;letter-spacing:-.03em}
+.engine-card--banker .engine-icon{background:rgba(244,196,84,.12);border-color:rgba(244,196,84,.28)}
+.engine-card--rated .engine-icon{color:#65b8ff;background:rgba(101,184,255,.09);border-color:rgba(101,184,255,.2)}
+.engine-card--bangers .engine-icon{color:#f6b85a;background:rgba(246,184,90,.09);border-color:rgba(246,184,90,.2)}
+.engine-card--gg .engine-icon{color:#4bd39c;background:rgba(75,211,156,.09);border-color:rgba(75,211,156,.2);font-size:16px}
+.engine-card--proof .engine-icon{color:#9fcfff;background:rgba(101,184,255,.08);border-color:rgba(101,184,255,.18)}
+
+.engine-card-copy{min-width:0}
+.engine-card-copy small{display:block;color:#8298a8;font-size:8.5px;font-weight:900;letter-spacing:.1em}
+.engine-card-copy strong{display:block;margin-top:3px;font-size:18px;font-weight:950;letter-spacing:-.015em}
+.engine-card-copy p{margin:5px 0 0;color:#8fa4b5;font-size:11.5px;line-height:1.45}
+.engine-card-meta{min-width:68px;padding-left:10px;text-align:right;border-left:1px solid rgba(255,255,255,.08)}
+.engine-card-meta b{display:block;color:#f4c454;font-size:15px;font-weight:950;white-space:nowrap}
+.engine-card--gg .engine-card-meta b{color:#4bd39c}
+.engine-card--bangers .engine-card-meta b{color:#f6b85a}
+.engine-card--rated .engine-card-meta b,.engine-card--proof .engine-card-meta b{color:#65b8ff}
+.engine-card-meta span{display:block;margin-top:2px;color:#71899a;font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+
+/* Give each homepage system a clear hierarchy without changing engine maths. */
+#bankerPanel{scroll-margin-top:90px}
+#bankerPanel .banker-head>div>span{color:#f4c454}
+#bankerPanel .banker-head h2{display:flex;align-items:center;gap:8px}
+#bankerPanel .banker-head h2:before{content:"♛";color:#f4c454;font-size:.82em}
+
+@media(max-width:980px){
+  .engine-card,.engine-card--banker,.engine-card--rated{grid-column:span 6}
+  .engine-hub-head{align-items:flex-start}
+}
+
+@media(max-width:700px){
+  .engine-hub{padding:14px;border-radius:16px}
+  .engine-hub-head{display:block}
+  .engine-hub-live{margin-top:10px}
+  .engine-hub-grid{display:flex;gap:9px;overflow-x:auto;scroll-snap-type:x mandatory;padding:1px 1px 7px;scrollbar-width:none}
+  .engine-hub-grid::-webkit-scrollbar{display:none}
+  .engine-card,.engine-card--banker,.engine-card--rated{flex:0 0 min(86vw,360px);min-height:142px;scroll-snap-align:start;grid-template-columns:46px minmax(0,1fr)}
+  .engine-icon{width:46px;height:46px;border-radius:13px}
+  .engine-card-meta{grid-column:2;padding:7px 0 0;border-left:0;border-top:1px solid rgba(255,255,255,.07);text-align:left;display:flex;align-items:center;gap:6px}
+  .engine-card-meta span{margin:0}
+  .header-actions{gap:6px!important}
+  .engine-nav-link{min-height:38px;padding:0 11px;font-size:12px}
+}
+
+@media(max-width:520px){
+  .engine-hub-head h2{font-size:25px}
+  .engine-hub-head p{font-size:13px}
+  .engine-card-copy strong{font-size:17px}
+  .engine-card-copy p{font-size:11px}
+  .engine-card{padding:13px}
+  .engine-nav-link{display:none}
+}
+
+@media(max-width:390px){
+  .engine-card,.engine-card--banker,.engine-card--rated{flex-basis:90vw}
+  .engine-hub{padding:12px}
+}
