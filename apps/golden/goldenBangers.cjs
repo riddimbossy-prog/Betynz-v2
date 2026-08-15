@@ -15,7 +15,7 @@ const LIMITS=Object.freeze({
 });
 
 const n=v=>Number(v);
-const finite=v=>Number.isFinite(n(v));
+const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(n(v));
 const r2=v=>finite(v)?Math.round((n(v)+Number.EPSILON)*100)/100:null;
 const pct=v=>finite(v)?`${Math.round(n(v)*100)}%`:'—';
 
