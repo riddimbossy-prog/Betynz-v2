@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { ENGINE,VERSION,snapshots,isSrl,publicFixture,supabaseConfigured,persistenceCoreEnabled,loadBoards,upsertPredictionLedger } from './runtimeConfig.mjs';
 import { applyTrustLayer } from './trustLayer.mjs';
 const require=createRequire(import.meta.url),{analyseMatch,selectTopBankers,CONFIG}=require('./goldenBanker.cjs'),{applyLowWinUnder35ToAnalysis}=require('./goldenUnder35.cjs');
+const RULES_REVISION='golden-top2-win-v3';
 
 function historyRows(intel,side){
   const rows=Array.isArray(intel?.[side]?.history)?intel[side].history:[];
@@ -41,8 +42,9 @@ function splitRowsFromEvidence(rows){
 }
 
 export function hasExactEvidence(analysis){
-  if(!analysis||analysis.waiting)return true;
-  return analysis?.evidence?.homeLast5?.length===5&&analysis?.evidence?.awayLast5?.length===5;
+  if(!analysis)return false;
+  if(analysis.waiting)return true;
+  return analysis?.rulesRevision===RULES_REVISION&&analysis?.evidence?.homeLast5?.length===5&&analysis?.evidence?.awayLast5?.length===5;
 }
 
 function recomputeFromEvidence(analysis,fixture=null){
@@ -59,8 +61,10 @@ function recomputeFromEvidence(analysis,fixture=null){
     homeFormPosition:analysis?.split?.positions?.home,
     awayFormPosition:analysis?.split?.positions?.away,
     formTableSize:analysis?.split?.positions?.tableSize,
+    homeFormTableSize:analysis?.split?.positions?.homeTableSize,
+    awayFormTableSize:analysis?.split?.positions?.awayTableSize,
   });
-  return {...analysis,...rebuilt,evidence:analysis.evidence,recalculatedAt:new Date().toISOString(),rulesRevision:'golden-consistency-v2'};
+  return {...analysis,...rebuilt,evidence:analysis.evidence,recalculatedAt:new Date().toISOString(),rulesRevision:RULES_REVISION};
 }
 
 export function upgradeAnalysisForCurrentRules(analysis,fixture=null){
@@ -69,14 +73,19 @@ export function upgradeAnalysisForCurrentRules(analysis,fixture=null){
 }
 
 export function analyseFixture(f,intel){
-  const homeHistory=historyRows(intel,'home'),awayHistory=historyRows(intel,'away');
+  const homeHistory=historyRows(intel,'home'),awayHistory=historyRows(intel,'away'),positions=intel?.formPositions||{};
   const analysis=analyseMatch({
     id:String(f.id),
     league:f?.league?.name||'Unknown League',
     homeTeam:f?.home?.name||'',
     awayTeam:f?.away?.name||'',
     homeLast5:splitRowsFromHistory(homeHistory,'home'),
-    awayLast5:splitRowsFromHistory(awayHistory,'away')
+    awayLast5:splitRowsFromHistory(awayHistory,'away'),
+    homeFormPosition:positions.home,
+    awayFormPosition:positions.away,
+    formTableSize:positions.tableSize,
+    homeFormTableSize:positions.homeTableSize,
+    awayFormTableSize:positions.awayTableSize,
   });
   const withEvidence={
     ...analysis,
@@ -84,7 +93,7 @@ export function analyseFixture(f,intel){
       homeLast5:evidenceRows(homeHistory,'home'),
       awayLast5:evidenceRows(awayHistory,'away')
     },
-    rulesRevision:'golden-consistency-v2'
+    rulesRevision:RULES_REVISION
   };
   return applyTrustLayer(publicFixture(f),withEvidence);
 }
@@ -112,11 +121,11 @@ export function makeBoard(date,board,items,{complete=false,processed=0,total=ite
   const analyses=normalizedItems.map(x=>x.analysis).filter(Boolean);
   const topBankers=topRowsFromItems(normalizedItems);
   const blocked=analyses.filter(a=>a?.trust?.blocked).length;
-  return{engine:'Golden Banker v4.3',engineCode:ENGINE,version:VERSION,date,rules:{sampleSize:5,maxBankers:4,bankerMinScore:7,dnbMinPPG:2,straightWinMinPPG:2.3,opponentPPG:'<1.0',defensiveBleed:'>2.30',under35:'low-win + low-PPG is only an entry gate; both O2.5 rates must be <=40% and both goal environments <=3.00',btts:'both exact split BTTS rates >=80%, both score rates >=80%, both concede rates >=80%',over25:'both exact split O2.5 rates >=60%',zeusSupervisor:'reject conflicted, bottom-three favourite, or unsafe banker routes before publication'},fixtures:(board?.fixtures||[]).filter(f=>!isSrl(f)).map(publicFixture),all:normalizedItems,topBankers,summary:{fixtures:(board?.fixtures||[]).filter(f=>!isSrl(f)).length,eligible:total,analysed:analyses.filter(a=>!a.waiting).length,waiting:analyses.filter(a=>a.waiting).length,bankersFound:topBankers.length,zeusBlocked:blocked},progress:{processed,total,percent:total?Math.round(processed/total*100):100,restored},complete,warning:warning||board?.warning||null,generatedAt:new Date().toISOString()}}
-const fingerprint=(date,f,a)=>createHash('sha256').update([ENGINE,'golden-consistency-v2',date,f?.id,marketCode(a),a?.finalRecommendation?.primaryBet,a?.finalRecommendation?.score].join('|')).digest('hex');
+  return{engine:'Golden Banker v4.3',engineCode:ENGINE,version:VERSION,date,rules:{sampleSize:5,maxBankers:4,bankerMinScore:7,dnbMinPPG:2,straightWinMinPPG:2.3,straightWinRank:'verified split-form Top 2 only; otherwise DNB',opponentPPG:'<1.0',defensiveBleed:'>2.30',under35:'low-win + low-PPG is only an entry gate; both O2.5 rates must be <=40% and both goal environments <=3.00',btts:'both exact split BTTS rates >=80%, both score rates >=80%, both concede rates >=80%',over25:'both exact split O2.5 rates >=60%',zeusSupervisor:'reject conflicted, bottom-three favourite, or unsafe banker routes before publication'},fixtures:(board?.fixtures||[]).filter(f=>!isSrl(f)).map(publicFixture),all:normalizedItems,topBankers,summary:{fixtures:(board?.fixtures||[]).filter(f=>!isSrl(f)).length,eligible:total,analysed:analyses.filter(a=>!a.waiting).length,waiting:analyses.filter(a=>a.waiting).length,bankersFound:topBankers.length,zeusBlocked:blocked},progress:{processed,total,percent:total?Math.round(processed/total*100):100,restored},complete,warning:warning||board?.warning||null,generatedAt:new Date().toISOString()}}
+const fingerprint=(date,f,a)=>createHash('sha256').update([ENGINE,RULES_REVISION,date,f?.id,marketCode(a),a?.finalRecommendation?.primaryBet,a?.finalRecommendation?.score].join('|')).digest('hex');
 function pickOdd(f,m){const o=f?.odds||{};if(m==='HOME_WIN')return Number(o.homeWin)||null;if(m==='AWAY_WIN')return Number(o.awayWin)||null;if(m==='OVER_2_5')return Number(o.over25)||null;if(m==='BTTS_YES')return Number(o.bttsYes)||null;return null}
 function reasons(a){const m=marketCode(a);const base=m==='UNDER_3_5'?a?.markets?.under35?.reasons||[]:m==='OVER_2_5'?a?.markets?.over25?.reasons||[]:m==='BTTS_YES'?a?.markets?.btts?.reasons||[]:/WIN|DNB/.test(m)?a?.markets?.winDnb?.reasons||[]:[];return [...base,...(a?.trust?.warnings||[])].slice(0,8)}
-export async function persistTop(date,rows){if(!supabaseConfigured()||!rows.length)return;await upsertPredictionLedger(rows.map(({fixture,analysis})=>({fixture_id:String(fixture.id),fixture_date:date,kickoff:fixture.kickoff||null,country:fixture?.league?.country||null,league_name:fixture?.league?.name||null,home_team:fixture?.home?.name||analysis.homeTeam,away_team:fixture?.away?.name||analysis.awayTeam,engine:ENGINE,market:marketCode(analysis),selection_label:analysis.finalRecommendation.primaryBet,odds:pickOdd(fixture,marketCode(analysis)),engine_score:Number(analysis.finalRecommendation.score||0),grade:Number(analysis.finalRecommendation.score||0)>=8.5?'A+':'A',decision:'BANKER',reasons:reasons(analysis),odds_snapshot:fixture.odds||{},payload:{analysis,engineVersion:'4.3.1',rulesRevision:'golden-consistency-v2',trust:analysis.trust,zeus:analysis.zeus,lockedAt:new Date().toISOString()},fingerprint:fingerprint(date,fixture,analysis),settlement_status:'PENDING'})))}
+export async function persistTop(date,rows){if(!supabaseConfigured()||!rows.length)return;await upsertPredictionLedger(rows.map(({fixture,analysis})=>({fixture_id:String(fixture.id),fixture_date:date,kickoff:fixture.kickoff||null,country:fixture?.league?.country||null,league_name:fixture?.league?.name||null,home_team:fixture?.home?.name||analysis.homeTeam,away_team:fixture?.away?.name||analysis.awayTeam,engine:ENGINE,market:marketCode(analysis),selection_label:analysis.finalRecommendation.primaryBet,odds:pickOdd(fixture,marketCode(analysis)),engine_score:Number(analysis.finalRecommendation.score||0),grade:Number(analysis.finalRecommendation.score||0)>=8.5?'A+':'A',decision:'BANKER',reasons:reasons(analysis),odds_snapshot:fixture.odds||{},payload:{analysis,engineVersion:'4.3.2',rulesRevision:RULES_REVISION,trust:analysis.trust,zeus:analysis.zeus,lockedAt:new Date().toISOString()},fingerprint:fingerprint(date,fixture,analysis),settlement_status:'PENDING'})))}
 
 function hydrateBoard(payload){
   const all=normalizeItems(Array.isArray(payload?.all)?payload.all:[]);
@@ -124,7 +133,7 @@ function hydrateBoard(payload){
   return {
     ...payload,
     version:VERSION,
-    rulesRevision:'golden-consistency-v2',
+    rulesRevision:RULES_REVISION,
     fixtures:Array.isArray(payload?.fixtures)?payload.fixtures.map(publicFixture):[],
     all,
     topBankers,
