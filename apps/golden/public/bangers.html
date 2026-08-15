@@ -8,7 +8,7 @@
   <link rel="icon" href="/assets/favicon-32x32.png">
   <link rel="stylesheet" href="/styles.css?v=6.4.0">
   <link rel="stylesheet" href="/branding.css?v=7.2.0">
-  <link rel="stylesheet" href="/bangers.css?v=1.0.0">
+  <link rel="stylesheet" href="/bangers.css?v=1.1.0">
   <link rel="stylesheet" href="/season-ui.css?v=1.0.0">
 </head>
 <body class="bangers-page">
@@ -23,20 +23,22 @@
 <main class="bangers-main">
   <section class="bangers-hero">
     <div>
-      <span>STRICT OVER 2.5 FINDER</span>
+      <span>HIGH-SCORING MATCH PROFILE</span>
       <h1>Bangers</h1>
-      <p>No soft scores. Every rule must agree before a game appears here.</p>
+      <p>Season, venue, recent-form and league goal signals must all agree before a match appears here.</p>
     </div>
-    <div class="bangers-badge">O2.5</div>
+    <div class="bangers-badge">GOALS</div>
   </section>
 
   <section class="banger-rules" aria-label="Banger rules">
-    <b>Odds 1.20–1.55</b>
-    <b>One side leaks ≥1.90</b>
-    <b>Both PPG &gt;1.50</b>
-    <b>One side scores ≥1.90</b>
-    <b>Reject both Top 5</b>
-    <b>Exact 5 HOME + 5 AWAY</b>
+    <b>Season: 70% + 70% or 80% + 65%</b>
+    <b>Home venue ≥72%</b>
+    <b>Away venue ≥68%</b>
+    <b>Combined GF+GA ≥3.40</b>
+    <b>xG+xGA ≥3.10 when available</b>
+    <b>Last 6: both 4+ or either 5+</b>
+    <b>League rate ≥56%</b>
+    <b>Both teams 10+ matches</b>
   </section>
 
   <section class="bangers-week">
@@ -55,10 +57,10 @@
 
   <section class="bangers-panel">
     <div class="bangers-head">
-      <div><span>QUALIFIED ONLY</span><h2 id="bangerTitle">Today’s Bangers</h2></div>
+      <div><span>PROFILE MATCHES ONLY</span><h2 id="bangerTitle">Today’s Bangers</h2></div>
       <strong id="bangerCount">0</strong>
     </div>
-    <div id="bangerList" class="banger-list"><div class="banger-empty">Scanning the strict gates…</div></div>
+    <div id="bangerList" class="banger-list"><div class="banger-empty">Scanning the statistical gates…</div></div>
   </section>
 
   <p class="note">Statistical football analysis only. No outcome is guaranteed.</p>
@@ -66,6 +68,6 @@
 
 <script src="/runtime-config.js?v=9.0.0"></script>
 <script src="/runtime-client.js?v=9.0.1"></script>
-<script type="module" src="/bangers.js?v=1.1.0"></script>
+<script type="module" src="/bangers.js?v=1.2.0"></script>
 </body>
 </html>
