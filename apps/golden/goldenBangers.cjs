@@ -5,7 +5,7 @@ const LIMITS=Object.freeze({
   over25OddMax:1.55,
   minLeakAvgGA:1.90,
   minPPGExclusive:1.50,
-  minAttackAvgGF:1.88,
+  minAttackAvgGF:1.90,
   topBand:3,
   topFive:5,
   bottomBand:2,
@@ -36,15 +36,19 @@ function evaluateBanger({home,away,over25Odd,positions={}}={}){
   const homeBand=splitBand(hp,hs),awayBand=splitBand(ap,as);
   const bothTopFive=ranksAvailable&&hp<=LIMITS.topFive&&ap<=LIMITS.topFive;
   const extremeRank=ranksAvailable&&(homeBand==='Top 3'||homeBand==='Bottom 2'||awayBand==='Top 3'||awayBand==='Bottom 2');
+  const signals={
+    homeLeak:finite(h.avgGA)&&n(h.avgGA)>=LIMITS.minLeakAvgGA,
+    awayLeak:finite(a.avgGA)&&n(a.avgGA)>=LIMITS.minLeakAvgGA,
+    homeAttack:finite(h.avgGF)&&n(h.avgGF)>=LIMITS.minAttackAvgGF,
+    awayAttack:finite(a.avgGF)&&n(a.avgGF)>=LIMITS.minAttackAvgGF,
+  };
 
   const gates={
     odds:finite(odd)&&odd>=LIMITS.over25OddMin&&odd<=LIMITS.over25OddMax,
-    homeLeak:finite(h.avgGA)&&n(h.avgGA)>=LIMITS.minLeakAvgGA,
-    awayLeak:finite(a.avgGA)&&n(a.avgGA)>=LIMITS.minLeakAvgGA,
+    oneLeak:signals.homeLeak||signals.awayLeak,
     homePPG:finite(h.ppg)&&n(h.ppg)>LIMITS.minPPGExclusive,
     awayPPG:finite(a.ppg)&&n(a.ppg)>LIMITS.minPPGExclusive,
-    homeAttack:finite(h.avgGF)&&n(h.avgGF)>=LIMITS.minAttackAvgGF,
-    awayAttack:finite(a.avgGF)&&n(a.avgGF)>=LIMITS.minAttackAvgGF,
+    oneAttack:signals.homeAttack||signals.awayAttack,
     splitRanks:ranksAvailable,
     notBothTopFive:ranksAvailable&&!bothTopFive,
     extremeRank:ranksAvailable&&extremeRank,
@@ -57,9 +61,9 @@ function evaluateBanger({home,away,over25Odd,positions={}}={}){
   const failures=[];
 
   if(gates.odds)reasons.push(`Over 2.5 odds ${odd.toFixed(2)} sit inside the 1.20–1.55 Banger window.`);else failures.push(`Over 2.5 odds must be 1.20–1.55; received ${finite(odd)?odd.toFixed(2):'unavailable'}.`);
-  if(gates.homeLeak&&gates.awayLeak)reasons.push(`Both split defences leak at least 1.90 goals per match (${r2(h.avgGA)} home / ${r2(a.avgGA)} away).`);else failures.push(`Both teams must concede at least 1.90 in the relevant split (${finite(h.avgGA)?r2(h.avgGA):'—'} / ${finite(a.avgGA)?r2(a.avgGA):'—'}).`);
+  if(gates.oneLeak)reasons.push(`At least one split defence leaks 1.90+ goals per match (${r2(h.avgGA)} home / ${r2(a.avgGA)} away).`);else failures.push(`At least one team must concede 1.90+ in the relevant split (${finite(h.avgGA)?r2(h.avgGA):'—'} / ${finite(a.avgGA)?r2(a.avgGA):'—'}).`);
   if(gates.homePPG&&gates.awayPPG)reasons.push(`Both teams are above 1.50 split PPG (${r2(h.ppg)} / ${r2(a.ppg)}).`);else failures.push(`Each team must be above 1.50 split PPG (${finite(h.ppg)?r2(h.ppg):'—'} / ${finite(a.ppg)?r2(a.ppg):'—'}).`);
-  if(gates.homeAttack&&gates.awayAttack)reasons.push(`Both attacks average at least 1.88 goals in their relevant split (${r2(h.avgGF)} / ${r2(a.avgGF)}).`);else failures.push(`Each attack must average at least 1.88 split goals (${finite(h.avgGF)?r2(h.avgGF):'—'} / ${finite(a.avgGF)?r2(a.avgGF):'—'}).`);
+  if(gates.oneAttack)reasons.push(`At least one attack averages 1.90+ goals in its relevant split (${r2(h.avgGF)} home / ${r2(a.avgGF)} away).`);else failures.push(`At least one team must score 1.90+ goals per relevant split match (${finite(h.avgGF)?r2(h.avgGF):'—'} / ${finite(a.avgGF)?r2(a.avgGF):'—'}).`);
   if(!ranksAvailable)failures.push('Relevant home/away split-table ranks are unavailable, so the Banger cannot fire.');
   else{
     reasons.push(`Split ranks: home ${hp}/${hs} (${homeBand}), away ${ap}/${as} (${awayBand}).`);
@@ -77,6 +81,7 @@ function evaluateBanger({home,away,over25Odd,positions={}}={}){
     odds:finite(odd)?r2(odd):null,
     limits:LIMITS,
     gates,
+    signals,
     ranks:{home:validRank(hp,hs)?hp:null,away:validRank(ap,as)?ap:null,homeTableSize:finite(hs)?hs:null,awayTableSize:finite(as)?as:null,homeBand,awayBand,bothTopFive,extremeRank},
     stats:{home:{ppg:finite(h.ppg)?r2(h.ppg):null,avgGF:finite(h.avgGF)?r2(h.avgGF):null,avgGA:finite(h.avgGA)?r2(h.avgGA):null},away:{ppg:finite(a.ppg)?r2(a.ppg):null,avgGF:finite(a.avgGF)?r2(a.avgGF):null,avgGA:finite(a.avgGA)?r2(a.avgGA):null}},
     reasons,

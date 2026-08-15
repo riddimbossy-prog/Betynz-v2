@@ -94,12 +94,12 @@ assert.match(splashJs,/v\.src='\/media\/zeus-thunder-original\.mp4'/);
 assert.equal(existsSync(splashAsset),false,'Legacy Zeus loading poster must remain removed');
 
 // Bangers product page and exact rule contract.
-for(const pattern of[/STRICT OVER 2\.5 FINDER/,/Odds 1\.20–1\.55/,/Both leak ≥1\.90/,/Both PPG &gt;1\.50/,/Both score ≥1\.88/,/Reject both Top 5/,/Top 3 \/ Bottom 2/])assert.match(bangersHtml,pattern);
+for(const pattern of[/STRICT OVER 2\.5 FINDER/,/Odds 1\.20–1\.55/,/One side leaks ≥1\.90/,/Both PPG &gt;1\.50/,/One side scores ≥1\.90/,/Reject both Top 5/,/Top 3 \/ Bottom 2/])assert.match(bangersHtml,pattern);
 assert.match(bangersJs,/board\?\.bangers/);
 assert.match(bangersJs,/BANGER MARKET/);
 assert.match(bangersJs,/Split rank/);
 assert.match(bangersCss,/\.banger-card/);
-for(const pattern of[/over25OddMin:1\.20/,/over25OddMax:1\.55/,/minLeakAvgGA:1\.90/,/minPPGExclusive:1\.50/,/minAttackAvgGF:1\.88/,/notBothTopFive/,/extremeRank/])assert.match(bangersSource,pattern);
+for(const pattern of[/over25OddMin:1\.20/,/over25OddMax:1\.55/,/minLeakAvgGA:1\.90/,/minPPGExclusive:1\.50/,/minAttackAvgGF:1\.90/,/oneLeak/,/oneAttack/,/notBothTopFive/,/extremeRank/])assert.match(bangersSource,pattern);
 assert.match(bangersScan,/calculateSplitTables/);
 assert.match(bangersScan,/league:leagueId,season,status:'FT'/);
 assert.match(bangersScan,/scanBangers/);

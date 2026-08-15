@@ -48,7 +48,8 @@ assert.match(edge,/SUPABASE_SERVICE_ROLE_KEY/);
 assert.match(edge,/path==='\/golden'/,'Supabase production API must support the browser Golden-board alias');
 assert.match(edge,/path==='\/golden-banker'/,'Canonical Golden Banker API route must remain available');
 
-assert.match(client,/GITHUB_PAGES_SUPABASE/);
+assert.doesNotMatch(client,/GITHUB_PAGES_SUPABASE/,'Public runtime must not expose backend diagnostic labels');
+assert.doesNotMatch(client,/BETYNZ_BACKEND/,'Public runtime must not publish a backend diagnostic marker');
 assert.match(client,/functions\/v1/);
 assert.match(client,/auth\/v1/);
 assert.match(client,/localStorage/);
@@ -60,10 +61,11 @@ assert.match(runtimeConfig,/__SUPABASE_ANON_KEY__/);
 
 for(const html of[index,rated,auth]){
   assert.match(html,/runtime-config\.js\?v=9\.0\.0/);
-  assert.match(html,/runtime-client\.js\?v=9\.0\.0/);
+  assert.match(html,/runtime-client\.js\?v=9\.0\.1/);
 }
 assert.doesNotMatch(auth,/HttpOnly cookies/);
-assert.match(auth,/Secure Supabase session/);
+assert.doesNotMatch(auth,/Supabase/i,'Public account UI must not name backend providers');
+assert.match(auth,/Secure account session/);
 
 assert.match(precompute,/const DAYS=7/);
 assert.match(precompute,/fixtureBoard\(date\)/);

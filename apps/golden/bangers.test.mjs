@@ -26,14 +26,26 @@ assert.equal(r.ranks.awayBand,'Bottom 2');
 r=evaluateBanger({home:strong,away:strong,over25Odd:1.56,positions:ranks(2,8)});
 assert.equal(r.qualified,false,'Odds above 1.55 must reject');
 
-r=evaluateBanger({home:{...strong,avgGA:1.8},away:strong,over25Odd:1.40,positions:ranks(2,8)});
-assert.equal(r.qualified,false,'Both teams must leak at least 1.90');
+r=evaluateBanger({
+  home:{...strong,avgGA:1.4,avgGF:2.1},
+  away:{...strong,avgGA:2.0,avgGF:1.4},
+  over25Odd:1.40,
+  positions:ranks(2,8)
+});
+assert.equal(r.qualified,true,'The leak and scoring thresholds may be supplied by different teams');
+assert.equal(r.gates.oneLeak,true);
+assert.equal(r.gates.oneAttack,true);
+
+r=evaluateBanger({home:{...strong,avgGA:1.8},away:{...strong,avgGA:1.8},over25Odd:1.40,positions:ranks(2,8)});
+assert.equal(r.qualified,false,'At least one team must leak 1.90 or more');
+assert.equal(r.gates.oneLeak,false);
+
+r=evaluateBanger({home:{...strong,avgGF:1.8},away:{...strong,avgGF:1.8},over25Odd:1.40,positions:ranks(2,8)});
+assert.equal(r.qualified,false,'At least one team must score 1.90 or more');
+assert.equal(r.gates.oneAttack,false);
 
 r=evaluateBanger({home:{...strong,ppg:1.5},away:strong,over25Odd:1.40,positions:ranks(2,8)});
-assert.equal(r.qualified,false,'PPG must be strictly above 1.50');
-
-r=evaluateBanger({home:{...strong,avgGF:1.8},away:strong,over25Odd:1.40,positions:ranks(2,8)});
-assert.equal(r.qualified,false,'Both attacks must average at least 1.88');
+assert.equal(r.qualified,false,'PPG must be strictly above 1.50 for both teams');
 
 r=evaluateBanger({home:strong,away:strong,over25Odd:1.40,positions:{}});
 assert.equal(r.qualified,false,'Missing split ranks must hard-reject');

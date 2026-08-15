@@ -57,10 +57,12 @@ async function splitRanksForFixture(fixture){
 
 function passesStatAndOddsGates(home,away,odd){
   const o=Number(odd);
+  const oneLeak=Number(home?.avgGA)>=LIMITS.minLeakAvgGA||Number(away?.avgGA)>=LIMITS.minLeakAvgGA;
+  const oneAttack=Number(home?.avgGF)>=LIMITS.minAttackAvgGF||Number(away?.avgGF)>=LIMITS.minAttackAvgGF;
   return Number.isFinite(o)&&o>=LIMITS.over25OddMin&&o<=LIMITS.over25OddMax&&
-    Number(home?.avgGA)>=LIMITS.minLeakAvgGA&&Number(away?.avgGA)>=LIMITS.minLeakAvgGA&&
+    oneLeak&&
     Number(home?.ppg)>LIMITS.minPPGExclusive&&Number(away?.ppg)>LIMITS.minPPGExclusive&&
-    Number(home?.avgGF)>=LIMITS.minAttackAvgGF&&Number(away?.avgGF)>=LIMITS.minAttackAvgGF;
+    oneAttack;
 }
 
 export async function scanBangers(board){
@@ -87,9 +89,9 @@ export async function scanBangers(board){
 export const BANGER_RULES=Object.freeze({
   market:'Over 2.5',
   odds:'1.20–1.55 inclusive',
-  leak:'Both teams ≥1.90 conceded per relevant split match',
+  leak:'At least one team ≥1.90 conceded per relevant split match',
   ppg:'Both teams >1.50 PPG in relevant split',
-  attack:'Both teams ≥1.88 goals scored per relevant split match',
+  attack:'At least one team ≥1.90 goals scored per relevant split match',
   rank:'Reject if both are Top 5; require at least one Top 3 or Bottom 2 in the home/away split table',
   sample:'Exact last 5 home for home team + exact last 5 away for away team'
 });

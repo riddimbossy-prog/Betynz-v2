@@ -20,7 +20,7 @@
   const clearSession=()=>localStorage.removeItem(sessionKey);
 
   async function supabaseAuth(path,{method='POST',body=null,token=null}={}){
-    if(!configured)return {ok:false,status:503,data:null,message:'Supabase browser runtime is not configured.'};
+    if(!configured)return {ok:false,status:503,data:null,message:'Account service is temporarily unavailable.'};
     const headers={apikey:anonKey,'content-type':'application/json'};
     if(token)headers.authorization=`Bearer ${token}`;
     const response=await originalFetch(`${supabaseUrl}/auth/v1/${path.replace(/^\//,'')}`,{method,headers,...(body?{body:JSON.stringify(body)}:{})});
@@ -102,6 +102,4 @@
   const scan=root=>{if(root instanceof HTMLImageElement)rewriteCrest(root);root?.querySelectorAll?.('img').forEach(rewriteCrest);};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>scan(document),{once:true});else scan(document);
   new MutationObserver(records=>records.forEach(r=>r.addedNodes.forEach(scan))).observe(document.documentElement,{childList:true,subtree:true});
-
-  window.BETYNZ_BACKEND=configured?'GITHUB_PAGES_SUPABASE':'NODE_FALLBACK';
 })();
