@@ -109,7 +109,10 @@ Deno.serve(async req=>{
       if(!safeDate(from)||!safeDate(to))return respond({error:'INVALID_DATE'},400);
       return respond(await proof(from,to));
     }
-    if(path==='/fixtures'||path==='/golden-banker'){
+    // The browser board historically requests /api/golden, which runtime-client
+    // rewrites to /golden on this Edge Function. Keep /golden-banker as the
+    // canonical route while serving /golden as a backward-compatible alias.
+    if(path==='/fixtures'||path==='/golden-banker'||path==='/golden'){
       const date=url.searchParams.get('date')||utcDate();
       if(!safeDate(date))return respond({error:'INVALID_DATE'},400);
       const row=await boardForDate(date);
