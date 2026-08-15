@@ -1,7 +1,7 @@
 import { ENGINE,VERSION,snapshots,jobs,utcDate,isPast,outOfRange,eligible,isSrl,publicFixture,getApiFootballFastFixtureBoard,getApiFootballIntelligence,acquireJobLock,renewJobLock,releaseJobLock,loadFixtureStates,checkpointFixtureStates,checkpointBoard,supabaseConfigured,getApiFootballResults,getPredictionLedger,upsertPredictionLedger,apiFootballConfigured,apiFootballRateState,persistenceCoreEnabled,getApiFootballFixtureCounts,getApiFootballLiveBoard } from './runtimeConfig.mjs';
 import { analyseFixture,waiting,makeBoard,persistTop,hydrate,hasExactEvidence,upgradeAnalysisForCurrentRules } from './runtimeBoard.mjs';
 
-const ANALYSIS_LOCK_REVISION='trust-proof-v1';
+const ANALYSIS_LOCK_REVISION='golden-consistency-v2';
 const configuredLease=Number(process.env.GOLDEN_BANKER_DATE_LOCK_SECONDS||900);
 const ANALYSIS_LOCK_LEASE_SECONDS=Math.min(1800,Math.max(300,Number.isFinite(configuredLease)?configuredLease:900));
 const ANALYSIS_LOCK_RENEW_MS=240000;
@@ -52,7 +52,7 @@ async function analyseDate(date,{force=false}={}){
           try{
             const intel=await getApiFootballIntelligence({date,beforeDate:date,sourceEventId:f.sourceId||f.id,kickoff:f.kickoff,homeName:f.home?.name,awayName:f.away?.name,league:f.league?.name,country:f.league?.country},f,{mode:'engine'});
             const analysis=analyseFixture(f,intel),item={fixture:publicFixture(f),analysis};items.push(item);processed++;
-            await checkpointFixtureStates([{fixture_date:date,fixture_id:id,source_fixture_id:String(f.sourceId||f.id),kickoff:f.kickoff||null,analysis_ready:true,state:'COMPLETE',stage:'GOLDEN_BANKER',attempts:1,payload:item,completed_at:new Date().toISOString()}]);
+            await checkpointFixtureStates([{fixture_date:date,fixture_id:id,source_fixture_id:String(f.sourceId||f.id),kickoff:f.kickoff||null,analysis_ready:true,state:'COMPLETE',stage:'GOLDEN_BANKER_V2',attempts:1,payload:item,completed_at:new Date().toISOString()}]);
           }catch(e){
             const msg=e?.message||'Split-form data unavailable.',item={fixture:publicFixture(f),analysis:waiting(f,msg)};warning=warning||msg;items.push(item);processed++;
             await checkpointFixtureStates([{fixture_date:date,fixture_id:id,source_fixture_id:String(f.sourceId||f.id),kickoff:f.kickoff||null,analysis_ready:false,state:e?.code==='SPLIT_SAMPLE_INCOMPLETE'?'WAITING_SPLIT_SAMPLE':'RETRYABLE',stage:'GOLDEN_BANKER_WAITING',attempts:1,last_error:msg,payload:item}]);
