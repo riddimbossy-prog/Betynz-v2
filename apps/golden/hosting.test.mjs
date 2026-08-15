@@ -33,6 +33,7 @@ assert.match(supabaseWorkflow,/functions deploy betynz-api/);
 assert.match(supabaseWorkflow,/SUPABASE_PROJECT_REF/);
 assert.match(supabaseWorkflow,/API_FOOTBALL_KEY/);
 
+assert.match(worker,/push:/);
 assert.match(worker,/cron:/);
 assert.match(worker,/apps\/golden\/precompute\.mjs/);
 assert.match(worker,/SUPABASE_SERVICE_ROLE_KEY/);
@@ -44,6 +45,8 @@ assert.match(edge,/prediction_ledger/);
 assert.match(edge,/API_FOOTBALL_KEY/);
 assert.match(edge,/\/media\/team/);
 assert.match(edge,/SUPABASE_SERVICE_ROLE_KEY/);
+assert.match(edge,/path==='\/golden'/,'Supabase production API must support the browser Golden-board alias');
+assert.match(edge,/path==='\/golden-banker'/,'Canonical Golden Banker API route must remain available');
 
 assert.match(client,/GITHUB_PAGES_SUPABASE/);
 assert.match(client,/functions\/v1/);
@@ -66,5 +69,7 @@ assert.match(precompute,/const DAYS=7/);
 assert.match(precompute,/fixtureBoard\(date\)/);
 assert.match(precompute,/goldenBoard\(date\)/);
 assert.match(precompute,/settleDate\(date\)/);
+assert.match(precompute,/workerKeepAlive/,'One-shot worker must keep Node alive while the API queue waits');
+assert.match(precompute,/clearInterval\(workerKeepAlive\)/,'Worker keepalive must be released after a successful run');
 
 console.log('GitHub Pages + Supabase-only production architecture tests passed');
