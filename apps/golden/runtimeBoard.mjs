@@ -36,13 +36,35 @@ function evidenceRows(rows,side){
   });
 }
 
+function splitRowsFromEvidence(rows){
+  return (rows||[]).map(r=>({gf:Number(r?.gf),ga:Number(r?.ga)}));
+}
+
 export function hasExactEvidence(analysis){
   if(!analysis||analysis.waiting)return true;
   return analysis?.evidence?.homeLast5?.length===5&&analysis?.evidence?.awayLast5?.length===5;
 }
 
+function recomputeFromEvidence(analysis,fixture=null){
+  if(!analysis||analysis.waiting)return analysis;
+  const homeEvidence=analysis?.evidence?.homeLast5||[],awayEvidence=analysis?.evidence?.awayLast5||[];
+  if(homeEvidence.length!==5||awayEvidence.length!==5)return applyLowWinUnder35ToAnalysis(analysis);
+  const rebuilt=analyseMatch({
+    id:analysis.id??fixture?.id,
+    league:analysis.league??fixture?.league?.name??'Unknown League',
+    homeTeam:analysis.homeTeam??fixture?.home?.name??'',
+    awayTeam:analysis.awayTeam??fixture?.away?.name??'',
+    homeLast5:splitRowsFromEvidence(homeEvidence),
+    awayLast5:splitRowsFromEvidence(awayEvidence),
+    homeFormPosition:analysis?.split?.positions?.home,
+    awayFormPosition:analysis?.split?.positions?.away,
+    formTableSize:analysis?.split?.positions?.tableSize,
+  });
+  return {...analysis,...rebuilt,evidence:analysis.evidence,recalculatedAt:new Date().toISOString(),rulesRevision:'golden-consistency-v2'};
+}
+
 export function upgradeAnalysisForCurrentRules(analysis,fixture=null){
-  const upgraded=applyLowWinUnder35ToAnalysis(analysis);
+  const upgraded=recomputeFromEvidence(analysis,fixture);
   return fixture?applyTrustLayer(fixture,upgraded):upgraded;
 }
 
@@ -61,7 +83,8 @@ export function analyseFixture(f,intel){
     evidence:{
       homeLast5:evidenceRows(homeHistory,'home'),
       awayLast5:evidenceRows(awayHistory,'away')
-    }
+    },
+    rulesRevision:'golden-consistency-v2'
   };
   return applyTrustLayer(publicFixture(f),withEvidence);
 }
@@ -89,17 +112,19 @@ export function makeBoard(date,board,items,{complete=false,processed=0,total=ite
   const analyses=normalizedItems.map(x=>x.analysis).filter(Boolean);
   const topBankers=topRowsFromItems(normalizedItems);
   const blocked=analyses.filter(a=>a?.trust?.blocked).length;
-  return{engine:'Golden Banker v4.3',engineCode:ENGINE,version:VERSION,date,rules:{sampleSize:5,maxBankers:4,bankerMinScore:7,dnbMinPPG:2,straightWinMinPPG:2.3,opponentPPG:'<1.0',defensiveBleed:'>2.30',lowWinUnder35:'both split win rates <20% AND both split PPG <1.00 => forced Under 3.5',zeusSupervisor:'reject conflicted or unsafe banker routes before publication'},fixtures:(board?.fixtures||[]).filter(f=>!isSrl(f)).map(publicFixture),all:normalizedItems,topBankers,summary:{fixtures:(board?.fixtures||[]).filter(f=>!isSrl(f)).length,eligible:total,analysed:analyses.filter(a=>!a.waiting).length,waiting:analyses.filter(a=>a.waiting).length,bankersFound:topBankers.length,zeusBlocked:blocked},progress:{processed,total,percent:total?Math.round(processed/total*100):100,restored},complete,warning:warning||board?.warning||null,generatedAt:new Date().toISOString()}}
-const fingerprint=(date,f,a)=>createHash('sha256').update([ENGINE,date,f?.id,marketCode(a),a?.finalRecommendation?.primaryBet,a?.finalRecommendation?.score].join('|')).digest('hex');
+  return{engine:'Golden Banker v4.3',engineCode:ENGINE,version:VERSION,date,rules:{sampleSize:5,maxBankers:4,bankerMinScore:7,dnbMinPPG:2,straightWinMinPPG:2.3,opponentPPG:'<1.0',defensiveBleed:'>2.30',under35:'low-win + low-PPG is only an entry gate; both O2.5 rates must be <=40% and both goal environments <=3.00',btts:'both exact split BTTS rates >=80%, both score rates >=80%, both concede rates >=80%',over25:'both exact split O2.5 rates >=60%',zeusSupervisor:'reject conflicted, bottom-three favourite, or unsafe banker routes before publication'},fixtures:(board?.fixtures||[]).filter(f=>!isSrl(f)).map(publicFixture),all:normalizedItems,topBankers,summary:{fixtures:(board?.fixtures||[]).filter(f=>!isSrl(f)).length,eligible:total,analysed:analyses.filter(a=>!a.waiting).length,waiting:analyses.filter(a=>a.waiting).length,bankersFound:topBankers.length,zeusBlocked:blocked},progress:{processed,total,percent:total?Math.round(processed/total*100):100,restored},complete,warning:warning||board?.warning||null,generatedAt:new Date().toISOString()}}
+const fingerprint=(date,f,a)=>createHash('sha256').update([ENGINE,'golden-consistency-v2',date,f?.id,marketCode(a),a?.finalRecommendation?.primaryBet,a?.finalRecommendation?.score].join('|')).digest('hex');
 function pickOdd(f,m){const o=f?.odds||{};if(m==='HOME_WIN')return Number(o.homeWin)||null;if(m==='AWAY_WIN')return Number(o.awayWin)||null;if(m==='OVER_2_5')return Number(o.over25)||null;if(m==='BTTS_YES')return Number(o.bttsYes)||null;return null}
 function reasons(a){const m=marketCode(a);const base=m==='UNDER_3_5'?a?.markets?.under35?.reasons||[]:m==='OVER_2_5'?a?.markets?.over25?.reasons||[]:m==='BTTS_YES'?a?.markets?.btts?.reasons||[]:/WIN|DNB/.test(m)?a?.markets?.winDnb?.reasons||[]:[];return [...base,...(a?.trust?.warnings||[])].slice(0,8)}
-export async function persistTop(date,rows){if(!supabaseConfigured()||!rows.length)return;await upsertPredictionLedger(rows.map(({fixture,analysis})=>({fixture_id:String(fixture.id),fixture_date:date,kickoff:fixture.kickoff||null,country:fixture?.league?.country||null,league_name:fixture?.league?.name||null,home_team:fixture?.home?.name||analysis.homeTeam,away_team:fixture?.away?.name||analysis.awayTeam,engine:ENGINE,market:marketCode(analysis),selection_label:analysis.finalRecommendation.primaryBet,odds:pickOdd(fixture,marketCode(analysis)),engine_score:Number(analysis.finalRecommendation.score||0),grade:Number(analysis.finalRecommendation.score||0)>=8.5?'A+':'A',decision:'BANKER',reasons:reasons(analysis),odds_snapshot:fixture.odds||{},payload:{analysis,engineVersion:'4.3.0',trust:analysis.trust,zeus:analysis.zeus,lockedAt:new Date().toISOString()},fingerprint:fingerprint(date,fixture,analysis),settlement_status:'PENDING'})))}
+export async function persistTop(date,rows){if(!supabaseConfigured()||!rows.length)return;await upsertPredictionLedger(rows.map(({fixture,analysis})=>({fixture_id:String(fixture.id),fixture_date:date,kickoff:fixture.kickoff||null,country:fixture?.league?.country||null,league_name:fixture?.league?.name||null,home_team:fixture?.home?.name||analysis.homeTeam,away_team:fixture?.away?.name||analysis.awayTeam,engine:ENGINE,market:marketCode(analysis),selection_label:analysis.finalRecommendation.primaryBet,odds:pickOdd(fixture,marketCode(analysis)),engine_score:Number(analysis.finalRecommendation.score||0),grade:Number(analysis.finalRecommendation.score||0)>=8.5?'A+':'A',decision:'BANKER',reasons:reasons(analysis),odds_snapshot:fixture.odds||{},payload:{analysis,engineVersion:'4.3.1',rulesRevision:'golden-consistency-v2',trust:analysis.trust,zeus:analysis.zeus,lockedAt:new Date().toISOString()},fingerprint:fingerprint(date,fixture,analysis),settlement_status:'PENDING'})))}
 
 function hydrateBoard(payload){
   const all=normalizeItems(Array.isArray(payload?.all)?payload.all:[]);
   const topBankers=topRowsFromItems(all);
   return {
     ...payload,
+    version:VERSION,
+    rulesRevision:'golden-consistency-v2',
     fixtures:Array.isArray(payload?.fixtures)?payload.fixtures.map(publicFixture):[],
     all,
     topBankers,
