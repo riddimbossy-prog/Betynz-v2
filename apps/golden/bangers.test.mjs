@@ -3,51 +3,51 @@ import { createRequire } from 'node:module';
 const require=createRequire(import.meta.url);
 const {evaluateBanger}=require('./goldenBangers.cjs');
 
-const strong={ppg:1.6,avgGF:2.0,avgGA:2.0};
-const ranks=(home,away,size=18)=>({home,away,homeTableSize:size,awayTableSize:size});
+const home={matchesPlayed:12,over25Rate:.75,homeOver25Rate:.75,avgGF:1.9,avgGA:1.6,last6Overs:4};
+const away={matchesPlayed:12,over25Rate:.70,awayOver25Rate:.70,avgGF:1.8,avgGA:1.6,last6Overs:4};
+const league={matchesPlayed:120,over25Rate:.60};
 
-let r=evaluateBanger({home:strong,away:strong,over25Odd:1.40,positions:ranks(2,8)});
-assert.equal(r.qualified,true,'Top 3 vs non-Top-5 should qualify when all remaining gates pass');
+let r=evaluateBanger({home,away,league});
+assert.equal(r.qualified,true,'A mature match clearing every statistical gate should qualify');
 assert.equal(r.score,10);
-assert.equal(r.ranks.homeBand,'Top 3');
+assert.equal(r.xg.available,false,'xG is optional when reliable data is unavailable');
+assert.equal(r.gates.xgEnvironment,true);
 
-r=evaluateBanger({home:strong,away:strong,over25Odd:1.40,positions:ranks(2,4)});
-assert.equal(r.qualified,false,'Both teams being Top 5 must reject the Banger');
-assert.equal(r.gates.notBothTopFive,false);
+r=evaluateBanger({home:{...home,over25Rate:.82},away:{...away,over25Rate:.66},league});
+assert.equal(r.qualified,true,'80% + 65% season route should qualify');
 
-r=evaluateBanger({home:strong,away:strong,over25Odd:1.40,positions:ranks(6,8)});
-assert.equal(r.qualified,true,'No Top 3 or Bottom 2 position is required anymore');
-assert.equal('extremeRank' in r.gates,false,'Removed extreme-rank gate must not return');
+r=evaluateBanger({home:{...home,homeOver25Rate:.71},away,league});
+assert.equal(r.qualified,false,'Home venue rate below 72% must fail');
+assert.equal(r.gates.homeVenueOver,false);
 
-r=evaluateBanger({home:strong,away:strong,over25Odd:1.55,positions:ranks(9,17)});
-assert.equal(r.qualified,true,'1.55 is inside the inclusive odds window when all remaining gates pass');
-assert.equal(r.ranks.awayBand,'Bottom 2');
+r=evaluateBanger({home,away:{...away,awayOver25Rate:.67},league});
+assert.equal(r.qualified,false,'Away venue rate below 68% must fail');
+assert.equal(r.gates.awayVenueOver,false);
 
-r=evaluateBanger({home:strong,away:strong,over25Odd:1.56,positions:ranks(2,8)});
-assert.equal(r.qualified,false,'Odds above 1.55 must reject');
+r=evaluateBanger({home:{...home,avgGF:1.5,avgGA:1.5},away:{...away,avgGF:1.5,avgGA:1.5},league});
+assert.equal(r.qualified,false,'Combined GF+GA environment below 3.40 must fail');
+assert.equal(r.gates.combinedAverageGoals,false);
 
-r=evaluateBanger({
-  home:{...strong,avgGA:1.4,avgGF:2.1},
-  away:{...strong,avgGA:2.0,avgGF:1.4},
-  over25Odd:1.40,
-  positions:ranks(6,8)
-});
-assert.equal(r.qualified,true,'The leak and scoring thresholds may be supplied by different teams');
-assert.equal(r.gates.oneLeak,true);
-assert.equal(r.gates.oneAttack,true);
+r=evaluateBanger({home,away,league,xgCombined:3.09});
+assert.equal(r.qualified,false,'Available xG+xGA below 3.10 must fail');
+assert.equal(r.gates.xgEnvironment,false);
 
-r=evaluateBanger({home:{...strong,avgGA:1.8},away:{...strong,avgGA:1.8},over25Odd:1.40,positions:ranks(6,8)});
-assert.equal(r.qualified,false,'At least one team must leak 1.90 or more');
-assert.equal(r.gates.oneLeak,false);
+r=evaluateBanger({home,away,league,xgCombined:3.10});
+assert.equal(r.qualified,true,'Available xG+xGA at 3.10 should pass');
 
-r=evaluateBanger({home:{...strong,avgGF:1.8},away:{...strong,avgGF:1.8},over25Odd:1.40,positions:ranks(6,8)});
-assert.equal(r.qualified,false,'At least one team must score 1.90 or more');
-assert.equal(r.gates.oneAttack,false);
+r=evaluateBanger({home:{...home,last6Overs:5},away:{...away,last6Overs:2},league});
+assert.equal(r.qualified,true,'Five or more recent high-scoring matches for either team activates the stated recent-form alternative');
 
-r=evaluateBanger({home:{...strong,ppg:1.5},away:strong,over25Odd:1.40,positions:ranks(6,8)});
-assert.equal(r.qualified,false,'PPG must be strictly above 1.50 for both teams');
+r=evaluateBanger({home:{...home,last6Overs:3},away:{...away,last6Overs:3},league});
+assert.equal(r.qualified,false,'Recent-form gate fails when neither team reaches four and neither reaches five');
+assert.equal(r.gates.recentOvers,false);
 
-r=evaluateBanger({home:strong,away:strong,over25Odd:1.40,positions:{}});
-assert.equal(r.qualified,false,'Missing split ranks must hard-reject because the both-Top-5 guard cannot be verified');
+r=evaluateBanger({home,away,league:{...league,over25Rate:.55}});
+assert.equal(r.qualified,false,'League rate below 56% must fail');
+assert.equal(r.gates.leagueOver,false);
 
-console.log('Bangers strict Over 2.5 gate tests passed');
+r=evaluateBanger({home:{...home,matchesPlayed:9},away,league});
+assert.equal(r.qualified,false,'Both teams need at least 10 completed league matches');
+assert.equal(r.gates.matureSample,false);
+
+console.log('Bangers high-scoring season profile tests passed');
