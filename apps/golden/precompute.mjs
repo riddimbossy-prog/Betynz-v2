@@ -2,6 +2,7 @@ import { utcDate, fixtureBoard, goldenBoard } from './runtime.mjs';
 import { settleDate } from './runtimeJobs.mjs';
 import { ENGINE,snapshots,checkpointBoard,getApiFootballFastFixtureBoard } from './runtimeConfig.mjs';
 import { scanBangers,BANGER_RULES } from './bangersScan.mjs';
+import { scanGG,GG_RULES } from './ggScan.mjs';
 
 const DAYS=7;
 const POLL_MS=Math.max(2000,Number(process.env.PRECOMPUTE_POLL_MS||5000));
@@ -19,7 +20,7 @@ function ensureBudget(){
   if(Date.now()-started>MAX_RUN_MS)throw new Error(`Precompute time budget exceeded after ${Math.round((Date.now()-started)/60000)} minutes.`);
 }
 
-async function attachBangers(date,board){
+async function withFreshFixtures(board,date){
   let scanBoard=board;
   try{
     const fresh=await getApiFootballFastFixtureBoard(date);
@@ -32,7 +33,25 @@ async function attachBangers(date,board){
       };
     }
   }catch{}
+  return scanBoard;
+}
 
+async function persistAugmented(date,augmented){
+  snapshots.set(date,augmented);
+  await checkpointBoard({
+    boardKey:ENGINE,
+    date,
+    complete:Boolean(augmented.complete),
+    processed:Number(augmented?.progress?.processed||0),
+    total:Number(augmented?.progress?.total||0),
+    payload:augmented,
+    generatedAt:augmented.generatedAt||new Date().toISOString()
+  });
+  return augmented;
+}
+
+async function attachBangers(date,board){
+  const scanBoard=await withFreshFixtures(board,date);
   try{
     const bangers=await scanBangers(scanBoard);
     const augmented={
@@ -45,24 +64,39 @@ async function attachBangers(date,board){
       summary:{...(scanBoard?.summary||{}),bangersFound:bangers.length},
       generatedAt:new Date().toISOString()
     };
-    snapshots.set(date,augmented);
-    await checkpointBoard({
-      boardKey:ENGINE,
-      date,
-      complete:Boolean(augmented.complete),
-      processed:Number(augmented?.progress?.processed||0),
-      total:Number(augmented?.progress?.total||0),
-      payload:augmented,
-      generatedAt:augmented.generatedAt
-    });
+    await persistAugmented(date,augmented);
     console.log(`[bangers] ${date}: ${bangers.length} high-scoring profile match${bangers.length===1?'':'es'}`);
     return augmented;
   }catch(error){
     const warning=String(error?.message||error||'Bangers profile scan failed');
     const augmented={...scanBoard,bangers:[],bangersReady:false,bangersWarning:warning,bangerRules:BANGER_RULES};
-    snapshots.set(date,augmented);
-    await checkpointBoard({boardKey:ENGINE,date,complete:Boolean(augmented.complete),processed:Number(augmented?.progress?.processed||0),total:Number(augmented?.progress?.total||0),payload:augmented,generatedAt:augmented.generatedAt||new Date().toISOString()}).catch(()=>null);
+    await persistAugmented(date,augmented).catch(()=>null);
     console.warn(`[bangers] ${date}: ${warning}`);
+    return augmented;
+  }
+}
+
+async function attachGG(date,board){
+  try{
+    const ggProfiles=await scanGG(board);
+    const augmented={
+      ...board,
+      ggProfiles,
+      ggReady:true,
+      ggWarning:null,
+      ggGeneratedAt:new Date().toISOString(),
+      ggRules:GG_RULES,
+      summary:{...(board?.summary||{}),ggProfilesFound:ggProfiles.length},
+      generatedAt:new Date().toISOString()
+    };
+    await persistAugmented(date,augmented);
+    console.log(`[gg] ${date}: ${ggProfiles.length} GG / BTTS profile match${ggProfiles.length===1?'':'es'}`);
+    return augmented;
+  }catch(error){
+    const warning=String(error?.message||error||'GG / BTTS profile scan failed');
+    const augmented={...board,ggProfiles:[],ggReady:false,ggWarning:warning,ggRules:GG_RULES};
+    await persistAugmented(date,augmented).catch(()=>null);
+    console.warn(`[gg] ${date}: ${warning}`);
     return augmented;
   }
 }
@@ -82,7 +116,7 @@ for(let n=0;n<DAYS;n++){
 }
 
 // Run the production Golden engine one date at a time, then attach the
-// season-level Bangers high-scoring profile to the same persisted board payload.
+// season-level Bangers and GG / BTTS statistical profiles to the persisted board.
 for(let n=0;n<DAYS;n++){
   ensureBudget();
   const date=utcDate(n);
@@ -93,7 +127,11 @@ for(let n=0;n<DAYS;n++){
     const p=board?.progress||{};
     const state=`${Number(p.processed||0)}/${Number(p.total||0)}`;
     if(state!==last){console.log(`[analyse] ${date}: ${state}${board?.complete?' complete':''}`);last=state;}
-    if(board?.complete){await attachBangers(date,board);break;}
+    if(board?.complete){
+      const withBangers=await attachBangers(date,board);
+      await attachGG(date,withBangers);
+      break;
+    }
     await sleep(POLL_MS);
   }
 }
