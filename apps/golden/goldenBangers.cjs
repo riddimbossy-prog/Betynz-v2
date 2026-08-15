@@ -1,88 +1,87 @@
 "use strict";
 
 const LIMITS=Object.freeze({
-  over25OddMin:1.20,
-  over25OddMax:1.55,
-  minLeakAvgGA:1.90,
-  minPPGExclusive:1.50,
-  minAttackAvgGF:1.90,
-  topBand:3,
-  topFive:5,
-  bottomBand:2,
+  seasonOverBoth:0.70,
+  seasonOverElite:0.80,
+  seasonOverPartner:0.65,
+  homeVenueOver:0.72,
+  awayVenueOver:0.68,
+  combinedAverageGoals:3.40,
+  combinedXgEnvironment:3.10,
+  recentOversEach:4,
+  recentOversElite:5,
+  leagueOver25:0.56,
+  minSeasonMatches:10,
 });
 
 const n=v=>Number(v);
-const finite=v=>Number.isFinite(n(v));
-const r2=v=>Math.round((n(v)+Number.EPSILON)*100)/100;
+const finite=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(n(v));
+const r2=v=>finite(v)?Math.round((n(v)+Number.EPSILON)*100)/100:null;
+const pct=v=>finite(v)?`${Math.round(n(v)*100)}%`:'—';
 
-function validRank(position,size){
-  return finite(position)&&finite(size)&&n(position)>=1&&n(size)>=1&&n(position)<=n(size);
-}
-
-function splitBand(position,size){
-  if(!validRank(position,size))return'Unknown';
-  const p=n(position),s=n(size);
-  if(p<=LIMITS.topBand)return'Top 3';
-  if(p>=Math.max(1,s-LIMITS.bottomBand+1))return'Bottom 2';
-  if(p<=LIMITS.topFive)return'Top 5';
-  return'Middle';
-}
-
-function evaluateBanger({home,away,over25Odd,positions={}}={}){
-  const h=home||{},a=away||{},odd=n(over25Odd);
-  const hp=n(positions.home),ap=n(positions.away);
-  const hs=n(positions.homeTableSize??positions.tableSize),as=n(positions.awayTableSize??positions.tableSize);
-  const ranksAvailable=validRank(hp,hs)&&validRank(ap,as);
-  const homeBand=splitBand(hp,hs),awayBand=splitBand(ap,as);
-  const bothTopFive=ranksAvailable&&hp<=LIMITS.topFive&&ap<=LIMITS.topFive;
-  const signals={
-    homeLeak:finite(h.avgGA)&&n(h.avgGA)>=LIMITS.minLeakAvgGA,
-    awayLeak:finite(a.avgGA)&&n(a.avgGA)>=LIMITS.minLeakAvgGA,
-    homeAttack:finite(h.avgGF)&&n(h.avgGF)>=LIMITS.minAttackAvgGF,
-    awayAttack:finite(a.avgGF)&&n(a.avgGF)>=LIMITS.minAttackAvgGF,
-  };
+function evaluateBanger({home,away,league,xgCombined=null}={}){
+  const h=home||{},a=away||{},l=league||{};
+  const seasonRoute=(finite(h.over25Rate)&&finite(a.over25Rate))&&(
+    (n(h.over25Rate)>=LIMITS.seasonOverBoth&&n(a.over25Rate)>=LIMITS.seasonOverBoth)||
+    (n(h.over25Rate)>=LIMITS.seasonOverElite&&n(a.over25Rate)>=LIMITS.seasonOverPartner)||
+    (n(a.over25Rate)>=LIMITS.seasonOverElite&&n(h.over25Rate)>=LIMITS.seasonOverPartner)
+  );
+  const combinedAverageGoals=[h.avgGF,h.avgGA,a.avgGF,a.avgGA].every(finite)
+    ?(n(h.avgGF)+n(h.avgGA)+n(a.avgGF)+n(a.avgGA))/2
+    :null;
+  const xgAvailable=finite(xgCombined);
+  const recentHome=finite(h.last6Overs)?n(h.last6Overs):null;
+  const recentAway=finite(a.last6Overs)?n(a.last6Overs):null;
+  const recentRoute=finite(recentHome)&&finite(recentAway)&&(
+    (recentHome>=LIMITS.recentOversEach&&recentAway>=LIMITS.recentOversEach)||
+    recentHome>=LIMITS.recentOversElite||recentAway>=LIMITS.recentOversElite
+  );
 
   const gates={
-    odds:finite(odd)&&odd>=LIMITS.over25OddMin&&odd<=LIMITS.over25OddMax,
-    oneLeak:signals.homeLeak||signals.awayLeak,
-    homePPG:finite(h.ppg)&&n(h.ppg)>LIMITS.minPPGExclusive,
-    awayPPG:finite(a.ppg)&&n(a.ppg)>LIMITS.minPPGExclusive,
-    oneAttack:signals.homeAttack||signals.awayAttack,
-    splitRanks:ranksAvailable,
-    notBothTopFive:ranksAvailable&&!bothTopFive,
+    seasonOver:seasonRoute,
+    homeVenueOver:finite(h.homeOver25Rate)&&n(h.homeOver25Rate)>=LIMITS.homeVenueOver,
+    awayVenueOver:finite(a.awayOver25Rate)&&n(a.awayOver25Rate)>=LIMITS.awayVenueOver,
+    combinedAverageGoals:finite(combinedAverageGoals)&&combinedAverageGoals>=LIMITS.combinedAverageGoals,
+    xgEnvironment:xgAvailable?n(xgCombined)>=LIMITS.combinedXgEnvironment:true,
+    recentOvers:recentRoute,
+    leagueOver:finite(l.over25Rate)&&n(l.over25Rate)>=LIMITS.leagueOver25,
+    matureSample:finite(h.matchesPlayed)&&finite(a.matchesPlayed)&&n(h.matchesPlayed)>=LIMITS.minSeasonMatches&&n(a.matchesPlayed)>=LIMITS.minSeasonMatches,
   };
 
   const qualified=Object.values(gates).every(Boolean);
-  const passed=Object.values(gates).filter(Boolean).length;
-  const score=qualified?10:Math.round((passed/Object.keys(gates).length)*100)/10;
+  const scoredGateNames=Object.keys(gates).filter(k=>k!=='xgEnvironment'||xgAvailable);
+  const passed=scoredGateNames.filter(k=>gates[k]).length;
+  const score=qualified?10:Math.round((passed/scoredGateNames.length)*100)/10;
   const reasons=[];
   const failures=[];
 
-  if(gates.odds)reasons.push(`Over 2.5 odds ${odd.toFixed(2)} sit inside the 1.20–1.55 Banger window.`);else failures.push(`Over 2.5 odds must be 1.20–1.55; received ${finite(odd)?odd.toFixed(2):'unavailable'}.`);
-  if(gates.oneLeak)reasons.push(`At least one split defence leaks 1.90+ goals per match (${r2(h.avgGA)} home / ${r2(a.avgGA)} away).`);else failures.push(`At least one team must concede 1.90+ in the relevant split (${finite(h.avgGA)?r2(h.avgGA):'—'} / ${finite(a.avgGA)?r2(a.avgGA):'—'}).`);
-  if(gates.homePPG&&gates.awayPPG)reasons.push(`Both teams are above 1.50 split PPG (${r2(h.ppg)} / ${r2(a.ppg)}).`);else failures.push(`Each team must be above 1.50 split PPG (${finite(h.ppg)?r2(h.ppg):'—'} / ${finite(a.ppg)?r2(a.ppg):'—'}).`);
-  if(gates.oneAttack)reasons.push(`At least one attack averages 1.90+ goals in its relevant split (${r2(h.avgGF)} home / ${r2(a.avgGF)} away).`);else failures.push(`At least one team must score 1.90+ goals per relevant split match (${finite(h.avgGF)?r2(h.avgGF):'—'} / ${finite(a.avgGF)?r2(a.avgGF):'—'}).`);
-  if(!ranksAvailable)failures.push('Relevant home/away split-table ranks are unavailable, so the Banger cannot fire.');
-  else{
-    reasons.push(`Split ranks: home ${hp}/${hs} (${homeBand}), away ${ap}/${as} (${awayBand}).`);
-    if(bothTopFive)failures.push('Both teams are Top 5 in their relevant split tables, so the match is rejected as a top-vs-top trap.');
-    else reasons.push('The two teams are not both Top 5, avoiding the top-vs-top trap.');
-  }
+  if(gates.seasonOver)reasons.push(`Season high-scoring rates clear the profile (${pct(h.over25Rate)} / ${pct(a.over25Rate)}).`);else failures.push(`Season high-scoring rates need both teams at 70%+, or an 80%+ / 65%+ pairing (${pct(h.over25Rate)} / ${pct(a.over25Rate)}).`);
+  if(gates.homeVenueOver)reasons.push(`Home venue high-scoring rate is ${pct(h.homeOver25Rate)} (72%+ required).`);else failures.push(`Home venue high-scoring rate must be at least 72% (${pct(h.homeOver25Rate)}).`);
+  if(gates.awayVenueOver)reasons.push(`Away venue high-scoring rate is ${pct(a.awayOver25Rate)} (68%+ required).`);else failures.push(`Away venue high-scoring rate must be at least 68% (${pct(a.awayOver25Rate)}).`);
+  if(gates.combinedAverageGoals)reasons.push(`Combined average goal environment is ${r2(combinedAverageGoals)} (3.40+ required).`);else failures.push(`Combined average goal environment must be at least 3.40 (${finite(combinedAverageGoals)?r2(combinedAverageGoals):'—'}).`);
+  if(!xgAvailable)reasons.push('xG/xGA gate is not applied because reliable xG data is unavailable.');
+  else if(gates.xgEnvironment)reasons.push(`Combined xG/xGA environment is ${r2(xgCombined)} (3.10+ required).`);
+  else failures.push(`Combined xG/xGA environment must be at least 3.10 when available (${r2(xgCombined)}).`);
+  if(gates.recentOvers)reasons.push(`Recent six-game high-scoring counts clear the profile (${recentHome}/6 / ${recentAway}/6).`);else failures.push(`Recent six-game profile needs 4+ for both teams, or 5+ for either team (${recentHome??'—'}/6 / ${recentAway??'—'}/6).`);
+  if(gates.leagueOver)reasons.push(`League high-scoring rate is ${pct(l.over25Rate)} (56%+ required).`);else failures.push(`League high-scoring rate must be at least 56% (${pct(l.over25Rate)}).`);
+  if(gates.matureSample)reasons.push(`Both teams have at least 10 completed league matches (${h.matchesPlayed} / ${a.matchesPlayed}).`);else failures.push(`Both teams need at least 10 completed league matches (${finite(h.matchesPlayed)?h.matchesPlayed:'—'} / ${finite(a.matchesPlayed)?a.matchesPlayed:'—'}).`);
 
   return{
-    market:'Bangers · Over 2.5',
-    bet:'Over 2.5',
+    market:'High-Scoring Match Profile',
     qualified,
     score,
-    odds:finite(odd)?r2(odd):null,
     limits:LIMITS,
     gates,
-    signals,
-    ranks:{home:validRank(hp,hs)?hp:null,away:validRank(ap,as)?ap:null,homeTableSize:finite(hs)?hs:null,awayTableSize:finite(as)?as:null,homeBand,awayBand,bothTopFive},
-    stats:{home:{ppg:finite(h.ppg)?r2(h.ppg):null,avgGF:finite(h.avgGF)?r2(h.avgGF):null,avgGA:finite(h.avgGA)?r2(h.avgGA):null},away:{ppg:finite(a.ppg)?r2(a.ppg):null,avgGF:finite(a.avgGF)?r2(a.avgGF):null,avgGA:finite(a.avgGA)?r2(a.avgGA):null}},
+    xg:{available:xgAvailable,combined:xgAvailable?r2(xgCombined):null},
+    stats:{
+      home:{matchesPlayed:finite(h.matchesPlayed)?n(h.matchesPlayed):null,over25Rate:finite(h.over25Rate)?n(h.over25Rate):null,homeOver25Rate:finite(h.homeOver25Rate)?n(h.homeOver25Rate):null,avgGF:r2(h.avgGF),avgGA:r2(h.avgGA),last6Overs:finite(h.last6Overs)?n(h.last6Overs):null},
+      away:{matchesPlayed:finite(a.matchesPlayed)?n(a.matchesPlayed):null,over25Rate:finite(a.over25Rate)?n(a.over25Rate):null,awayOver25Rate:finite(a.awayOver25Rate)?n(a.awayOver25Rate):null,avgGF:r2(a.avgGF),avgGA:r2(a.avgGA),last6Overs:finite(a.last6Overs)?n(a.last6Overs):null},
+      league:{matchesPlayed:finite(l.matchesPlayed)?n(l.matchesPlayed):null,over25Rate:finite(l.over25Rate)?n(l.over25Rate):null},
+      combinedAverageGoals:r2(combinedAverageGoals),
+    },
     reasons,
     failures,
   };
 }
 
-module.exports={LIMITS,evaluateBanger,splitBand};
+module.exports={LIMITS,evaluateBanger};

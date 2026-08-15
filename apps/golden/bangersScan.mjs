@@ -1,97 +1,107 @@
 import { createRequire } from 'node:module';
 import { apiFootballRequest } from './runtimeConfig.mjs';
 const require=createRequire(import.meta.url);
-const {evaluateBanger,LIMITS}=require('./goldenBangers.cjs');
+const {evaluateBanger}=require('./goldenBangers.cjs');
 
 const HISTORY_TTL_SECONDS=43200;
 const completed=row=>['FT','AET','PEN'].includes(String(row?.fixture?.status?.short||'').toUpperCase());
 const ms=row=>{const value=Date.parse(row?.fixture?.date||'');return Number.isFinite(value)?value:0};
-const score=(gf,ga)=>gf>ga?3:gf===ga?1:0;
 const responseArray=body=>Array.isArray(body?.response)?body.response:[];
+const over25=(hg,ag)=>Number(hg)+Number(ag)>=3;
+const round2=v=>Math.round((Number(v)+Number.EPSILON)*100)/100;
 
-function tableEntry(teamId,teamName,matches){
-  const five=matches.sort((a,b)=>b.date-a.date).slice(0,5);
-  if(five.length!==5)return null;
-  const totals=five.reduce((acc,m)=>{acc.points+=m.points;acc.gf+=m.gf;acc.ga+=m.ga;return acc},{points:0,gf:0,ga:0});
-  return{teamId:String(teamId),teamName:teamName||'',points:totals.points,ppg:Math.round(totals.points/5*100)/100,gf:totals.gf,ga:totals.ga,gd:totals.gf-totals.ga};
+function completedBefore(rows,beforeMs){
+  return (rows||[]).filter(row=>{
+    if(!completed(row))return false;
+    const date=ms(row),hg=Number(row?.goals?.home),ag=Number(row?.goals?.away);
+    return Boolean(date&&date<beforeMs&&Number.isFinite(hg)&&Number.isFinite(ag));
+  });
 }
 
-function buildSplitTable(rows,side,beforeMs){
-  const byTeam=new Map();
-  for(const row of rows||[]){
-    if(!completed(row))continue;
-    const date=ms(row);if(!date||date>=beforeMs)continue;
-    const homeId=row?.teams?.home?.id,awayId=row?.teams?.away?.id;
-    const hg=Number(row?.goals?.home),ag=Number(row?.goals?.away);
-    if(!Number.isFinite(hg)||!Number.isFinite(ag))continue;
-    const id=side==='home'?homeId:awayId,name=side==='home'?row?.teams?.home?.name:row?.teams?.away?.name;
-    if(id==null)continue;
-    const gf=side==='home'?hg:ag,ga=side==='home'?ag:hg,key=String(id);
-    if(!byTeam.has(key))byTeam.set(key,{teamId:key,teamName:name||'',matches:[]});
-    byTeam.get(key).matches.push({date,gf,ga,points:score(gf,ga)});
+function teamSeasonProfile(rows,teamId){
+  const id=String(teamId);
+  const matches=[];
+  for(const row of rows){
+    const homeId=String(row?.teams?.home?.id??''),awayId=String(row?.teams?.away?.id??'');
+    if(homeId!==id&&awayId!==id)continue;
+    const isHome=homeId===id,hg=Number(row?.goals?.home),ag=Number(row?.goals?.away);
+    const gf=isHome?hg:ag,ga=isHome?ag:hg;
+    matches.push({date:ms(row),isHome,gf,ga,over:over25(hg,ag)});
   }
-  const table=[...byTeam.values()].map(x=>tableEntry(x.teamId,x.teamName,x.matches)).filter(Boolean);
-  table.sort((a,b)=>b.points-a.points||b.gd-a.gd||b.gf-a.gf||a.teamName.localeCompare(b.teamName));
-  return table.map((row,index)=>({...row,position:index+1,tableSize:table.length}));
+  matches.sort((a,b)=>a.date-b.date);
+  const played=matches.length;
+  const homeMatches=matches.filter(x=>x.isHome),awayMatches=matches.filter(x=>!x.isHome);
+  const last6=matches.slice(-6);
+  const sum=(list,key)=>list.reduce((acc,x)=>acc+Number(x[key]||0),0);
+  const rate=list=>list.length?list.filter(x=>x.over).length/list.length:null;
+  return{
+    matchesPlayed:played,
+    over25Rate:rate(matches),
+    homeOver25Rate:rate(homeMatches),
+    awayOver25Rate:rate(awayMatches),
+    avgGF:played?round2(sum(matches,'gf')/played):null,
+    avgGA:played?round2(sum(matches,'ga')/played):null,
+    last6Overs:last6.filter(x=>x.over).length,
+    last6Matches:last6.length,
+  };
 }
 
-export function calculateSplitTables(rows,beforeMs){
-  return{home:buildSplitTable(rows,'home',beforeMs),away:buildSplitTable(rows,'away',beforeMs)};
+function leagueProfile(rows){
+  return{
+    matchesPlayed:rows.length,
+    over25Rate:rows.length?rows.filter(row=>over25(row?.goals?.home,row?.goals?.away)).length/rows.length:null,
+  };
 }
 
-function findRank(table,teamId){
-  const row=(table||[]).find(x=>String(x.teamId)===String(teamId));
-  return row?{position:row.position,tableSize:row.tableSize,ppg:row.ppg,gf:row.gf,ga:row.ga,gd:row.gd}:null;
+export function calculateSeasonGoalProfile(rows,{homeId,awayId,beforeMs,xgCombined=null}={}){
+  const eligible=completedBefore(rows,beforeMs);
+  return{
+    home:teamSeasonProfile(eligible,homeId),
+    away:teamSeasonProfile(eligible,awayId),
+    league:leagueProfile(eligible),
+    xgCombined:Number.isFinite(Number(xgCombined))?Number(xgCombined):null,
+  };
 }
 
-async function splitRanksForFixture(fixture){
-  const leagueId=Number(fixture?.league?.id),season=Number(fixture?.league?.season),homeId=fixture?.home?.id,awayId=fixture?.away?.id;
-  const beforeMs=Date.parse(fixture?.kickoff||'');
-  if(!Number.isFinite(leagueId)||!Number.isFinite(season)||homeId==null||awayId==null||!Number.isFinite(beforeMs))return null;
-  const body=await apiFootballRequest('/fixtures',{league:leagueId,season,status:'FT',__priority:2},HISTORY_TTL_SECONDS);
-  const tables=calculateSplitTables(responseArray(body),beforeMs);
-  const home=findRank(tables.home,homeId),away=findRank(tables.away,awayId);
-  if(!home||!away)return null;
-  return{home:home.position,away:away.position,homeTableSize:home.tableSize,awayTableSize:away.tableSize,homeRow:home,awayRow:away};
-}
-
-function passesStatAndOddsGates(home,away,odd){
-  const o=Number(odd);
-  const oneLeak=Number(home?.avgGA)>=LIMITS.minLeakAvgGA||Number(away?.avgGA)>=LIMITS.minLeakAvgGA;
-  const oneAttack=Number(home?.avgGF)>=LIMITS.minAttackAvgGF||Number(away?.avgGF)>=LIMITS.minAttackAvgGF;
-  return Number.isFinite(o)&&o>=LIMITS.over25OddMin&&o<=LIMITS.over25OddMax&&
-    oneLeak&&
-    Number(home?.ppg)>LIMITS.minPPGExclusive&&Number(away?.ppg)>LIMITS.minPPGExclusive&&
-    oneAttack;
+async function leagueRowsForFixture(fixture,cache){
+  const leagueId=Number(fixture?.league?.id),season=Number(fixture?.league?.season);
+  if(!Number.isFinite(leagueId)||!Number.isFinite(season))return null;
+  const key=`${leagueId}:${season}`;
+  if(cache.has(key))return cache.get(key);
+  const promise=apiFootballRequest('/fixtures',{league:leagueId,season,status:'FT',__priority:2},HISTORY_TTL_SECONDS)
+    .then(body=>responseArray(body))
+    .catch(()=>null);
+  cache.set(key,promise);
+  return promise;
 }
 
 export async function scanBangers(board){
-  const items=Array.isArray(board?.all)?board.all:[];
-  const fixtures=new Map((board?.fixtures||[]).map(f=>[String(f?.id||''),f]));
+  const fixtures=Array.isArray(board?.fixtures)?board.fixtures:[];
+  const analysisById=new Map((board?.all||[]).map(x=>[String(x?.fixture?.id||x?.analysis?.id||''),x?.analysis]).filter(x=>x[0]));
+  const leagueCache=new Map();
   const output=[];
-  for(const item of items){
-    const analysis=item?.analysis;
-    if(!analysis||analysis.waiting)continue;
-    const fixture=fixtures.get(String(item?.fixture?.id||analysis?.id||''))||item?.fixture;
-    if(!fixture)continue;
-    const home=analysis?.split?.home,away=analysis?.split?.away,odd=fixture?.odds?.over25;
-    if(!passesStatAndOddsGates(home,away,odd))continue;
-    let positions=null;
-    try{positions=await splitRanksForFixture(fixture)}catch{}
-    const banger=evaluateBanger({home,away,over25Odd:odd,positions:positions||{}});
+  for(const fixture of fixtures){
+    const homeId=fixture?.home?.id,awayId=fixture?.away?.id,beforeMs=Date.parse(fixture?.kickoff||'');
+    if(homeId==null||awayId==null||!Number.isFinite(beforeMs))continue;
+    const rows=await leagueRowsForFixture(fixture,leagueCache);
+    if(!Array.isArray(rows))continue;
+    const profile=calculateSeasonGoalProfile(rows,{homeId,awayId,beforeMs});
+    const banger=evaluateBanger(profile);
     if(!banger.qualified)continue;
-    output.push({fixture,analysis,banger});
+    output.push({fixture,analysis:analysisById.get(String(fixture?.id||''))||null,banger});
   }
   output.sort((a,b)=>Date.parse(a?.fixture?.kickoff||'')-Date.parse(b?.fixture?.kickoff||''));
   return output;
 }
 
 export const BANGER_RULES=Object.freeze({
-  market:'Over 2.5',
-  odds:'1.20–1.55 inclusive',
-  leak:'At least one team ≥1.90 conceded per relevant split match',
-  ppg:'Both teams >1.50 PPG in relevant split',
-  attack:'At least one team ≥1.90 goals scored per relevant split match',
-  rank:'Reject only when both teams are Top 5 in their relevant home/away split tables',
-  sample:'Exact last 5 home for home team + exact last 5 away for away team'
+  profile:'High-Scoring Match Profile',
+  season:'Both teams 70%+ season high-scoring rate, or one 80%+ with the other 65%+',
+  homeVenue:'Home team home high-scoring rate 72%+',
+  awayVenue:'Away team away high-scoring rate 68%+',
+  goals:'Combined average GF+GA environment 3.40+',
+  xg:'Combined xG+xGA 3.10+ when reliable xG data is available',
+  recent:'Last 6: both teams 4+ high-scoring matches, or either team 5+',
+  league:'League high-scoring rate 56%+',
+  sample:'Both teams at least 10 completed league matches'
 });

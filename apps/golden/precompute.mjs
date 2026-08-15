@@ -55,10 +55,10 @@ async function attachBangers(date,board){
       payload:augmented,
       generatedAt:augmented.generatedAt
     });
-    console.log(`[bangers] ${date}: ${bangers.length} strict Over 2.5 qualifier${bangers.length===1?'':'s'}`);
+    console.log(`[bangers] ${date}: ${bangers.length} high-scoring profile match${bangers.length===1?'':'es'}`);
     return augmented;
   }catch(error){
-    const warning=String(error?.message||error||'Bangers scan failed');
+    const warning=String(error?.message||error||'Bangers profile scan failed');
     const augmented={...scanBoard,bangers:[],bangersReady:false,bangersWarning:warning,bangerRules:BANGER_RULES};
     snapshots.set(date,augmented);
     await checkpointBoard({boardKey:ENGINE,date,complete:Boolean(augmented.complete),processed:Number(augmented?.progress?.processed||0),total:Number(augmented?.progress?.total||0),payload:augmented,generatedAt:augmented.generatedAt||new Date().toISOString()}).catch(()=>null);
@@ -81,8 +81,8 @@ for(let n=0;n<DAYS;n++){
   }
 }
 
-// Run the production Golden Banker engine one date at a time, then attach the
-// strict Bangers scan to the same persisted board payload.
+// Run the production Golden engine one date at a time, then attach the
+// season-level Bangers high-scoring profile to the same persisted board payload.
 for(let n=0;n<DAYS;n++){
   ensureBudget();
   const date=utcDate(n);
