@@ -1,9 +1,9 @@
 import { loadLocalEnv } from '../web/src/lib/env.mjs';
-import { apiFootballConfigured,apiFootballRateState,getApiFootballFastFixtureBoard,getApiFootballFixtureCounts,getApiFootballIntelligence,getApiFootballLiveBoard,getApiFootballResults } from '../web/src/lib/apiFootball.mjs';
+import { apiFootballConfigured,apiFootballRateState,apiFootballRequest,getApiFootballFastFixtureBoard,getApiFootballFixtureCounts,getApiFootballIntelligence,getApiFootballLiveBoard,getApiFootballResults } from '../web/src/lib/apiFootball.mjs';
 import { persistenceCoreEnabled,acquireJobLock,renewJobLock,releaseJobLock,checkpointFixtureStates,loadFixtureStates,checkpointBoard,loadBoards } from '../web/src/lib/persistenceCore.mjs';
 import { supabaseConfigured,upsertPredictionLedger,getPredictionLedger } from '../web/src/lib/supabase.mjs';
 await loadLocalEnv();
-export {apiFootballConfigured,apiFootballRateState,getApiFootballFastFixtureBoard,getApiFootballFixtureCounts,getApiFootballIntelligence,getApiFootballLiveBoard,getApiFootballResults,persistenceCoreEnabled,acquireJobLock,renewJobLock,releaseJobLock,checkpointFixtureStates,loadFixtureStates,checkpointBoard,loadBoards,supabaseConfigured,upsertPredictionLedger,getPredictionLedger};
+export {apiFootballConfigured,apiFootballRateState,apiFootballRequest,getApiFootballFastFixtureBoard,getApiFootballFixtureCounts,getApiFootballIntelligence,getApiFootballLiveBoard,getApiFootballResults,persistenceCoreEnabled,acquireJobLock,renewJobLock,releaseJobLock,checkpointFixtureStates,loadFixtureStates,checkpointBoard,loadBoards,supabaseConfigured,upsertPredictionLedger,getPredictionLedger};
 export const VERSION='6.0.1',ENGINE='GOLDEN_BANKER_V4_3';
 export const snapshots=new Map(),jobs=new Map();
 const FINISHED=new Set(['FT','AET','PEN','FINISHED','ENDED','COMPLETED']),LIVE=new Set(['1H','HT','2H','ET','BT','P','LIVE','INT','INPLAY']);
