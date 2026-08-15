@@ -8,6 +8,12 @@ const POLL_MS=Math.max(2000,Number(process.env.PRECOMPUTE_POLL_MS||5000));
 const MAX_RUN_MS=Math.max(10*60*1000,Number(process.env.PRECOMPUTE_MAX_RUN_MS||5*60*60*1000));
 const started=Date.now();
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+// API-Football deliberately unrefs its internal queue timer so the long-running
+// web server can shut down cleanly. A one-shot GitHub Actions worker has no
+// server socket to keep Node alive, so a queued request can otherwise leave a
+// pending top-level await and Node exits with code 13. Keep one referenced
+// handle for the lifetime of this worker and clear it on successful completion.
+const workerKeepAlive=setInterval(()=>{},30000);
 
 function ensureBudget(){
   if(Date.now()-started>MAX_RUN_MS)throw new Error(`Precompute time budget exceeded after ${Math.round((Date.now()-started)/60000)} minutes.`);
@@ -98,4 +104,5 @@ for(const n of[-2,-1,0]){
   try{await settleDate(date);console.log(`[settle] ${date}: done`);}catch(error){console.warn(`[settle] ${date}: ${error?.message||error}`);}
 }
 
+clearInterval(workerKeepAlive);
 console.log(`Betynz precompute worker finished in ${Math.round((Date.now()-started)/1000)} seconds.`);
