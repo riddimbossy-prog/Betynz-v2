@@ -1,5 +1,6 @@
 "use strict";
 const {CONFIG,round1,round2,clamp,verdict}=require('./goldenCore.cjs');
+
 function scoreOver25(home, away) {
 let score = 0;
 const reasons = [];
@@ -7,12 +8,14 @@ const homeBleed = home.avgGA > CONFIG.defensiveBleedGAExclusive;
 const awayBleed = away.avgGA > CONFIG.defensiveBleedGAExclusive;
 const homeStrongAttack = home.avgGF >= CONFIG.strongAttackAvgGF;
 const awayStrongAttack = away.avgGF >= CONFIG.strongAttackAvgGF;
+const homeDirectional = home.over25Rate >= CONFIG.strongOver25Rate;
+const awayDirectional = away.over25Rate >= CONFIG.strongOver25Rate;
+const directionalConfirmed = homeDirectional && awayDirectional;
+
 if (homeBleed || awayBleed) {
 score += 2.4;
 const team = homeBleed && awayBleed ? "Both teams" : homeBleed ? "Home team" : "Away team";
-reasons.push(
-`${team} exceed the defensive-bleed line (>2.30 conceded per split match).`
-);
+reasons.push(`${team} exceed the defensive-bleed line (>2.30 conceded per split match).`);
 }
 if (homeBleed && awayBleed) {
 score += 1.6;
@@ -36,8 +39,7 @@ reasons.push(`Positive split O2.5 frequency (${Math.round(combinedOverRate * 100
 score -= 1.0;
 reasons.push("Recent split O2.5 frequency is weak.");
 }
-const projectedTotalSignal =
-(home.avgGF + home.avgGA + away.avgGF + away.avgGA) / 2;
+const projectedTotalSignal = (home.avgGF + home.avgGA + away.avgGF + away.avgGA) / 2;
 if (projectedTotalSignal >= 3.4) {
 score += 1.4;
 reasons.push(`High combined split goal environment (${round2(projectedTotalSignal)} goals signal).`);
@@ -49,24 +51,37 @@ if (home.avgGF < 0.6 && away.avgGF < 0.6) {
 score -= 2.0;
 reasons.push("Both attacks are producing too little in their relevant splits.");
 }
-score = round1(clamp(score));
+
+let hardCap = null;
+if (!directionalConfirmed) {
+hardCap = 6.9;
+reasons.push(`Golden Banker O2.5 requires BOTH split profiles at ${Math.round(CONFIG.strongOver25Rate*100)}%+ O2.5 (${Math.round(home.over25Rate*100)}% / ${Math.round(away.over25Rate*100)}%).`);
+}
+if (home.over25Rate < 0.40 || away.over25Rate < 0.40) {
+hardCap = Math.min(hardCap ?? 10, 5.9);
+reasons.push("One side is below 40% O2.5 in the exact split sample, so the high-goals route is rejected.");
+}
+score = clamp(score);
+if (hardCap !== null) score = Math.min(score, hardCap);
+score = round1(score);
 return {
 market: "Over 2.5 Goals",
 score,
 verdict: verdict(score),
-qualified: score >= CONFIG.bankerMinScore,
+qualified: directionalConfirmed && score >= CONFIG.bankerMinScore,
 reasons,
+directionalConfirmed,
 };
 }
+
 function scoreBTTS(home, away) {
 let score = 0;
 const reasons = [];
-const bothReliableScorers =
-home.scoreRate >= CONFIG.reliableScoreRate &&
-away.scoreRate >= CONFIG.reliableScoreRate;
-const bothRegularConceders =
-home.concedeRate >= CONFIG.regularConcedeRate &&
-away.concedeRate >= CONFIG.regularConcedeRate;
+const bothReliableScorers = home.scoreRate >= CONFIG.reliableScoreRate && away.scoreRate >= CONFIG.reliableScoreRate;
+const bothRegularConceders = home.concedeRate >= CONFIG.regularConcedeRate && away.concedeRate >= CONFIG.regularConcedeRate;
+const bothBttsStrong = home.bttsRate >= 0.80 && away.bttsRate >= 0.80;
+const directionalConfirmed = bothReliableScorers && bothRegularConceders && bothBttsStrong;
+
 if (bothReliableScorers) {
 score += 3.0;
 reasons.push("Both teams scored in at least 80% of their relevant split matches.");
@@ -99,33 +114,29 @@ reasons.push(`Very strong split BTTS rate (${Math.round(combinedBTTSRate * 100)}
 score += 1.2;
 reasons.push(`Positive split BTTS rate (${Math.round(combinedBTTSRate * 100)}% combined).`);
 }
-if (
-home.avgGA > CONFIG.defensiveBleedGAExclusive &&
-away.avgGA > CONFIG.defensiveBleedGAExclusive
-) {
+if (home.avgGA > CONFIG.defensiveBleedGAExclusive && away.avgGA > CONFIG.defensiveBleedGAExclusive) {
 score += 0.8;
 reasons.push("Both teams are above the defensive-bleed threshold.");
 }
-const lowPPGTeam =
-home.ppg < 1.0 ? "Home team" : away.ppg < 1.0 ? "Away team" : null;
-const poorScoringTeam =
-home.scoreRate < CONFIG.poorScoreRate
-? "Home team"
-: away.scoreRate < CONFIG.poorScoreRate
-? "Away team"
-: null;
+
 let hardCap = null;
-if (lowPPGTeam) {
+if (!bothBttsStrong) {
 hardCap = 6.9;
-reasons.push(
-`${lowPPGTeam} has <1.0 split PPG, activating the BTTS trap: BTTS cannot be a banker.`
-);
+reasons.push(`Golden Banker BTTS requires BOTH exact split BTTS rates at 80%+ (${Math.round(home.bttsRate*100)}% / ${Math.round(away.bttsRate*100)}%).`);
+}
+if (!bothReliableScorers || !bothRegularConceders) {
+hardCap = Math.min(hardCap ?? 10, 6.9);
+reasons.push("BTTS cannot be banker-grade unless both teams independently score and concede in at least 80% of the relevant split sample.");
+}
+const lowPPGTeam = home.ppg < 1.0 ? "Home team" : away.ppg < 1.0 ? "Away team" : null;
+const poorScoringTeam = home.scoreRate < CONFIG.poorScoreRate ? "Home team" : away.scoreRate < CONFIG.poorScoreRate ? "Away team" : null;
+if (lowPPGTeam) {
+hardCap = Math.min(hardCap ?? 10, 6.9);
+reasons.push(`${lowPPGTeam} has <1.0 split PPG, activating the BTTS trap: BTTS cannot be a banker.`);
 }
 if (poorScoringTeam) {
 hardCap = Math.min(hardCap ?? 10, 5.9);
-reasons.push(
-`${poorScoringTeam} scores in fewer than 60% of its split matches, so BTTS is rejected.`
-);
+reasons.push(`${poorScoringTeam} scores in fewer than 60% of its split matches, so BTTS is rejected.`);
 }
 score = clamp(score);
 if (hardCap !== null) score = Math.min(score, hardCap);
@@ -134,9 +145,10 @@ return {
 market: "BTTS / GG",
 score,
 verdict: verdict(score),
-qualified: score >= CONFIG.bankerMinScore,
+qualified: directionalConfirmed && score >= CONFIG.bankerMinScore,
 reasons,
 trapActivated: hardCap !== null,
+directionalConfirmed,
 };
 }
 module.exports={scoreOver25,scoreBTTS};
