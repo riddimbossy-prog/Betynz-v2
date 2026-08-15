@@ -1,6 +1,12 @@
 name: Betynz Board Worker
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/golden/**'
+      - 'apps/web/src/lib/apiFootball.mjs'
+      - '.github/workflows/precompute.yml'
   schedule:
     - cron: '7,37 * * * *'
   workflow_dispatch:
