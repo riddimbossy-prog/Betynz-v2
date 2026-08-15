@@ -1,0 +1,11 @@
+.early-season-flag{display:inline-block;margin-left:5px;color:#ff4b55;font-size:13px;line-height:1;vertical-align:middle;filter:saturate(1.15);text-shadow:0 0 10px rgba(255,75,85,.28)}
+.season-chip{display:inline-flex;align-items:center;gap:4px;width:max-content;max-width:100%;margin:7px 0 0;padding:5px 8px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;border:1px solid rgba(255,255,255,.1);white-space:nowrap}
+.season-chip.early{color:#ff9ea3;border-color:rgba(255,75,85,.32);background:rgba(255,75,85,.08)}
+.season-chip.solid{color:#9fe7c7;border-color:rgba(75,211,156,.25);background:rgba(75,211,156,.07)}
+.banker-team-name,.match-team-name,.banger-team-name{display:inline-flex;align-items:center;justify-content:center;gap:2px;min-width:0}
+.match-teams>div:last-child .match-team-name{justify-content:flex-end}
+.filters{grid-template-columns:repeat(6,minmax(120px,1fr))}
+.bangers-tools select{min-width:150px}
+@media(max-width:1100px){.filters{grid-template-columns:repeat(3,minmax(120px,1fr))}}
+@media(max-width:650px){.filters{grid-template-columns:1fr 1fr}.season-chip{font-size:8px}.early-season-flag{font-size:12px}}
+@media(max-width:430px){.filters{grid-template-columns:1fr}}
