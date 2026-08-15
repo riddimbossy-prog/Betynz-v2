@@ -1,5 +1,3 @@
-const BOTTOM3_RE=/bottom\s*3/i;
-
 function roundNumber(fixture,analysis){
   const values=[fixture?.league?.round,fixture?.round,fixture?.seasonRound,analysis?.round,analysis?.leagueRound,analysis?.seasonRound,analysis?.meta?.round];
   for(const value of values){
@@ -12,6 +10,10 @@ function roundNumber(fixture,analysis){
 
 function primaryMarket(analysis){return String(analysis?.finalRecommendation?.primaryBet||'Skip')}
 function marketScore(analysis,key){const n=Number(analysis?.markets?.[key]?.score);return Number.isFinite(n)?n:0}
+function numericBottomThree(position,tableSize){
+  const p=Number(position),size=Number(tableSize);
+  return Number.isFinite(p)&&Number.isFinite(size)&&size>=3&&p>=Math.max(1,size-2);
+}
 
 function conflictingMarkets(analysis){
   const bet=primaryMarket(analysis),warnings=[];
@@ -37,7 +39,7 @@ export function evaluateTrust(fixture,analysis){
     if(Number(fav?.ppg)<2){blocked=true;warnings.push('Zeus blocked winner market: favourite is below 2.0 split PPG.');}
     if(Number(opp?.ppg)>=1){blocked=true;warnings.push('Zeus blocked winner market: opponent is not weak enough (<1.0 split PPG required).');}
     const favPos=String(favouriteSide).toLowerCase()==='away'?positions?.away:positions?.home;
-    if(BOTTOM3_RE.test(String(favPos||''))){blocked=true;warnings.push('Zeus blocked winner market: favourite is in the split-form bottom three.');}
+    if(numericBottomThree(favPos,positions?.tableSize)){blocked=true;warnings.push(`Zeus blocked winner market: favourite is Bottom 3 in the split-form table (#${favPos}/${positions.tableSize}).`);}
   }
   if(Number(analysis?.finalRecommendation?.score)<7){blocked=true;warnings.push('Primary market does not clear the 7/10 banker gate.');}
   score=Math.max(0,Math.min(100,score));
