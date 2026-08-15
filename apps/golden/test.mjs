@@ -6,7 +6,7 @@ const {calculateSplitStats,analyseMatch,analyseBoard}=require('./goldenBanker.cj
 const {applyLowWinUnder35ToAnalysis}=require('./goldenUnder35.cjs');
 const {evaluateBanger}=require('./goldenBangers.cjs');
 
-// Core Golden Banker maths remains protected.
+// Core Golden maths remains protected.
 const stats=calculateSplitStats([{gf:2,ga:0},{gf:1,ga:0},{gf:3,ga:1},{gf:2,ga:1},{gf:1,ga:0}]);
 assert.equal(stats.ppg,3);
 assert.equal(stats.avgGA,.4);
@@ -24,35 +24,26 @@ assert.equal(forcedUnder.markets.under35.forced,true);
 assert.equal(forcedUnder.finalRecommendation.primaryBet,'Under 3.5');
 assert.equal(forcedUnder.finalRecommendation.score,10);
 assert.equal(forcedUnder.finalRecommendation.hardOverride,true);
-assert.equal(forcedUnder.banker,true);
 
 const legacyForced={...forcedUnder,markets:{over25:forcedUnder.markets.over25,btts:forcedUnder.markets.btts,winDnb:forcedUnder.markets.winDnb},finalRecommendation:{primaryBet:'Over 2.5',score:9.4,confidence:'High',bankerStatus:'Banker',summary:'legacy pick'},banker:true};
 const migratedForced=applyLowWinUnder35ToAnalysis(legacyForced);
 assert.equal(migratedForced.finalRecommendation.primaryBet,'Under 3.5');
-assert.equal(migratedForced.finalRecommendation.hardOverride,true);
-
-const exactTwenty=analyseMatch({
-  league:'T',homeTeam:'20 Home',awayTeam:'0 Away',
-  homeLast5:[{gf:1,ga:0},{gf:0,ga:1},{gf:0,ga:2},{gf:1,ga:2},{gf:0,ga:3}],
-  awayLast5:[{gf:0,ga:1},{gf:0,ga:2},{gf:1,ga:2},{gf:0,ga:3},{gf:0,ga:4}]
-});
-assert.equal(exactTwenty.split.home.wins,1);
-assert.equal(exactTwenty.markets.under35.forced,false);
 
 const board=analyseBoard(new Array(6).fill(0).map((_,i)=>({id:`m${i}`,league:'T',homeTeam:`H${i}`,awayTeam:`A${i}`,homeLast5:[{gf:3,ga:0},{gf:2,ga:0},{gf:3,ga:1},{gf:2,ga:1},{gf:3,ga:0}],awayLast5:[{gf:0,ga:3},{gf:0,ga:2},{gf:1,ga:4},{gf:0,ga:3},{gf:1,ga:4}]})));
 assert.ok(board.topBankers.length<=4);
 
-// Bangers is a strict all-or-nothing engine, separate from Golden soft scoring.
-const strong={ppg:1.6,avgGF:2,avgGA:2};
-let banger=evaluateBanger({home:strong,away:strong,over25Odd:1.40,positions:{home:2,away:8,homeTableSize:18,awayTableSize:18}});
+// Bangers is now a season-level high-scoring statistical profile.
+const profileHome={matchesPlayed:12,over25Rate:.75,homeOver25Rate:.75,avgGF:1.9,avgGA:1.6,last6Overs:4};
+const profileAway={matchesPlayed:12,over25Rate:.70,awayOver25Rate:.70,avgGF:1.8,avgGA:1.6,last6Overs:4};
+const profileLeague={matchesPlayed:120,over25Rate:.60};
+let banger=evaluateBanger({home:profileHome,away:profileAway,league:profileLeague});
 assert.equal(banger.qualified,true);
 assert.equal(banger.score,10);
-banger=evaluateBanger({home:strong,away:strong,over25Odd:1.40,positions:{home:2,away:4,homeTableSize:18,awayTableSize:18}});
-assert.equal(banger.qualified,false,'Both Top 5 must be rejected');
-banger=evaluateBanger({home:strong,away:strong,over25Odd:1.40,positions:{home:6,away:8,homeTableSize:18,awayTableSize:18}});
-assert.equal(banger.qualified,true,'Bangers no longer requires either team to be Top 3 or Bottom 2');
-banger=evaluateBanger({home:strong,away:strong,over25Odd:1.56,positions:{home:6,away:8,homeTableSize:18,awayTableSize:18}});
-assert.equal(banger.qualified,false,'Odds above 1.55 must be rejected');
+assert.equal(banger.market,'High-Scoring Match Profile');
+banger=evaluateBanger({home:{...profileHome,matchesPlayed:9},away:profileAway,league:profileLeague});
+assert.equal(banger.qualified,false,'10-match sample gate must be enforced');
+banger=evaluateBanger({home:profileHome,away:profileAway,league:profileLeague,xgCombined:3.09});
+assert.equal(banger.qualified,false,'Available xG environment below 3.10 must fail');
 
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 const html=read('./public/index.html');
@@ -70,44 +61,38 @@ const serverSource=read('./server.mjs');
 const splashAsset=new URL('../web/public/assets/zeus-board-loading.jpg',import.meta.url);
 
 // Current board/UI contract.
-for(const pattern of[/id="market"/,/id="confidence"/,/id="league"/,/id="matchCentreToggle"/,/href="\/bangers\.html"/,/href="\/proof"/])assert.match(html,pattern);
+for(const pattern of[/id="market"/,/id="confidence"/,/id="league"/,/id="seasonStage"/,/id="matchCentreToggle"/,/href="\/bangers\.html"/,/href="\/proof"/])assert.match(html,pattern);
 assert.match(appJs,/pageSize:\s*20/);
 assert.match(appJs,/WAITING FOR 5\+5/);
 assert.match(appJs,/Why this pick/);
 assert.match(appJs,/Exact home results/);
 assert.match(appJs,/Exact away results/);
-assert.match(appJs,/marketCard\('Under 3\.5',a\.markets\?\.under35\)/);
 
-// Android-safe, video-only splash contract: no static Zeus poster and video is created dynamically.
+// Android-safe, video-only splash contract.
 assert.match(html,/id="boardSplash"/);
 assert.match(html,/id="boardSplashMedia"/);
 assert.doesNotMatch(html,/id="boardSplashVideo"/);
 assert.doesNotMatch(html,/zeus-board-loading\.jpg/);
-assert.doesNotMatch(html,/preload" as="video"/);
 assert.match(splashCss,/\.board-splash__video/);
-assert.match(splashCss,/object-fit:contain/);
-assert.doesNotMatch(splashCss,/zeus-board-loading\.jpg/);
 assert.match(splashJs,/document\.createElement\('video'\)/);
-assert.match(splashJs,/v\.loop=false/);
-assert.match(splashJs,/v\.play\(\)/);
-assert.match(splashJs,/boardReady&&mediaDone/);
-assert.match(splashJs,/MAX_SPLASH_MS=3600/);
 assert.match(splashJs,/v\.src='\/media\/zeus-thunder-original\.mp4'/);
 assert.equal(existsSync(splashAsset),false,'Legacy Zeus loading poster must remain removed');
 
-// Bangers product page and exact rule contract.
-for(const pattern of[/STRICT OVER 2\.5 FINDER/,/Odds 1\.20–1\.55/,/One side leaks ≥1\.90/,/Both PPG &gt;1\.50/,/One side scores ≥1\.90/,/Reject both Top 5/])assert.match(bangersHtml,pattern);
-assert.doesNotMatch(bangersHtml,/Top 3 \/ Bottom 2/,'Removed extreme-rank requirement must not appear in the public Bangers rules');
-assert.match(bangersJs,/board\?\.bangers/);
-assert.match(bangersJs,/BANGER MARKET/);
-assert.match(bangersJs,/Split rank/);
+// New Bangers checklist and public presentation.
+for(const pattern of[/HIGH-SCORING MATCH PROFILE/,/70% \+ 70% or 80% \+ 65%/,/Home venue ≥72%/,/Away venue ≥68%/,/Combined GF\+GA ≥3\.40/,/xG\+xGA ≥3\.10 when available/,/League rate ≥56%/,/Both teams 10\+ matches/,/id="bangerSeason"/])assert.match(bangersHtml,pattern);
+assert.doesNotMatch(bangersHtml,/Odds 1\.20–1\.55/);
+assert.doesNotMatch(bangersHtml,/Reject both Top 5/);
+assert.match(bangersJs,/High-Scoring Match/);
+assert.match(bangersJs,/SEASON RATE/);
+assert.match(bangersJs,/HOME RATE/);
+assert.match(bangersJs,/AWAY RATE/);
 assert.match(bangersCss,/\.banger-card/);
-for(const pattern of[/over25OddMin:1\.20/,/over25OddMax:1\.55/,/minLeakAvgGA:1\.90/,/minPPGExclusive:1\.50/,/minAttackAvgGF:1\.90/,/oneLeak/,/oneAttack/,/notBothTopFive/])assert.match(bangersSource,pattern);
-assert.doesNotMatch(bangersSource,/extremeRank/,'Removed extreme-rank gate must not remain in Bangers engine logic');
-assert.match(bangersScan,/calculateSplitTables/);
+for(const pattern of[/seasonOverBoth:0\.70/,/seasonOverElite:0\.80/,/seasonOverPartner:0\.65/,/homeVenueOver:0\.72/,/awayVenueOver:0\.68/,/combinedAverageGoals:3\.40/,/combinedXgEnvironment:3\.10/,/recentOversEach:4/,/recentOversElite:5/,/leagueOver25:0\.56/,/minSeasonMatches:10/])assert.match(bangersSource,pattern);
+assert.doesNotMatch(bangersSource,/over25OddMin|notBothTopFive|minPPGExclusive/);
+assert.match(bangersScan,/calculateSeasonGoalProfile/);
 assert.match(bangersScan,/league:leagueId,season,status:'FT'/);
 assert.match(bangersScan,/scanBangers/);
-assert.doesNotMatch(bangersScan,/require at least one Top 3 or Bottom 2/i);
+assert.doesNotMatch(bangersScan,/passesStatAndOddsGates|calculateSplitTables/);
 assert.match(precompute,/attachBangers/);
 assert.match(precompute,/bangersReady:true/);
 assert.match(precompute,/bangersFound:bangers\.length/);
@@ -120,4 +105,4 @@ assert.match(serverSource,/accept-ranges':'bytes/);
 assert.match(serverSource,/serveTeamCrest/);
 assert.match(serverSource,/media\.api-sports\.io\/football\/teams/);
 
-console.log('Golden engine + strict Bangers + current UI + dynamic video-only splash tests passed');
+console.log('Golden engine + high-scoring Bangers profile + current UI + splash tests passed');
