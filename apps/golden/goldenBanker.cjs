@@ -4,55 +4,25 @@ const {scoreWinDNB}=require('./goldenWin.cjs');
 const {scoreLowWinUnder35}=require('./goldenUnder35.cjs');
 
 function choosePrimaryMarket(under35,over25,btts,winDnb){
-  if(under35?.forced){
-    return {
-      type:"UNDER35",
-      bet:"Under 3.5",
-      score:under35.score,
-      market:under35.market,
-      protectionPriority:5,
-      forced:true,
-    };
-  }
-
   const candidates=[];
+  if(under35?.qualified){
+    candidates.push({type:"UNDER35",bet:"Under 3.5",score:under35.score,market:under35.market,protectionPriority:5,forced:false});
+  }
   if(winDnb.qualified&&winDnb.bet!=="Skip"){
-    candidates.push({
-      type:"WIN_DNB",
-      bet:winDnb.bet,
-      score:winDnb.score,
-      market:winDnb.market,
-      protectionPriority:winDnb.bet.endsWith("DNB")?3:2,
-    });
+    candidates.push({type:"WIN_DNB",bet:winDnb.bet,score:winDnb.score,market:winDnb.market,protectionPriority:winDnb.bet.endsWith("DNB")?4:3});
   }
   if(over25.qualified){
-    candidates.push({
-      type:"OVER25",
-      bet:"Over 2.5",
-      score:over25.score,
-      market:over25.market,
-      protectionPriority:2,
-    });
+    candidates.push({type:"OVER25",bet:"Over 2.5",score:over25.score,market:over25.market,protectionPriority:2});
   }
   if(btts.qualified){
-    candidates.push({
-      type:"BTTS",
-      bet:"BTTS Yes",
-      score:btts.score,
-      market:btts.market,
-      protectionPriority:1,
-    });
+    candidates.push({type:"BTTS",bet:"BTTS Yes",score:btts.score,market:btts.market,protectionPriority:1});
   }
   if(!candidates.length){
-    return {
-      type:"SKIP",
-      bet:"Skip",
-      score:Math.max(over25.score,btts.score,winDnb.score),
-      market:"None",
-      protectionPriority:0,
-    };
+    return {type:"SKIP",bet:"Skip",score:Math.max(under35?.score||0,over25.score,btts.score,winDnb.score),market:"None",protectionPriority:0};
   }
   candidates.sort((a,b)=>{
+    const gap=Math.abs(Number(b.score)-Number(a.score));
+    if(gap<=0.4&&b.protectionPriority!==a.protectionPriority)return b.protectionPriority-a.protectionPriority;
     if(b.score!==a.score)return b.score-a.score;
     return b.protectionPriority-a.protectionPriority;
   });
@@ -97,7 +67,7 @@ function analyseMatch(input){
       confidence:confidence(primary.score),
       bankerStatus:banker?"Banker":"Not Banker",
       summary:primaryReasons[0],
-      hardOverride:Boolean(primary.forced),
+      hardOverride:false,
     },
     banker,
   };
@@ -114,7 +84,7 @@ function selectTopBankers(analyses,maxBankers=CONFIG.maxBankers){
         if(bet==="Under 3.5")return 5;
         if(/DNB$/.test(bet))return 4;
         if(/ Win$/.test(bet))return 3;
-        if(bet==="Over 2.5")return 3;
+        if(bet==="Over 2.5")return 2;
         if(bet==="BTTS Yes")return 1;
         return 0;
       };
@@ -129,7 +99,7 @@ function analyseBoard(matches){
   const topBankers=selectTopBankers(analyses,CONFIG.maxBankers);
   return {
     engine:"Golden Banker v4.3",
-    philosophy:"Protect the stake first. Void is better than loss. Last 5 split home/away data only.",
+    philosophy:"Protect the stake first. Last 5 split home/away data only. Markets must clear their own directional confirmation gates.",
     analysed:analyses.length,
     bankersFound:topBankers.length,
     analyses,
