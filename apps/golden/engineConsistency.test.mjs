@@ -46,6 +46,33 @@ assert.equal(genuineUnder.markets.under35.forced,false);
 assert.equal(genuineUnder.finalRecommendation.primaryBet,'Under 3.5');
 assert.equal(genuineUnder.finalRecommendation.hardOverride,false);
 
+const dominantHome=[{gf:1,ga:0},{gf:1,ga:0},{gf:2,ga:0},{gf:1,ga:0},{gf:1,ga:0}];
+const weakAway=[{gf:0,ga:1},{gf:0,ga:1},{gf:0,ga:2},{gf:0,ga:1},{gf:0,ga:1}];
+const top2Win=analyseMatch({
+  league:'Regression',homeTeam:'Elite Home',awayTeam:'Weak Away',homeLast5:dominantHome,awayLast5:weakAway,
+  homeFormPosition:1,awayFormPosition:12,formTableSize:12,homeFormTableSize:12,awayFormTableSize:12
+});
+assert.equal(top2Win.markets.winDnb.straightWinMathEligible,true);
+assert.equal(top2Win.markets.winDnb.straightWinTop2Confirmed,true);
+assert.equal(top2Win.markets.winDnb.bet,'Elite Home Win','Top-2 favourite may keep straight win when all maths pass');
+assert.equal(top2Win.finalRecommendation.primaryBet,'Elite Home Win');
+
+const rank3Downgrade=analyseMatch({
+  league:'Regression',homeTeam:'Rank Three',awayTeam:'Weak Away',homeLast5:dominantHome,awayLast5:weakAway,
+  homeFormPosition:3,awayFormPosition:12,formTableSize:12,homeFormTableSize:12,awayFormTableSize:12
+});
+assert.equal(rank3Downgrade.markets.winDnb.straightWinMathEligible,true);
+assert.equal(rank3Downgrade.markets.winDnb.straightWinTop2Confirmed,false);
+assert.equal(rank3Downgrade.markets.winDnb.bet,'Rank Three DNB','Outside Top 2 must downgrade to DNB');
+assert.equal(rank3Downgrade.finalRecommendation.primaryBet,'Rank Three DNB');
+
+const unknownRankDowngrade=analyseMatch({
+  league:'Regression',homeTeam:'No Rank',awayTeam:'Weak Away',homeLast5:dominantHome,awayLast5:weakAway
+});
+assert.equal(unknownRankDowngrade.markets.winDnb.straightWinMathEligible,true);
+assert.equal(unknownRankDowngrade.markets.winDnb.straightWinTop2Confirmed,false);
+assert.equal(unknownRankDowngrade.markets.winDnb.bet,'No Rank DNB','Unverified rank must never produce a straight win');
+
 const bottomThreeTrust=evaluateTrust({round:12},{
   finalRecommendation:{primaryBet:'Home Win',score:8.5},
   split:{home:{ppg:2.4},away:{ppg:.4},positions:{home:10,away:2,tableSize:12}},
@@ -55,9 +82,12 @@ assert.equal(bottomThreeTrust.blocked,true,'numeric Bottom 3 favourite must be b
 assert.ok(bottomThreeTrust.warnings.some(x=>/Bottom 3/i.test(x)));
 
 const runtimeBoard=readFileSync(new URL('./runtimeBoard.mjs',import.meta.url),'utf8');
+const runtimeConfig=readFileSync(new URL('./runtimeConfig.mjs',import.meta.url),'utf8');
 assert.match(runtimeBoard,/function recomputeFromEvidence/);
 assert.match(runtimeBoard,/analyseMatch\(\{/);
-assert.match(runtimeBoard,/rulesRevision:'golden-consistency-v2'/);
-assert.match(runtimeBoard,/engineVersion:'4\.3\.1'/);
+assert.match(runtimeBoard,/golden-top2-win-v3/);
+assert.match(runtimeBoard,/engineVersion:'4\.3\.2'/);
+assert.match(runtimeConfig,/API_FOOTBALL_EXACT_SPLIT_TABLES/);
+assert.match(runtimeConfig,/VERSION='6\.2\.0'/);
 
-console.log('Golden consistency v2 regression tests passed');
+console.log('Golden consistency v3 regression tests passed');
