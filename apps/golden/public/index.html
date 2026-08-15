@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/glass-90.css?v=7.4.0">
   <link rel="stylesheet" href="/account.css?v=8.0.0">
   <link rel="stylesheet" href="/match-lifecycle.css?v=8.1.0">
+  <link rel="stylesheet" href="/season-ui.css?v=1.0.0">
 </head>
 <body class="splash-active">
 <div id="boardSplash" class="board-splash" role="status" aria-live="polite" aria-label="Loading Betynz.com">
@@ -115,6 +116,11 @@
           <option value="SETTLED">Settled</option>
           <option value="WAITING">Waiting 5+5</option>
         </select>
+        <select id="season" aria-label="Season maturity filter">
+          <option value="ALL">All season stages</option>
+          <option value="EARLY">🚩 Early Season · R1–R8</option>
+          <option value="SOLID">Solid Season · R9+</option>
+        </select>
         <input id="search" placeholder="Search team…" aria-label="Search team">
       </div>
 
@@ -141,7 +147,7 @@
 <script src="/runtime-config.js?v=9.0.0"></script>
 <script src="/runtime-client.js?v=9.0.1"></script>
 <script type="module" src="/splash.js?v=7.3.0"></script>
-<script type="module" src="/app.js?v=7.5.0"></script>
+<script type="module" src="/app.js?v=7.6.0"></script>
 <script type="module" src="/match-lifecycle.js?v=8.1.0"></script>
 <script type="module" src="/rated-link.js?v=6.3.0"></script>
 <script type="module" src="/account.js?v=8.0.0"></script>

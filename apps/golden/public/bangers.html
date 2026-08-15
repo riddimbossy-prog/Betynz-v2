@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/styles.css?v=6.4.0">
   <link rel="stylesheet" href="/branding.css?v=7.2.0">
   <link rel="stylesheet" href="/bangers.css?v=1.0.0">
+  <link rel="stylesheet" href="/season-ui.css?v=1.0.0">
 </head>
 <body class="bangers-page">
 <header>
@@ -42,6 +43,11 @@
     <div id="bangerDays"></div>
     <div class="bangers-tools">
       <select id="bangerLeague" aria-label="League filter"><option value="ALL">All leagues</option></select>
+      <select id="bangerSeason" aria-label="Season maturity filter">
+        <option value="ALL">All season stages</option>
+        <option value="EARLY">🚩 Early Season · R1–R8</option>
+        <option value="SOLID">Solid Season · R9+</option>
+      </select>
       <button id="bangerRefresh" type="button">↻ Refresh</button>
     </div>
     <p id="bangerState">Loading Bangers…</p>
@@ -60,6 +66,6 @@
 
 <script src="/runtime-config.js?v=9.0.0"></script>
 <script src="/runtime-client.js?v=9.0.1"></script>
-<script type="module" src="/bangers.js?v=1.0.1"></script>
+<script type="module" src="/bangers.js?v=1.1.0"></script>
 </body>
 </html>

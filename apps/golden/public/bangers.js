@@ -1,6 +1,8 @@
+import {seasonPhase,earlySeasonFlag,seasonChip} from './season-phase.js';
+
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt',"'":'&#39;','"':'&quot;'}[c]));
-const state={date:new Date().toISOString().slice(0,10),board:null,timer:null,league:'ALL'};
+const state={date:new Date().toISOString().slice(0,10),board:null,timer:null,league:'ALL',season:'ALL'};
 const off=n=>{const d=new Date();d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
 const time=v=>{const d=new Date(v);return Number.isNaN(d.getTime())?'TBA':d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})};
 const num=v=>Number.isFinite(Number(v))?Number(v).toFixed(2):'—';
@@ -28,14 +30,15 @@ function updateLeague(){
 }
 
 function card(row){
-  const f=row?.fixture||{},b=row?.banger||{},s=b.stats||{},r=b.ranks||{};
+  const f=row?.fixture||{},b=row?.banger||{},s=b.stats||{},r=b.ranks||{},a=row?.analysis||{},earlyFlag=earlySeasonFlag(f,a);
   const why=(b.reasons||[]).slice(0,6);
   return `<article class="banger-card">
     <div class="banger-meta">${flag(f.league)}<b>${esc(f?.league?.name||'League')}</b><span>${esc(f?.league?.country||'')}</span><time>${esc(time(f.kickoff))}</time></div>
+    ${seasonChip(f,a)}
     <div class="banger-teams">
-      <div class="banger-team">${crest(f.home)}<strong>${esc(f?.home?.name||'Home')}</strong></div>
+      <div class="banger-team">${crest(f.home)}<strong class="banger-team-name">${esc(f?.home?.name||'Home')}${earlyFlag}</strong></div>
       <span class="banger-vs">VS</span>
-      <div class="banger-team">${crest(f.away)}<strong>${esc(f?.away?.name||'Away')}</strong></div>
+      <div class="banger-team">${crest(f.away)}<strong class="banger-team-name">${esc(f?.away?.name||'Away')}${earlyFlag}</strong></div>
     </div>
     <div class="banger-pick"><div><small>BANGER MARKET</small><strong>Over 2.5 Goals</strong></div><div class="banger-odd">${num(b.odds)}</div></div>
     <div class="banger-stats">
@@ -47,16 +50,23 @@ function card(row){
 }
 
 function render(){
-  const b=state.board||{},all=Array.isArray(b.bangers)?b.bangers:[],rows=state.league==='ALL'?all:all.filter(x=>x?.fixture?.league?.name===state.league);
+  const b=state.board||{},all=Array.isArray(b.bangers)?b.bangers:[];
+  const rows=all.filter(x=>{
+    const f=x?.fixture||{},a=x?.analysis||{};
+    if(state.league!=='ALL'&&f?.league?.name!==state.league)return false;
+    if(state.season!=='ALL'&&seasonPhase(f,a).key!==state.season)return false;
+    return true;
+  });
   $('#bangerCount').textContent=String(rows.length);
   const d=new Date(`${state.date}T00:00:00Z`);$('#bangerTitle').textContent=`${d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short',timeZone:'UTC'})} Bangers`;
   if(!b.bangersReady){
-    $('#bangerState').innerHTML=`<span class="banger-wait">${esc(b.bangersWarning||'Bangers scan is still waiting for complete odds, split form and split-rank evidence.')}</span>`;
+    $('#bangerState').innerHTML=`<span class="banger-wait">${esc(b.bangersWarning||'Bangers scan is still waiting for complete split-form evidence.')}</span>`;
     $('#bangerList').innerHTML='<div class="banger-empty">Scanning the strict Over 2.5 gates…</div>';
     return;
   }
-  $('#bangerState').textContent=`Scan complete · ${all.length} match${all.length===1?'':'es'} cleared every Banger gate.`;
-  $('#bangerList').innerHTML=rows.length?rows.map(card).join(''):'<div class="banger-empty">No match cleared every strict Banger rule for this date.</div>';
+  const phaseLabel=state.season==='EARLY'?' · Early Season':state.season==='SOLID'?' · Solid Season':'';
+  $('#bangerState').textContent=`Scan complete · ${rows.length} visible match${rows.length===1?'':'es'}${phaseLabel}.`;
+  $('#bangerList').innerHTML=rows.length?rows.map(card).join(''):'<div class="banger-empty">No Bangers match the selected filters for this date.</div>';
 }
 
 async function load(date=state.date){
@@ -74,5 +84,6 @@ async function load(date=state.date){
 }
 
 $('#bangerLeague').addEventListener('change',e=>{state.league=e.target.value;render()});
+$('#bangerSeason').addEventListener('change',e=>{state.season=e.target.value;render()});
 $('#bangerRefresh').addEventListener('click',()=>load(state.date));
 days();load();

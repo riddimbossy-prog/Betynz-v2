@@ -1,5 +1,7 @@
+import {seasonPhase,earlySeasonFlag,seasonChip} from './season-phase.js';
+
 const $=s=>document.querySelector(s);
-const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt',"'":'&#39;','"':'&quot;'}[c]));
 const validDate=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''));
 const today=()=>new Date().toISOString().slice(0,10);
 const qDate=new URLSearchParams(location.search).get('date');
@@ -37,16 +39,17 @@ function orderedQualified(){
 function metric(label,value){return `<span>${esc(label)}<b>${esc(value)}</b></span>`;}
 
 function card(x,i,topIds){
-  const f=x.fixture||{},a=x.analysis||{},r=a.finalRecommendation||{},h=a?.split?.home||{},w=a?.split?.away||{};
+  const f=x.fixture||{},a=x.analysis||{},r=a.finalRecommendation||{},h=a?.split?.home||{},w=a?.split?.away||{},earlyFlag=earlySeasonFlag(f,a);
   const isTop=topIds.has(String(f.id));
   return `<article class="rated-card ${isTop?'top-four':''}">
     <span class="rated-badge">${isTop?'TOP 4 BANKER':'HIGHLY RATED'}</span>
     <div class="rated-rank">#${i+1}</div>
     <div class="rated-meta"><span>${esc(f?.league?.country||'')}</span><b>${esc(f?.league?.name||a.league||'League')}</b><em>${esc(time(f.kickoff))}</em></div>
+    ${seasonChip(f,a)}
     <div class="rated-teams">
-      <div class="rated-team">${crest(f.home)}<strong>${esc(a.homeTeam||f?.home?.name||'Home')}</strong></div>
+      <div class="rated-team">${crest(f.home)}<strong>${esc(a.homeTeam||f?.home?.name||'Home')}${earlyFlag}</strong></div>
       <span class="rated-vs">VS</span>
-      <div class="rated-team">${crest(f.away)}<strong>${esc(a.awayTeam||f?.away?.name||'Away')}</strong></div>
+      <div class="rated-team">${crest(f.away)}<strong>${esc(a.awayTeam||f?.away?.name||'Away')}${earlyFlag}</strong></div>
     </div>
     <div class="rated-pick">
       <div><small>PRIMARY MARKET</small><strong>${esc(r.primaryBet||'—')}</strong></div>
@@ -65,27 +68,28 @@ function card(x,i,topIds){
 
 function render(){
   const rows=orderedQualified(),topIds=new Set((board?.topBankers||[]).map(x=>String(x?.fixture?.id||x?.analysis?.id||'')));
-  $('#ratedCount').textContent=rows.length;
   const p=board?.progress||{};$('#ratedProgress').textContent=`${p.processed||0}/${p.total||0}`;
-  $('#ratedState').textContent=board?.complete?`Complete · ${rows.length} qualified pick${rows.length===1?'':'s'} for this date.`:`Analysing ${p.processed||0}/${p.total||0} · qualified picks update automatically.`;
-  const market=$('#ratedMarket').value,conf=$('#ratedConfidence').value,q=$('#ratedSearch').value.trim().toLowerCase();
+  const market=$('#ratedMarket').value,conf=$('#ratedConfidence').value,season=$('#ratedSeason').value,q=$('#ratedSearch').value.trim().toLowerCase();
   const filtered=rows.filter(x=>{
     const a=x.analysis,f=x.fixture;
     if(market!=='ALL'&&marketType(a)!==market)return false;
     if(conf!=='ALL'&&String(a?.finalRecommendation?.confidence||'').toUpperCase()!==conf)return false;
+    if(season!=='ALL'&&seasonPhase(f,a).key!==season)return false;
     if(q&&!`${f?.home?.name||''} ${f?.away?.name||''}`.toLowerCase().includes(q))return false;
     return true;
   });
-  $('#ratedGrid').innerHTML=filtered.length?filtered.map((x,i)=>card(x,rows.indexOf(x),topIds)).join(''):`<div class="rated-empty">No qualified picks match these filters.</div>`;
+  $('#ratedCount').textContent=filtered.length;
+  $('#ratedState').textContent=board?.complete?`Complete · ${filtered.length} qualified match${filtered.length===1?'':'es'} visible.`:`Analysing ${p.processed||0}/${p.total||0} · qualified matches update automatically.`;
+  $('#ratedGrid').innerHTML=filtered.length?filtered.map((x,i)=>card(x,rows.indexOf(x),topIds)).join(''):`<div class="rated-empty">No qualified matches match these filters.</div>`;
 }
 
 async function load(next=date){
-  clearTimeout(timer);date=next;$('#ratedDate').value=date;history.replaceState(null,'',`/highly-rated.html?date=${encodeURIComponent(date)}`);$('#backTop4').href=`/?date=${encodeURIComponent(date)}`;$('#ratedState').textContent='Loading qualified picks…';
+  clearTimeout(timer);date=next;$('#ratedDate').value=date;history.replaceState(null,'',`/highly-rated.html?date=${encodeURIComponent(date)}`);$('#backTop4').href=`/?date=${encodeURIComponent(date)}`;$('#ratedState').textContent='Loading qualified matches…';
   try{
     const r=await fetch(`/api/golden-banker?date=${encodeURIComponent(date)}`,{cache:'no-store'});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.message||b.error||`HTTP ${r.status}`);board=b;render();if(!b.complete&&!b.historicalLock)timer=setTimeout(()=>load(date),4000);
-  }catch(e){$('#ratedState').textContent=`Could not load this date · ${e.message}`;$('#ratedGrid').innerHTML='<div class="rated-empty">Qualified picks are unavailable for this date right now.</div>';}
+  }catch(e){$('#ratedState').textContent=`Could not load this date · ${e.message}`;$('#ratedGrid').innerHTML='<div class="rated-empty">Qualified matches are unavailable for this date right now.</div>';}
 }
 
 $('#ratedDate').onchange=e=>{if(validDate(e.target.value))load(e.target.value);};
-$('#ratedMarket').onchange=render;$('#ratedConfidence').onchange=render;$('#ratedSearch').oninput=render;
+$('#ratedMarket').onchange=render;$('#ratedConfidence').onchange=render;$('#ratedSeason').onchange=render;$('#ratedSearch').oninput=render;
 load(date);
