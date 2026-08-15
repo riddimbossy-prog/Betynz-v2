@@ -61,7 +61,7 @@ const serverSource=read('./server.mjs');
 const splashAsset=new URL('../web/public/assets/zeus-board-loading.jpg',import.meta.url);
 
 // Current board/UI contract.
-for(const pattern of[/id="market"/,/id="confidence"/,/id="league"/,/id="seasonStage"/,/id="matchCentreToggle"/,/href="\/bangers\.html"/,/href="\/proof"/])assert.match(html,pattern);
+for(const pattern of[/id="market"/,/id="confidence"/,/id="league"/,/id="season"/,/id="matchCentreToggle"/,/href="\/bangers\.html"/,/href="\/proof"/])assert.match(html,pattern);
 assert.match(appJs,/pageSize:\s*20/);
 assert.match(appJs,/WAITING FOR 5\+5/);
 assert.match(appJs,/Why this pick/);
