@@ -5,6 +5,7 @@ maxBankers: 4,
 bankerMinScore: 7.0,
 dnbFavouriteMinPPG: 2.0,
 straightWinFavouriteMinPPG: 2.3, // With 5 games, reachable qualifying value is effectively 2.4+
+straightWinTopRank: 2,
 opponentMaxPPGExclusive: 1.0,
 defensiveBleedGAExclusive: 2.30, // With 5 games, effective trigger is 2.4+
 strongAttackAvgGF: 1.80,
@@ -135,10 +136,15 @@ function resolvePositions(input) {
 const hp = Number(input.homeFormPosition);
 const ap = Number(input.awayFormPosition);
 const size = Number(input.formTableSize);
+const homeSize = Number(input.homeFormTableSize);
+const awaySize = Number(input.awayFormTableSize);
+const tableSize = Number.isFinite(size) && size > 0 ? size : null;
 return {
 home: Number.isFinite(hp) && hp > 0 ? hp : null,
 away: Number.isFinite(ap) && ap > 0 ? ap : null,
-tableSize: Number.isFinite(size) && size > 0 ? size : null,
+tableSize,
+homeTableSize: Number.isFinite(homeSize) && homeSize > 0 ? homeSize : tableSize,
+awayTableSize: Number.isFinite(awaySize) && awaySize > 0 ? awaySize : tableSize,
 };
 }
 module.exports={CONFIG,round1,round2,clamp,calculateSplitStats,verdict,confidence,positionBand,resolvePositions};
