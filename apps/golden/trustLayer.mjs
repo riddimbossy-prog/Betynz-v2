@@ -14,6 +14,10 @@ function numericBottomThree(position,tableSize){
   const p=Number(position),size=Number(tableSize);
   return Number.isFinite(p)&&Number.isFinite(size)&&size>=3&&p>=Math.max(1,size-2);
 }
+function verifiedTop2(position){
+  const p=Number(position);
+  return Number.isFinite(p)&&p>=1&&p<=2;
+}
 
 function conflictingMarkets(analysis){
   const bet=primaryMarket(analysis),warnings=[];
@@ -31,7 +35,7 @@ export function evaluateTrust(fixture,analysis){
   else if(Number.isFinite(round)&&round<=8){score-=12;warnings.push(`Early-season round ${round}: sample stability is still developing.`)}
   const conflicts=conflictingMarkets(analysis);warnings.push(...conflicts);score-=conflicts.length*18;
   const home=analysis?.split?.home,away=analysis?.split?.away,positions=analysis?.split?.positions||{};
-  const bet=primaryMarket(analysis),winMarket=/Win|DNB/.test(bet);
+  const bet=primaryMarket(analysis),winMarket=/Win|DNB/.test(bet),straightWin=/ Win$/.test(bet);
   if(winMarket){
     const favouriteSide=analysis?.markets?.winDnb?.favouriteSide;
     const fav=String(favouriteSide).toLowerCase()==='away'?away:home;
@@ -39,7 +43,14 @@ export function evaluateTrust(fixture,analysis){
     if(Number(fav?.ppg)<2){blocked=true;warnings.push('Zeus blocked winner market: favourite is below 2.0 split PPG.');}
     if(Number(opp?.ppg)>=1){blocked=true;warnings.push('Zeus blocked winner market: opponent is not weak enough (<1.0 split PPG required).');}
     const favPos=String(favouriteSide).toLowerCase()==='away'?positions?.away:positions?.home;
-    if(numericBottomThree(favPos,positions?.tableSize)){blocked=true;warnings.push(`Zeus blocked winner market: favourite is Bottom 3 in the split-form table (#${favPos}/${positions.tableSize}).`);}
+    const favTableSize=String(favouriteSide).toLowerCase()==='away'?(positions?.awayTableSize??positions?.tableSize):(positions?.homeTableSize??positions?.tableSize);
+    if(numericBottomThree(favPos,favTableSize)){blocked=true;warnings.push(`Zeus blocked winner market: favourite is Bottom 3 in the relevant split-form table (#${favPos}/${favTableSize}).`);}
+    if(straightWin&&!verifiedTop2(favPos)){
+      blocked=true;
+      warnings.push(Number.isFinite(Number(favPos))
+        ? `Zeus blocked straight win: favourite is #${favPos} in the relevant split-form table. Only verified #1 or #2 may receive a Win tip.`
+        : 'Zeus blocked straight win: no verified relevant split-form Top-2 position is available.');
+    }
   }
   if(Number(analysis?.finalRecommendation?.score)<7){blocked=true;warnings.push('Primary market does not clear the 7/10 banker gate.');}
   score=Math.max(0,Math.min(100,score));
