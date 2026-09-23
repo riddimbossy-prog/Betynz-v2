@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#121916"><meta name="description" content="Betynz compares Sportybet markets with football form, head-to-head evidence and matchup risk.">
+  <title>Betynz · The daily shortlist</title><link rel="icon" href="./icon.svg" type="image/svg+xml"><link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" type="module"></script>
+</head>
+<body>
+  <header class="masthead"><div class="nav wrap"><a class="brand" href="./" aria-label="Betynz home"><img src="./icon.svg" alt="" width="34" height="34">BETYNZ<span>THE DAILY SHORTLIST</span></a><div class="nav-right"><span id="source-status" class="source-status">Checking feed</span><button id="refresh" class="quiet">↻ <span>Refresh</span></button></div></div></header>
+  <main class="wrap">
+    <section class="intro"><div><p class="eyebrow">FOOTBALL INTELLIGENCE</p><h1>Every matchup.<br><span>One considered pick.</span></h1><p class="intro-copy">Sportybet markets at 1.50 or below, weighed against form, head-to-head evidence and the ways a match could go wrong.</p></div><aside class="principles"><span class="rule-number">≤ 1.50</span><p>Maximum decimal odds</p><div>Top four & bottom three teams</div><div>No top-five or bottom-three clashes</div><div>Extra mismatch filter on busy days</div></aside></section>
+    <div id="notice" class="notice" role="status" hidden></div>
+    <section class="workspace" aria-label="Daily predictions">
+      <div class="board-heading"><div><p class="eyebrow">THE MATCHDAY BOARD</p><h2>Your daily shortlist</h2></div><span id="updated" class="muted"></span></div>
+      <nav id="dates" class="dates" aria-label="Select fixture date"></nav>
+      <div id="metrics" class="metrics" aria-label="Coverage summary"></div>
+      <div class="toolbar"><label class="search"><span class="sr-only">Search teams or leagues</span><input id="search" type="search" placeholder="Search a team or league…"></label><label><span class="sr-only">League</span><select id="league"><option value="">All leagues</option></select></label><label><span class="sr-only">Market</span><select id="market"><option value="">All final markets</option></select></label><label><span class="sr-only">Sort matches</span><select id="sort"><option value="probability">Highest probability</option><option value="risk">Lowest risk score</option><option value="kickoff">Kickoff time</option><option value="value">Highest estimated return</option></select></label></div>
+      <div class="board-meta"><label class="toggle"><input id="show-skipped" type="checkbox"> Show excluded matches</label><a id="market-download" href="#" download hidden>Download full market list ↗</a><span id="result-count" class="muted"></span></div>
+      <div id="board" class="board" aria-live="polite"><div class="empty"><div class="loading-ring"></div><h3>Loading the daily board</h3><p>Checking the latest Sportybet market snapshot.</p></div></div>
+    </section>
+    <section class="method"><div><p class="eyebrow">HOW THE SHORTLIST WORKS</p><h2>Evidence first.<br>Risk stays visible.</h2></div><ol><li><b>Compare the available markets</b><p>Every returned Sportybet market is retained. Eligible outcomes must be active and priced above 1.00, up to 1.50.</p></li><li><b>Read the matchup</b><p>Home and away form, league positions, H2H, score transitions and available advanced statistics inform the estimate.</p></li><li><b>Choose one final market</b><p>The highest estimated chance wins the comparison. Value, uncertainty and failure scenarios remain visible alongside it.</p></li></ol></section>
+  </main>
+  <footer class="wrap"><strong>BETYNZ</strong><p>Probabilities are model estimates, not guarantees. Low odds can still lose. Statistics: API-Football · Odds and fixture discovery: Sportybet · All dates use UTC; kickoffs use your local time.</p><a href="https://github.com/riddimbossy-prog/Betynz-v2" target="_blank" rel="noopener noreferrer">Method & source ↗</a></footer>
+</body>
+</html>

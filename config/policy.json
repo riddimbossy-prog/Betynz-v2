@@ -1,0 +1,17 @@
+{
+  "maximumOdds": 1.5,
+  "busyDayLeagueCount": 50,
+  "topTeamCount": 4,
+  "bottomTeamCount": 3,
+  "avoidBothTop": 5,
+  "minimumSplitGames": 5,
+  "minimumLeagueGames": 40,
+  "minimumLeagueTeams": 8,
+  "minimumStandingGames": 5,
+  "minimumMismatchPpgGap": 0.65,
+  "maximumLeagueUpsetRate": 0.45,
+  "maximumLeagueBrier": 0.75,
+  "maximumOddsAgeMinutes": 90,
+  "blockedLeagueIds": [],
+  "blockedLeaguePatterns": ["friendl", "simulated", "esoccer", "virtual", "amateur", "reserve", "u17", "u19", "u20", "u21", "u23", "youth"]
+}

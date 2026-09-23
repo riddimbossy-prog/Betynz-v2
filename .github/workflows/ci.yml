@@ -1,17 +1,16 @@
-name: Betynz CI
-on:
-  push:
-    branches: ['main', 'agent/**']
-  pull_request:
-    branches: ['main']
+name: Betynz checks
+on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20.18.0'
-          cache: npm
+          node-version: '22'
       - run: npm ci
+      - run: npm run check
+      - run: npm test
       - run: npm run build
