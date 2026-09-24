@@ -24,7 +24,7 @@ export function eligibility(f,policy,leagueCount,now=Date.now()) {
   if(busy&&!mismatch)reasons.push('Busy-day filter: no clear table and split-form mismatch');
   return {eligible:!reasons.length,busy,mismatch,reasons};
 }
-function explain(f,m,p) {
+function explain(f,m,p,policy) {
   const home=m.home,away=m.away;
   const reasons=[`${f.home.name} earns ${home.ppg.toFixed(2)} points per home game across its last ${home.games}; ${f.away.name} earns ${away.ppg.toFixed(2)} away.`,
     `The home side scores ${home.gf.toFixed(1)} and concedes ${home.ga.toFixed(1)} at home; the away side scores ${away.gf.toFixed(1)} and concedes ${away.ga.toFixed(1)} away.`,
@@ -36,14 +36,14 @@ function explain(f,m,p) {
   } else reasons.push('No recent H2H record was available; the risk assessment includes this gap.');
   if(home.xg!==null||away.xg!==null)reasons.push(`Available expected-goals averages: home ${home.xg===null?'unavailable':home.xg.toFixed(2)}, away ${away.xg===null?'unavailable':away.xg.toFixed(2)}. Finishing that differs from xG is partly pulled toward the chance-quality evidence.`);
   else reasons.push('Expected-goals data is unavailable. Advanced assessment uses score transitions and available shots/corners/cards.');
-  reasons.push(`${p.selection} in ${p.market} has the highest estimated chance among the eligible category winners at odds no higher than 1.50.`);
+  reasons.push(`${p.selection} in ${p.market} has the highest estimated chance among the eligible category winners at odds from ${(policy.minimumOdds??1.2).toFixed(2)} to ${policy.maximumOdds.toFixed(2)}.`);
   if(p.evidence)for(const [source,e] of Object.entries(p.evidence))if(e.count)reasons.push(`For this particular market, the weighted positive-return rate in ${source} is ${(e.successRate*100).toFixed(0)}% across ${e.count} usable matches. Samples can overlap; they are deduplicated in the final estimate.`);
   if(p.expectedReturn<0)reasons.push('The estimated return at this price is negative despite the high chance of success.');
   if(p.disagreement>0.15)reasons.push('The matchup model and observed market history disagree; the risk rating is increased.');
   return reasons;
 }
 export function analyse(f,policy,{leagueCount=0,now=Date.now(),reliability}={}) {
-  const gate=eligibility(f,policy,leagueCount,now),book=selections(f,policy.maximumOdds);
+  const gate=eligibility(f,policy,leagueCount,now),book=selections(f,policy.maximumOdds,policy.minimumOdds);
   const basic={id:f.id,kickoff:f.kickoff,home:f.home,away:f.away,league:f.league,oddsFetchedAt:f.oddsFetchedAt,gate,coverage:book.counts,
     excludedMarkets:book.excluded,diagnostics:f.diagnostics||[],statsSource:f.statsSource,statsFetchedAt:f.statsFetchedAt,standings:{home:f.homeStanding?.rank,away:f.awayStanding?.rank,size:f.league.size}};
   if(!gate.eligible)return {...basic,status:'skipped',reasons:gate.reasons,categoryTips:[],tip:null};
@@ -64,7 +64,7 @@ export function analyse(f,policy,{leagueCount=0,now=Date.now(),reliability}={}) 
   const categoryTips=[...categories.values()];let tip=categoryTips[0]||null;
   if(tip)tip={...tip,scenarios:failureScenarios(tip.compiled,model)};
   return {...basic,status:tip?'qualified':'skipped',leagueReliability:league,categoryTips,tip,
-    reasons:tip?explain(f,model,tip):['No supported market at odds 1.50 or lower has sufficient data'],
+    reasons:tip?explain(f,model,tip,policy):[`No supported market at odds ${(policy.minimumOdds??1.2).toFixed(2)}–${policy.maximumOdds.toFixed(2)} has sufficient data`],
     form:{home:model.home,away:model.away},h2h:{...advancedH2H(f),sameVenue:model.h2h.filter(r=>r.venueMatch).length},
     expectedGoals:{home:round(model.lambdaHome),away:round(model.lambdaAway)},
     probabilityNotice:'Model estimates, not calibrated guarantees. The range is a sampling-uncertainty indicator and does not include every source of error.'};

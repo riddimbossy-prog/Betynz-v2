@@ -5,9 +5,9 @@ A complete replacement of the previous multi-engine application. This repository
 ## The requested selection policy
 
 1. Discover daily football fixtures from Sportybet's Today **and** Upcoming books using its required 1X2 discovery parameter. Follow pagination and fetch each event's full market list without a market whitelist. Retain the original markets in a downloadable daily audit.
-2. Only active outcomes with decimal odds **greater than 1.00 and no higher than 1.50** are prediction candidates. Suspended or stale odds never qualify.
+2. Only active outcomes with decimal odds **from 1.20 to 1.50, inclusive** are prediction candidates. Suspended or stale odds never qualify.
 3. Compare candidates using the home team's home form, the away team's away form, league standings, recent H2H, venue-specific H2H, half-time/full-time transitions, scoring trends and available advanced statistics. Select one candidate per market category.
-4. Publish **one final tip per match**: the category winner with the highest estimated probability of a positive return. Expected return and risk break exact ties. Show loss probability, refund probability, uncertainty, expected return and conditional failure scenarios separately.
+4. Publish **one final tip per match**: the category winner with the highest estimated probability of a positive return. Expected return and risk break exact ties. Show loss probability, refund probability, uncertainty, expected return and conditional failure scenarios separately. Each match’s **Why this pick** button opens its explanation and market comparison in a popup, with Close, Escape and backdrop dismissal.
 5. Only fixtures involving at least one **top-four or bottom-three** team can qualify. On a day with **50 or more leagues**, also require a mismatch supported by both table position and venue-specific form.
 6. Exclude **top-five versus top-five**, **bottom-three versus bottom-three**, unreliable leagues, unavailable statistics and excluded competition types. Top-versus-bottom remains eligible. Positions refer to the current overall league table; form uses the relevant home/away split.
 

@@ -14,7 +14,7 @@ test('full pipeline writes one prediction plus every raw market; statistics IDs 
     const index=await refresh({sporty,football,dataDir:directory,today:date,days:1});
     const board=await readJSON(`${directory}/board-${date}.json`),raw=await readJSON(`${directory}/markets-${date}.json`);
     assert.equal(index.complete,true);assert.equal(board.summary.qualified,1);assert.equal(board.matches[0].id,'sr:match:1');
-    assert.ok(board.matches[0].tip.odds<=1.5);assert.deepEqual(raw.fixtures[0].markets,f.markets);
+    assert.ok(board.matches[0].tip.odds>=1.2&&board.matches[0].tip.odds<=1.5);assert.deepEqual(raw.fixtures[0].markets,f.markets);
   } finally {await rm(directory,{recursive:true,force:true});}
 });
 test('provider outage publishes explicit unavailable state with no synthetic or cached picks',async()=>{

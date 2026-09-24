@@ -31,9 +31,17 @@ test('one highest-probability final pick, one candidate per category, all prices
   const r=analyse(f,policy,{now,leagueCount:50,reliability:stable});
   assert.ok(r.tip);assert.equal(r.categoryTips.length,new Set(r.categoryTips.map(x=>x.category)).size);
   assert.equal(r.tip.probability,Math.max(...r.categoryTips.map(x=>x.probability)));
-  assert.ok(r.categoryTips.every(x=>x.odds<=1.5&&x.odds>1));
+  assert.ok(r.categoryTips.every(x=>x.odds<=1.5&&x.odds>=1.2));
   assert.ok(r.tip.risk.score>=0&&r.tip.risk.score<=100);assert.equal(r.tip.scenarios.length,3);
   assert.ok(r.reasons.join(' ').includes('Alpha FC'));assert.ok(r.tip.lossProbability>=0);
+});
+test('a likely market below 1.20 cannot win a category or become the final pick',()=>{
+  const f=fixture();f.markets=[market(18,'Over/Under',[['Under 9.5',1.19]],'total=9.5')];
+  const skipped=analyse(f,policy,{now,leagueCount:20,reliability:stable});
+  assert.equal(skipped.tip,null);assert.deepEqual(skipped.categoryTips,[]);
+  f.markets.push(market(18,'Over/Under',[['Under 8.5',1.20]],'total=8.5'));
+  const accepted=analyse(f,policy,{now,leagueCount:20,reliability:stable});
+  assert.equal(accepted.tip.odds,1.20);assert.equal(accepted.tip.selection,'Under 8.5');
 });
 test('probability mass is normalized; Asian return calculation values pushes correctly',()=>{
   const grid=scoreGrid(2.5,0.8);assert.ok(Math.abs(grid.reduce((s,r)=>s+r.weight,0)-1)<1e-9);

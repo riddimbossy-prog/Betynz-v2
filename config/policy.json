@@ -1,4 +1,5 @@
 {
+  "minimumOdds": 1.2,
   "maximumOdds": 1.5,
   "busyDayLeagueCount": 50,
   "topTeamCount": 4,

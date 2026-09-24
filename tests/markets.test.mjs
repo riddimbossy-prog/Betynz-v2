@@ -1,7 +1,13 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import { compileSelection,evaluate,lineResult,selections } from '../src/engine/markets.mjs';
 import { fixture,market } from './helpers.mjs';
-test('odds filter is inclusive at 1.50 and excludes suspended, zero, missing, negative and higher prices',()=>{
+test('odds filter includes 1.20 and 1.50 and rejects prices outside both boundaries',()=>{
+  for(const odds of [null,'',0,-1,1,1.01,1.19,1.1999,1.20,1.35,1.50,1.5001,1.51]) {
+    const f=fixture();f.markets=[market(1,'1X2',[['Home',odds]])];
+    assert.equal(selections(f).candidates.length,odds>=1.20&&odds<=1.50?1:0,`odds ${odds}`);
+  }
+});
+test('suspended markets and outcomes are excluded even at an eligible price',()=>{
   const f=fixture();f.markets=[market(1,'1X2',[['Home',1.5],['Draw',1.51],['Away',1]])];
   assert.deepEqual(selections(f).candidates.map(c=>c.odds),[1.5]);
   f.markets[0].outcomes[0].isActive=0;assert.equal(selections(f).candidates.length,0);

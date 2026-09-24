@@ -130,12 +130,12 @@ export function evaluate(s,r) {
     default: return null;
   }
 }
-export function selections(fixture,maxOdds=1.5) {
+export function selections(fixture,maxOdds=1.5,minOdds=1.2) {
   const candidates=[],excluded=[],seen=new Set(); let outcomes=0,qualifying=0;
   for(const m of fixture.markets||[]) {
     for(const o of m.outcomes||[]) {
       outcomes++; const odds=number(o.odds);
-      if(odds===null||odds<=1||odds>maxOdds) continue;
+      if(odds===null||odds<minOdds||odds>maxOdds) continue;
       qualifying++;
       const key=[m.id,m.specifier||'',m.extendedSpecifier||'',o.id||o.desc||o.name].join('|');
       if(seen.has(key)) continue; seen.add(key);

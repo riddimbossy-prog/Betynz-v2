@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id);
-const state={index:null,board:null,date:null,request:0};
+const state={index:null,board:null,date:null,request:0,dialogMatchId:null};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pct=v=>Number.isFinite(v)?`${(v*100).toFixed(1)}%`:'—';
 const signed=v=>`${v>=0?'+':''}${(v*100).toFixed(1)}%`;
@@ -14,6 +14,8 @@ function crest(t) {
 function teams(m) {return `<div class="teams">${['home','away'].map(side=>`<div class="team">${crest(m[side])}<span>${esc(m[side].name)} ${m.standings?.[side]?`<small class="rank">#${m.standings[side]}</small>`:''}</span></div>`).join('')}</div>`;}
 function effective(m) {
   if(!m.tip)return m;
+  const min=state.board.policy?.minimumOdds??1.2,maxOdds=state.board.policy?.maximumOdds??1.5;
+  if(!Number.isFinite(m.tip.odds)||m.tip.odds<min||m.tip.odds>maxOdds)return {...m,tip:null,status:'skipped',reasons:[`Odds must be between ${min.toFixed(2)} and ${maxOdds.toFixed(2)}. Waiting for a qualifying selection.`]};
   if(Date.parse(m.kickoff)<=Date.now())return {...m,tip:null,status:'skipped',reasons:['Match has started; the pre-match tip is no longer active.']};
   const age=Date.now()-Date.parse(m.oddsFetchedAt),max=state.board.policy?.maximumOddsAgeMinutes||90;
   if(!Number.isFinite(age)||age>max*60000)return {...m,tip:null,status:'skipped',reasons:['Odds snapshot has expired. Waiting for a fresh Sportybet scan.']};
@@ -21,7 +23,7 @@ function effective(m) {
 }
 function detail(m) {
   const p=m.tip,form=m.form||{};
-  return `<details><summary>Why this pick · compare markets & risk</summary><div class="analysis">
+  return `<div class="analysis">
     <ul>${m.reasons.map(r=>`<li>${esc(r)}</li>`).join('')}</ul>
     <div class="form-grid">${['home','away'].map(s=>`<div><h3>${esc(m[s].name)} · ${s} form</h3><div class="form-line">${(form[s]?.form||[]).map(v=>`<span class="form-letter ${esc(v)}">${esc(v)}</span>`).join('')}</div><p>Most recent first · ${form[s]?.games||0} games</p></div>`).join('')}</div>
     ${m.h2h?.games?`<h3>H2H advanced</h3><p>${m.h2h.games} meetings · ${m.h2h.sameVenue} in the same venue arrangement. Both teams scored in ${pct(m.h2h.bttsRate)}; over 2.5 goals occurred in ${pct(m.h2h.over25Rate)}. Half-time leads were held in ${pct(m.h2h.leadHoldRate)} of cases, with ${m.h2h.reversals} full reversals across ${m.h2h.halfTimeGames} known half-time results.</p><p>Home-perspective HT/FT paths: ${Object.entries(m.h2h.htftCounts||{}).map(([k,v])=>`${esc(k)}: ${v}`).join(' · ')}. H = home, A = away, D = draw.</p>`:''}
@@ -29,18 +31,29 @@ function detail(m) {
     <p>Sampling range: ${pct(p.probabilityRange[0])}–${pct(p.probabilityRange[1])}; ${p.sampleCount} usable historical matches. ${esc(p.method)}. Risk factors: ${esc(p.risk.factors.join('; ')||'Normal model and match uncertainty')}.</p>
     <h3>Best candidate in each market category</h3><div class="table-wrap"><table><thead><tr><th>Market & selection</th><th>Odds</th><th>Model chance</th><th>Loss chance</th><th>Est. return</th></tr></thead><tbody>${m.categoryTips.map(c=>`<tr><td><b>${esc(c.selection)}</b><small>${esc(c.market)} ${esc(c.specifier)}</small></td><td>${c.odds.toFixed(2)}</td><td>${pct(c.probability)}</td><td>${pct(c.lossProbability)}</td><td class="${c.expectedReturn<0?'negative':'positive'}">${signed(c.expectedReturn)}</td></tr>`).join('')}</tbody></table></div>
     ${p.scenarios?.length?`<h3>What happens if the match goes wrong?</h3><div class="scenario-grid">${p.scenarios.map(s=>`<div class="scenario"><span>${esc(s.label)}</span><strong>${pct(s.survivalProbability)}</strong><small>Conditional chance of avoiding a loss · scenario chance ${pct(s.scenarioProbability)}</small></div>`).join('')}</div>`:''}
-    <h3>League & market coverage</h3><p>${m.coverage?.markets||0} markets fetched; ${m.coverage?.underCap||0} outcomes at 1.50 or lower. League stability checked against ${m.leagueReliability?.forecastChecks||0} historical forecasts. Observed upset rate: ${pct(m.leagueReliability?.upsetRate)}.</p>
+    <h3>League & market coverage</h3><p>${m.coverage?.markets||0} markets fetched; ${m.coverage?.underCap||0} outcomes within the 1.20–1.50 odds range. League stability checked against ${m.leagueReliability?.forecastChecks||0} historical forecasts. Observed upset rate: ${pct(m.leagueReliability?.upsetRate)}.</p>
     ${m.excludedMarkets?.length?`<details><summary>${m.excludedMarkets.length} market outcomes excluded from analysis</summary><ul>${m.excludedMarkets.map(c=>`<li>${esc(c.market)} — ${esc(c.selection)} (${c.odds.toFixed(2)}): ${esc(c.reason)}</li>`).join('')}</ul></details>`:''}
     <p class="analysis-note">${esc(m.probabilityNotice)} Half-win and half-loss settlement is included for supported Asian lines. Sportybet odds checked ${esc(new Date(m.oddsFetchedAt).toLocaleString())}.</p>
-  </div></details>`;
+  </div>`;
+}
+function openPick(id) {
+  const m=state.board?.matches.map(effective).find(m=>m.id===id);
+  if(!m?.tip){render();return;}
+  state.dialogMatchId=id;
+  $('pick-title').textContent=`${m.home.name} v ${m.away.name}`;
+  $('pick-subtitle').textContent=`${m.tip.selection} · ${m.tip.market} · Odds ${m.tip.odds.toFixed(2)}`;
+  $('pick-content').innerHTML=detail(m);
+  $('pick-dialog').showModal();document.body.classList.add('dialog-open');
+  $('pick-content').scrollTop=0;
 }
 function matchCard(m) {
   const p=m.tip;
-  return `<article class="match ${p?'':'skipped'}"><div class="match-top"><span class="competition">${esc(m.league.country)} · ${esc(m.league.name)}</span><span>${esc(localTime(m.kickoff))}${m.gate?.mismatch?' · Mismatch':''}</span></div><div class="match-body">${teams(m)}${p?`<div class="pick"><span class="label">FINAL PICK <span class="price">${p.odds.toFixed(2)}</span></span><div class="selection">${esc(p.selection)}</div><span class="market-name">${esc(p.market)} ${esc(p.specifier)}</span></div><div class="stats"><div class="chance"><strong>${pct(p.probability)}</strong><span>MODEL CHANCE</span></div><div><span class="risk ${p.risk.label.toLowerCase()}">${esc(p.risk.label)} risk</span><span class="risk-score">${p.risk.score}/100 risk score</span></div></div>`:`<div class="skipped-reason"><span class="label">EXCLUDED</span><br>${m.reasons.map(esc).join('<br>')}</div>`}</div>${p?detail(m):''}</article>`;
+  return `<article class="match ${p?'':'skipped'}"><div class="match-top"><span class="competition">${esc(m.league.country)} · ${esc(m.league.name)}</span><span>${esc(localTime(m.kickoff))}${m.gate?.mismatch?' · Mismatch':''}</span></div><div class="match-body">${teams(m)}${p?`<div class="pick"><span class="label">FINAL PICK <span class="price">${p.odds.toFixed(2)}</span></span><div class="selection">${esc(p.selection)}</div><span class="market-name">${esc(p.market)} ${esc(p.specifier)}</span></div><div class="stats"><div class="chance"><strong>${pct(p.probability)}</strong><span>MODEL CHANCE</span></div><div><span class="risk ${p.risk.label.toLowerCase()}">${esc(p.risk.label)} risk</span><span class="risk-score">${p.risk.score}/100 risk score</span></div></div>`:`<div class="skipped-reason"><span class="label">EXCLUDED</span><br>${m.reasons.map(esc).join('<br>')}</div>`}</div>${p?`<button type="button" class="why-pick" data-match-id="${esc(m.id)}" aria-haspopup="dialog" aria-controls="pick-dialog">Why this pick <span aria-hidden="true">↗</span></button>`:''}</article>`;
 }
 function render() {
   if(!state.board)return;
   const all=state.board.matches.map(effective),search=$('search').value.toLowerCase(),league=$('league').value,market=$('market').value,skipped=$('show-skipped').checked;
+  if(state.dialogMatchId&&!all.some(m=>m.id===state.dialogMatchId&&m.tip))$('pick-dialog').close();
   const matches=all.filter(m=>(m.tip||skipped)&&(!league||m.league.id===league)&&(!market||m.tip?.category===market)&&(!search||`${m.home.name} ${m.away.name} ${m.league.name}`.toLowerCase().includes(search)));
   const sort=$('sort').value;
   matches.sort((a,b)=>sort==='kickoff'?Date.parse(a.kickoff)-Date.parse(b.kickoff):sort==='risk'?(a.tip?.risk.score??100)-(b.tip?.risk.score??100):sort==='value'?(b.tip?.expectedReturn??-9)-(a.tip?.expectedReturn??-9):(b.tip?.probability??-1)-(a.tip?.probability??-1));
@@ -54,6 +67,7 @@ function render() {
   document.querySelectorAll('img.crest').forEach(img=>{img.onerror=()=>{const node=document.createElement('span');node.className='crest initial';node.textContent=img.dataset.initial;node.setAttribute('aria-hidden','true');img.replaceWith(node);};});
 }
 async function selectDate(date) {
+  if($('pick-dialog').open)$('pick-dialog').close();
   const request=++state.request;state.date=date;
   document.querySelectorAll('#dates button').forEach(b=>{b.classList.toggle('active',b.dataset.date===date);b.setAttribute('aria-pressed',String(b.dataset.date===date));});
   $('board').innerHTML='<div class="empty"><div class="loading-ring"></div><h3>Loading matches…</h3></div>';
@@ -91,6 +105,17 @@ async function load() {
   finally{$('refresh').disabled=false;}
 }
 for(const id of ['search','league','market','sort','show-skipped'])$(id).addEventListener(id==='search'?'input':'change',render);
+$('board').addEventListener('click',event=>{const button=event.target.closest('.why-pick');if(button)openPick(button.dataset.matchId);});
+$('pick-close').onclick=()=>$('pick-dialog').close();
+$('pick-dialog').addEventListener('click',event=>{
+  if(event.target!==$('pick-dialog'))return;
+  const r=event.target.getBoundingClientRect();
+  if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)event.target.close();
+});
+$('pick-dialog').addEventListener('close',()=>{
+  const id=state.dialogMatchId;state.dialogMatchId=null;document.body.classList.remove('dialog-open');
+  [...document.querySelectorAll('.why-pick')].find(b=>b.dataset.matchId===id)?.focus();
+});
 $('refresh').onclick=load;
 setInterval(render,60000);setInterval(()=>{if(!document.hidden)load();},5*60000);
 load();
