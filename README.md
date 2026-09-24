@@ -4,7 +4,7 @@ A complete replacement of the previous multi-engine application. This repository
 
 ## The requested selection policy
 
-1. Discover daily football fixtures from Sportybet's Today **and** Upcoming books. Follow pagination and fetch each event's full market list; no fixed market whitelist. Retain the original markets in a downloadable daily audit.
+1. Discover daily football fixtures from Sportybet's Today **and** Upcoming books using its required 1X2 discovery parameter. Follow pagination and fetch each event's full market list without a market whitelist. Retain the original markets in a downloadable daily audit.
 2. Only active outcomes with decimal odds **greater than 1.00 and no higher than 1.50** are prediction candidates. Suspended or stale odds never qualify.
 3. Compare candidates using the home team's home form, the away team's away form, league standings, recent H2H, venue-specific H2H, half-time/full-time transitions, scoring trends and available advanced statistics. Select one candidate per market category.
 4. Publish **one final tip per match**: the category winner with the highest estimated probability of a positive return. Expected return and risk break exact ties. Show loss probability, refund probability, uncertainty, expected return and conditional failure scenarios separately.

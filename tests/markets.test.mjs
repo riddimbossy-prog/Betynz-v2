@@ -43,3 +43,15 @@ test('ambiguous sequence, scorer, time window and handicap markets are not guess
     const m=market(800,desc,[['Home',1.3]],'hcp=1');assert.equal(compileSelection(m,m.outcomes[0]),null,desc);
   }
 });
+test('observed Sportybet compound markets preserve their actual win conditions',()=>{
+  const noDraw=market(900041,'No Draw Both Teams To Score Yes/No',[['No',1.29]]);
+  const s=compileSelection(noDraw,noDraw.outcomes[0]);
+  assert.equal(evaluate(s,{home:1,away:1}),1); // A scoring draw makes No win.
+  assert.equal(evaluate(s,{home:2,away:1}),-1);
+  const both=market(59,'Both Halves Under 1.5',[['No',1.10]],'total=1.5');
+  assert.equal(evaluate(compileSelection(both,both.outcomes[0]),{home:2,away:0,htHome:2,htAway:0}),1);
+  const combo=market(854,'Home Team or Over 2.5',[['Yes',1.01]],'total=2.5');
+  const c=compileSelection(combo,combo.outcomes[0]);
+  assert.equal(evaluate(c,{home:0,away:3}),1);assert.equal(evaluate(c,{home:0,away:1}),-1);
+  const f=fixture();f.markets=[{...noDraw,banned:true}];assert.equal(selections(f).candidates.length,0);
+});

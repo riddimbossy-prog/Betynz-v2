@@ -11,7 +11,7 @@ function lineFrom(m,o) {
   const match=clean(o.desc||o.name).match(/(?:over|under)\s*([+-]?\d+(?:\.\d+)?)/);
   return match?Number(match[1]):null;
 }
-export function marketActive(m) { return !m.suspended && !m.isSuspended && (m.status===undefined || m.status===null || String(m.status)==='0' || clean(m.status)==='active'); }
+export function marketActive(m) { return !m.banned && !m.suspended && !m.isSuspended && (m.status===undefined || m.status===null || String(m.status)==='0' || clean(m.status)==='active'); }
 export function outcomeActive(o) { return !o.suspended && !o.isSuspended && o.isActive!==false && String(o.isActive)!=='0' && o.active!==false; }
 function booleanResult(value,want) { return Boolean(value)===want?1:-1; }
 export function lineResult(value,line,direction) {
@@ -42,6 +42,8 @@ export function compileSelection(m,o,fixture={}) {
   const line=lineFrom(m,o); const direction=/^over\b/.test(outcome)?'over':/^under\b/.test(outcome)?'under':null;
   const btts=/both teams (?:to )?score|\bbtts\b|\bgg\b/.test(name);
   const ou=/over\s*\/\s*under|total|number of goals/.test(name);
+  if(/^no draw both teams to score yes\/no$/.test(name)&&yn!==null) return {kind:'no-draw-btts',period,stat,yes:yn};
+  if(/^both halves (over|under)/.test(name)&&line!==null&&yn!==null&&line%1===0.5) return {kind:'both-halves-total',period:'ft',stat,line,direction:name.includes('under')?'under':'over',yes:yn};
   if((name.includes('&')||name.includes(' and ')||name.includes(' or ')) && stat==='goals') {
     // Only unambiguous supported combinations are compiled; never guess the operator.
     const isOr=name.includes(' or ');
@@ -53,7 +55,7 @@ export function compileSelection(m,o,fixture={}) {
       const parts=outcome.split(/\s*(?:&|and)\s*/);
       if(parts.length===2&&/^(over|under)/.test(parts[0])&&yesNo(parts[1])!==null) return {kind:'total-btts',period,stat,line,direction:parts[0].startsWith('over')?'over':'under',yes:yesNo(parts[1]),operator:isOr?'or':'and'};
     }
-    const resultTotal=name.match(/^(home|away|draw) (or|and) (over|under)(?:\/under)?/);
+    const resultTotal=name.match(/^(home|away|draw)(?: team)? (or|and) (over|under)(?:\/under)?/);
     if(resultTotal && line!==null && yn!==null && line%1===0.5) return {kind:'result-total',period,stat,side:resultTotal[1],operator:resultTotal[2],direction:resultTotal[3],line,yes:yn};
     return null;
   }
@@ -96,6 +98,11 @@ export function evaluate(s,r) {
     case 'dnb': return result==='draw'?0:result===s.side?1:-1;
     case 'total': return lineResult(goals,s.line,s.direction);
     case 'btts': return booleanResult(h>0&&a>0,s.yes);
+    case 'no-draw-btts': return booleanResult(h!==a&&h>0&&a>0,s.yes);
+    case 'both-halves-total': {
+      if(r.htHome==null||r.htAway==null)return null;
+      return booleanResult(lineResult(r.htHome+r.htAway,s.line,s.direction)===1&&lineResult(r.home+r.away-r.htHome-r.htAway,s.line,s.direction)===1,s.yes);
+    }
     case 'clean-sheet': return booleanResult(s.team==='home'?a===0:h===0,s.yes);
     case 'win-to-nil': return booleanResult(s.team==='home'?h>0&&a===0:a>0&&h===0,s.yes);
     case 'team-score': return booleanResult(goals>0,s.yes);

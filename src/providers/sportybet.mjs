@@ -1,5 +1,9 @@
 import { HttpClient } from './http.mjs';
 import { number, mapLimit, day } from '../util.mjs';
+// Match the request contract used by the existing, working Ghana web feed.
+// FactsCenter requires a discovery market; event detail returns the full book.
+export const DISCOVERY_MARKET='1';
+const CLIENT_AGENT='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 export function normalizeEvent(ev,tournament={},fetchedAt=new Date().toISOString()) {
   const cat=ev.sport?.category||{}; const tour=cat.tournament||tournament;
   const stamp=number(ev.estimateStartTime);
@@ -14,10 +18,10 @@ export function flattenPage(data,at) {
   return data.tournaments.flatMap(t=>(t.events||[]).map(e=>normalizeEvent(e,t,at)));
 }
 export class Sportybet {
-  constructor({country=process.env.SPORTYBET_COUNTRY||'gh',client,concurrency=Number(process.env.SPORTYBET_CONCURRENCY||4)}={}) {
+  constructor({country=process.env.SPORTYBET_COUNTRY||'gh',client,fetchImpl,concurrency=Number(process.env.SPORTYBET_CONCURRENCY||4)}={}) {
     if(!/^[a-z]{2}$/.test(country)) throw new Error('Invalid SPORTYBET_COUNTRY');
     this.country=country; this.base=`https://www.sportybet.com/api/${country}/factsCenter`;
-    this.client=client||new HttpClient({interval:200,headers:{'user-agent':'Mozilla/5.0',origin:'https://www.sportybet.com',referer:`https://www.sportybet.com/${country}/sport/football`,clientid:'web',platform:'web'}});
+    this.client=client||new HttpClient({fetchImpl,interval:200,headers:{'user-agent':CLIENT_AGENT,accept:'application/json, text/plain, */*',origin:'https://www.sportybet.com',referer:`https://www.sportybet.com/${country}/sport/football/today`,clientid:'web',platform:'web'}});
     this.concurrency=concurrency;
   }
   async call(path,params={}) {
@@ -28,12 +32,13 @@ export class Sportybet {
   }
   async fixtures() {
     const records=new Map(); const diagnostics=[]; let complete=true;
-    // Today and Upcoming are separate books. No market whitelist on discovery.
+    // Today and Upcoming are separate books. marketId is a required discovery
+    // parameter, not the set of markets analysed; eventMarkets loads all of them.
     for(const today of [true,false]) {
       let expected=null; const seen=new Set();
       for(let page=1;page<=200;page++) {
         try {
-          const data=await this.call('pcUpcomingEvents',{sportId:'sr:sport:1',pageSize:100,pageNum:page,...(today?{todayGames:true}:{})});
+          const data=await this.call('pcUpcomingEvents',{sportId:'sr:sport:1',marketId:DISCOVERY_MARKET,pageSize:100,pageNum:page,...(today?{todayGames:true}:{})});
           const rows=flattenPage(data,new Date().toISOString());
           expected=number(data.totalNum);
           let added=0;

@@ -17,7 +17,7 @@ test('missing scores are not zero; extra-time results do not substitute for 90-m
   f.score.fulltime={home:1,away:1};assert.equal(resultRecord(f).home,1);
   assert.equal(normalizeStats([{team:{id:1},statistics:[{type:'Corner Kicks',value:null}]}])['1'].corners,null);
 });
-test('Sportybet scans both books and every page, then downloads event markets without a whitelist',async()=>{
+test('Sportybet scans both books with the required discovery market, then downloads all event markets',async()=>{
   const calls=[];
   const client={async json(url,{validate}) {
     calls.push(String(url));const u=new URL(url),today=u.searchParams.get('todayGames')==='true',page=Number(u.searchParams.get('pageNum'));
@@ -28,8 +28,20 @@ test('Sportybet scans both books and every page, then downloads event markets wi
   }};
   const sporty=new Sportybet({client});const result=await sporty.fixtures();
   assert.equal(result.fixtures.length,3);assert.equal(result.complete,true);
-  assert.ok(calls.every(c=>!c.includes('marketId=')));
+  assert.ok(calls.every(c=>new URL(c).searchParams.get('marketId')==='1'));
   const detail=await sporty.eventMarkets(result.fixtures[0]);assert.equal(detail.markets[0].id,'unknown-new-market');
+  assert.equal(new URL(calls.at(-1)).searchParams.has('marketId'),false);
+});
+test('live Ghana request regression: complete client header avoids 403; discovery market avoids 422',async()=>{
+  const requests=[];
+  const sporty=new Sportybet({fetchImpl:async(url,options)=>{
+    requests.push({url:String(url),headers:options.headers});
+    if(!options.headers['user-agent'].includes('Chrome/'))return new Response('Request blocked',{status:403});
+    if(!new URL(url).searchParams.has('marketId'))return new Response('Missing marketId',{status:422});
+    return Response.json({bizCode:10000,data:{totalNum:0,tournaments:[]}});
+  }});
+  const result=await sporty.fixtures();assert.equal(result.complete,true);assert.equal(requests.length,2);
+  assert.ok(requests.every(r=>r.headers.referer==='https://www.sportybet.com/gh/sport/football/today'));
 });
 test('incomplete pagination and blocked feeds report incomplete, never false success',async()=>{
   let n=0;const client={async json(){n++;throw new Error('HTTP 403');}};
