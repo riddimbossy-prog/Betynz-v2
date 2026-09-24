@@ -30,6 +30,7 @@ jobs:
           restore-keys: football-v7-
       - name: Fetch Sportybet markets and analyse daily fixtures
         env:
+          STATISTICS_PROVIDER: ${{ vars.STATISTICS_PROVIDER || 'sportybet' }}
           API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
           SPORTYBET_COUNTRY: ${{ vars.SPORTYBET_COUNTRY || 'gh' }}
           BOARD_DAYS: ${{ vars.BOARD_DAYS || '1' }}

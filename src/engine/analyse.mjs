@@ -9,7 +9,7 @@ export function eligibility(f,policy,leagueCount,now=Date.now()) {
   if(/postpon|cancel|abandon|live|finish|ended/i.test(f.matchStatus||'')) reasons.push('Match is not available pre-match');
   if(!f.oddsFetchedAt||now-Date.parse(f.oddsFetchedAt)>policy.maximumOddsAgeMinutes*60000) reasons.push('Sportybet odds are stale');
   if(policy.blockedLeagueIds.includes(String(f.league.apiId||f.league.id)))reasons.push('League is excluded');
-  if(policy.blockedLeaguePatterns.some(p=>new RegExp(p,'i').test(f.league.name)))reasons.push('Excluded competition type');
+  if(policy.blockedLeaguePatterns.some(p=>new RegExp(p,'i').test(`${f.league.name} ${f.league.country||''}`)))reasons.push('Excluded competition type');
   if(!h||!a||!size) return {eligible:false,busy,mismatch:false,reasons:[...reasons,'League standings unavailable']};
   const topH=h.rank<=policy.topTeamCount,topA=a.rank<=policy.topTeamCount;
   const bottomH=h.rank>size-policy.bottomTeamCount,bottomA=a.rank>size-policy.bottomTeamCount;
@@ -45,7 +45,7 @@ function explain(f,m,p) {
 export function analyse(f,policy,{leagueCount=0,now=Date.now(),reliability}={}) {
   const gate=eligibility(f,policy,leagueCount,now),book=selections(f,policy.maximumOdds);
   const basic={id:f.id,kickoff:f.kickoff,home:f.home,away:f.away,league:f.league,oddsFetchedAt:f.oddsFetchedAt,gate,coverage:book.counts,
-    excludedMarkets:book.excluded,diagnostics:f.diagnostics||[],standings:{home:f.homeStanding?.rank,away:f.awayStanding?.rank,size:f.league.size}};
+    excludedMarkets:book.excluded,diagnostics:f.diagnostics||[],statsSource:f.statsSource,statsFetchedAt:f.statsFetchedAt,standings:{home:f.homeStanding?.rank,away:f.awayStanding?.rank,size:f.league.size}};
   if(!gate.eligible)return {...basic,status:'skipped',reasons:gate.reasons,categoryTips:[],tip:null};
   const league=reliability||leagueReliability(f.leagueHistory,policy);
   if(!league.reliable)return {...basic,status:'skipped',leagueReliability:league,reasons:[`League reliability: ${league.reason}`],categoryTips:[],tip:null};

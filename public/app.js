@@ -61,6 +61,7 @@ async function selectDate(date) {
     const board=await get(`./data/board-${date}.json`);if(request!==state.request)return;
     if(!Array.isArray(board.matches))throw new Error('The board data is incomplete');
     state.board=board;
+    $('statistics-source').textContent=`Statistics: ${board.statisticsSource||'Awaiting data'}`;
     const warnings=[...(board.diagnostics||[])];
     if(board.generatedAt&&Date.now()-Date.parse(board.generatedAt)>90*60000)warnings.unshift('This board is older than 90 minutes. Expired odds and started matches are excluded.');
     if(board.busyDay)warnings.unshift(`${board.leagueCount} leagues on this date: only clear table and form mismatches can qualify.`);
@@ -74,7 +75,7 @@ async function selectDate(date) {
     $('market').innerHTML='<option value="">All final markets</option>'+[...markets].map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');
     $('market-download').hidden=board.status==='pending';$('market-download').href=`./data/markets-${date}.json`;
     const fresh=board.generatedAt&&Date.now()-Date.parse(board.generatedAt)<90*60000;
-    $('source-status').textContent=board.status==='ready'&&fresh?'Sportybet snapshot':board.status==='partial'?'Partial market feed':'Feed unavailable';$('source-status').classList.toggle('live',board.status==='ready'&&fresh);
+    $('source-status').textContent=board.status==='ready'&&fresh?'Sportybet snapshot':board.status==='partial'?'Partial scan':'Feed unavailable';$('source-status').classList.toggle('live',board.status==='ready'&&fresh);
     render();
   }catch(e){if(request!==state.request)return;state.board=null;$('board').innerHTML=`<div class="empty"><h3>Unable to load this board</h3><p>${esc(e.message)}</p><button id="retry-date">Try again</button></div>`;$('retry-date').onclick=()=>selectDate(date);$('source-status').textContent='Feed unavailable';$('source-status').classList.remove('live');}
 }
