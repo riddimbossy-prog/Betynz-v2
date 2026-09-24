@@ -3,16 +3,17 @@ import { Football,matchFixture } from '../src/providers/football.mjs';
 import { analyse,eligibility } from '../src/engine/analyse.mjs';
 import { leagueReliability } from '../src/engine/model.mjs';
 import { day,addDays,readJSON,writeJSON,mapLimit,unique } from '../src/util.mjs';
-export async function refresh({sporty=new Sportybet(),football=new Football(),dataDir='data',today=day(),days=Number(process.env.BOARD_DAYS||3)}={}) {
+export async function refresh({sporty=new Sportybet(),football=new Football(),dataDir='data',today=day(),days=Number(process.env.BOARD_DAYS||1)}={}) {
   const policy=await readJSON('config/policy.json'),aliases=await readJSON('config/team-aliases.json');
   const dates=Array.from({length:Math.max(1,Math.min(7,days))},(_,n)=>addDays(today,n));
   const start=new Date().toISOString(),diagnostics=[];
   console.log(`Betynz refresh: ${dates.join(', ')} | Sportybet ${sporty.country}`);
   const books=await sporty.dailyBooks(dates).catch(e=>({fixtures:[],complete:false,diagnostics:[e.message]}));
+  console.log(`Sportybet: ${books.fixtures.length} fixtures, ${books.fixtures.reduce((n,f)=>n+f.markets.length,0)} market rows, complete=${books.complete}`);
   diagnostics.push(...books.diagnostics);
   const statsByDay=new Map();
   if(books.fixtures.length) for(const date of dates) {
-    try { statsByDay.set(date,await football.fixtures(date)); }
+    try { statsByDay.set(date,await football.fixtures(date));console.log(`Statistics ${date}: ${statsByDay.get(date).length} fixtures available for matching`); }
     catch(e) { diagnostics.push(`Statistics ${date}: ${e.message}`);statsByDay.set(date,[]); }
   }
   const leagueCache=new Map();

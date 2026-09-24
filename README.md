@@ -56,7 +56,7 @@ Open `http://localhost:3000`. Building before the first refresh displays an hone
 
 ## Production
 
-`.github/workflows/pages.yml` refreshes and deploys `betynz.com` on main-branch changes, manual dispatch and a half-hour cron. GitHub schedule timing is best-effort. It scans today plus the next two UTC days, caches statistics privately, publishes static JSON plus the board to GitHub Pages, and retains a seven-day data-audit artifact. The UI shows local kickoff times, reloads every five minutes and removes started/expired predictions every minute.
+`.github/workflows/pages.yml` refreshes and deploys `betynz.com` on main-branch changes, manual dispatch and a half-hour cron. GitHub schedule timing is best-effort. It scans the current UTC day by default so future-day analysis does not delay today's board. Set the optional repository variable `BOARD_DAYS` to 2–7 for a longer board. It caches statistics privately, publishes static JSON plus the board to GitHub Pages, and retains a seven-day data-audit artifact. New code pushes supersede an older production build; scheduled scans do not interrupt a running scan. The UI shows local kickoff times, reloads every five minutes and removes started/expired predictions every minute.
 
 Required GitHub secret: `API_FOOTBALL_KEY`. Optional repository variable: `SPORTYBET_COUNTRY` (default `gh`). GitHub Pages must use Actions as its deployment source, as in the previous deployment. No secret is included in the website. The replacement no longer uses the old Supabase edge function or old scheduled jobs; it does not delete any existing database or user records.
 
