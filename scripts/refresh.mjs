@@ -1,10 +1,12 @@
 import { Sportybet } from '../src/providers/sportybet.mjs';
 import { Football,matchFixture } from '../src/providers/football.mjs';
 import { SportyStats } from '../src/providers/sporty-stats.mjs';
+import { BetexplorerHtft, findTeam } from '../src/providers/betexplorer-htft.mjs';
 import { analyse,eligibility } from '../src/engine/analyse.mjs';
+import { applyHtft } from '../src/engine/htft.mjs';
 import { leagueReliability } from '../src/engine/model.mjs';
 import { day,addDays,readJSON,writeJSON,mapLimit,unique } from '../src/util.mjs';
-export async function refresh({sporty=new Sportybet(),football=process.env.STATISTICS_PROVIDER==='api-football'?new Football():new SportyStats(),dataDir='data',today=day(),days=Number(process.env.BOARD_DAYS||1)}={}) {
+export async function refresh({sporty=new Sportybet(),football=process.env.STATISTICS_PROVIDER==='api-football'?new Football():new SportyStats(),betexplorer=new BetexplorerHtft(),dataDir='data',today=day(),days=Number(process.env.BOARD_DAYS||1)}={}) {
   const policy=await readJSON('config/policy.json'),aliases=await readJSON('config/team-aliases.json');
   const dates=Array.from({length:Math.max(1,Math.min(7,days))},(_,n)=>addDays(today,n));
   const start=new Date().toISOString(),diagnostics=[];
@@ -54,21 +56,37 @@ export async function refresh({sporty=new Sportybet(),football=process.env.STATI
       } catch(e) { return skipped(`Analysis unavailable: ${e.message}`); }
       finally { processed++; if(processed%20===0)console.log(`${date}: analysed ${processed}/${fixtures.length}`); }
     });
+    const marketsById=new Map(fixtures.map(f=>[f.id,f.markets]));
+    const tables=new Map();
+    for(const row of results.filter(r=>r.tip)) {
+      const key=`${row.league.country||''}|${row.league.name||''}`;
+      if(!tables.has(key)) tables.set(key,betexplorer.leagueTables(row.league).catch(e=>({error:e.message})));
+    }
+    for(const row of results) {
+      if(!row.tip) continue;
+      const key=`${row.league.country||''}|${row.league.name||''}`;
+      const table=await tables.get(key);
+      if(!table||table.error) {
+        row.htft={status:'unavailable',route:'no combo',pick:null,caveat:table?.error||'BetExplorer HT/FT unavailable'};
+        diagnostics.push(`HT/FT ${row.league.name}: ${row.htft.caveat}`);
+        continue;
+      }
+      row.htft=applyHtft({homeRow:findTeam(table.home,row.home.name),awayRow:findTeam(table.away,row.away.name),homeName:row.home.name,awayName:row.away.name,markets:marketsById.get(row.id)||[],minimumOdds:policy.minimumOdds,maximumOdds:policy.maximumOdds,venueConfirmed:table.venueConfirmed});
+    }
     const qualified=results.filter(r=>r.tip).sort((a,b)=>b.tip.probability-a.tip.probability);
     const statisticsErrors=results.filter(r=>r.reasons.some(s=>s.startsWith('Analysis unavailable:')||s==='No verified statistics fixture match')).length;
     const scanComplete=books.complete&&statisticsErrors===0;
-    const board={version:7,date,generatedAt:new Date().toISOString(),oddsSource:'Sportybet',statisticsSource:football.source||'API-Football',
+    const board={version:8,date,generatedAt:new Date().toISOString(),oddsSource:'Sportybet',statisticsSource:football.source||'API-Football',htftSource:'BetExplorer',
       statistics:{matched:matchedCount,analysed:analysisCount,unavailable:statisticsErrors},
       status:scanComplete?'ready':fixtures.length?'partial':'unavailable',complete:scanComplete,oddsComplete:books.complete,leagueCount,busyDay:leagueCount>=policy.busyDayLeagueCount,
-      summary:{fixtures:fixtures.length,qualified:qualified.length,skipped:results.length-qualified.length,markets:fixtures.reduce((s,f)=>s+f.markets.length,0)},
+      summary:{fixtures:fixtures.length,qualified:qualified.length,skipped:results.length-qualified.length,markets:fixtures.reduce((s,f)=>s+f.markets.length,0),htft:qualified.filter(r=>r.htft?.pick).length},
       matches:[...qualified,...results.filter(r=>!r.tip)],diagnostics,policy};
     await writeJSON(`${dataDir}/board-${date}.json`,board);
-    // Retain every returned market, including markets the analysis cannot safely model.
     await writeJSON(`${dataDir}/markets-${date}.json`,{date,fetchedAt:start,source:'Sportybet',complete:books.complete,fixtures:fixtures.map(f=>({id:f.id,kickoff:f.kickoff,home:f.home.name,away:f.away.name,league:f.league,oddsFetchedAt:f.oddsFetchedAt,status:f.marketFetchStatus,markets:f.markets}))});
     daily.push({date,...board.summary,status:board.status,leagueCount});
-    console.log(`${date}: ${fixtures.length} fixtures, ${leagueCount} leagues, ${qualified.length} selected`);
+    console.log(`${date}: ${fixtures.length} fixtures, ${leagueCount} leagues, ${qualified.length} selected, ${board.summary.htft} HT/FT cards`);
   }
-  const index={version:7,generatedAt:new Date().toISOString(),startedAt:start,dates:daily,diagnostics,complete:daily.every(d=>d.status==='ready'),policy};
+  const index={version:8,generatedAt:new Date().toISOString(),startedAt:start,dates:daily,diagnostics,complete:daily.every(d=>d.status==='ready'),policy};
   await writeJSON(`${dataDir}/index.json`,index);
   console.log(JSON.stringify({complete:index.complete,dates:daily,diagnostics:diagnostics.slice(0,15)}));
   return index;
