@@ -34,14 +34,9 @@ jobs:
           STATISTICS_PROVIDER: ${{ vars.STATISTICS_PROVIDER || 'sportybet' }}
           API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
           SPORTYBET_COUNTRY: ${{ vars.SPORTYBET_COUNTRY || 'gh' }}
-          BOARD_DAYS: ${{ vars.BOARD_DAYS || '1' }}
+          BOARD_DAYS: '5'
         run: |
-          hour=$(date -u +%H)
-          if [ "$hour" -ge 21 ]; then
-            export BOARD_DAYS=2
-            echo "9pm Accra window: scanning today and tomorrow"
-          fi
-          echo "BOARD_DAYS=$BOARD_DAYS at ${hour}:00 UTC"
+          echo "Scanning five days from $(date -u +%F) with the shortlist and HT/FT models"
           npm run refresh
       - uses: actions/cache/save@v4
         if: always()
