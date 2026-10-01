@@ -1,128 +1,294 @@
-const $=id=>document.getElementById(id);
-const state={index:null,board:null,date:null,request:0,dialogMatchId:null};
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const pct=v=>Number.isFinite(v)?`${(v*100).toFixed(1)}%`:'—';
-const signed=v=>`${v>=0?'+':''}${(v*100).toFixed(1)}%`;
-const localTime=v=>new Date(v).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-const utcDay=()=>new Date().toISOString().slice(0,10);
-async function get(path) {const response=await fetch(`${path}?t=${Date.now()}`,{cache:'no-store'});if(!response.ok)throw new Error(`Data request failed (${response.status})`);return response.json();}
-function crest(t) {
-  let safe=null;try{const url=new URL(t.logo);if(url.protocol==='https:')safe=url.href;}catch{}
-  const initial=esc(t.name?.slice(0,2).toUpperCase());
-  return safe?`<img class="crest" src="${esc(safe)}" alt="" loading="lazy" data-initial="${initial}">`:`<span class="crest initial" aria-hidden="true">${initial}</span>`;
+const $ = (id) => document.getElementById(id);
+const AMP = "&" + "amp;";
+const LT = "&" + "lt;";
+const GT = "&" + "gt;";
+const QUOT = "&" + "quot;";
+const APOS = "&" + "#39;";
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": AMP, "<": LT, ">": GT, '"': QUOT, "'": APOS }[c]));
+const state = { index: null, board: null, date: null, request: 0, mode: "route", matchId: null, whyKey: null };
+const STOP = new Set(["fc","cf","cd","sc","ac","afc","wfc","fk","sk","bk","if","de","da","do","del","la","el","the","of","and","w","women","club"]);
+
+function wordsOf(name) {
+  return String(name).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z\s-]/g, " ").split(/[\s-]+/).filter((word) => word && !STOP.has(word.toLowerCase()));
 }
-function teams(m) {return `<div class="teams">${['home','away'].map(side=>`<div class="team">${crest(m[side])}<span>${esc(m[side].name)} ${m.standings?.[side]?`<small class="rank">#${m.standings[side]}</small>`:''}</span></div>`).join('')}</div>`;}
-function effective(m) {
-  if(!m.tip)return m;
-  const min=state.board.policy?.minimumOdds??1.2,maxOdds=state.board.policy?.maximumOdds??1.5;
-  if(!Number.isFinite(m.tip.odds)||m.tip.odds<min||m.tip.odds>maxOdds)return {...m,tip:null,status:'skipped',reasons:[`Odds must be between ${min.toFixed(2)} and ${maxOdds.toFixed(2)}. Waiting for a qualifying selection.`]};
-  if(Date.parse(m.kickoff)<=Date.now())return {...m,tip:null,status:'skipped',reasons:['Match has started; the pre-match tip is no longer active.']};
-  const age=Date.now()-Date.parse(m.oddsFetchedAt),max=state.board.policy?.maximumOddsAgeMinutes||90;
-  if(!Number.isFinite(age)||age>max*60000)return {...m,tip:null,status:'skipped',reasons:['Odds snapshot has expired. Waiting for a fresh Sportybet scan.']};
-  return m;
+function teamCode(name) {
+  const words = wordsOf(name);
+  if (!words.length) return "---";
+  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+  if (words.length === 2) return (words[0].slice(0, 2) + words[1][0]).toUpperCase();
+  return words.slice(0, 3).map((word) => word[0]).join("").toUpperCase();
 }
-function detail(m) {
-  const p=m.tip,form=m.form||{};
-  return `<div class="analysis">
-    <ul>${m.reasons.map(r=>`<li>${esc(r)}</li>`).join('')}</ul>
-    <div class="form-grid">${['home','away'].map(s=>`<div><h3>${esc(m[s].name)} · ${s} form</h3><div class="form-line">${(form[s]?.form||[]).map(v=>`<span class="form-letter ${esc(v)}">${esc(v)}</span>`).join('')}</div><p>Most recent first · ${form[s]?.games||0} games</p></div>`).join('')}</div>
-    ${m.h2h?.games?`<h3>H2H advanced</h3><p>${m.h2h.games} meetings · ${m.h2h.sameVenue} in the same venue arrangement. Both teams scored in ${pct(m.h2h.bttsRate)}; over 2.5 goals occurred in ${pct(m.h2h.over25Rate)}. Half-time leads were held in ${pct(m.h2h.leadHoldRate)} of cases, with ${m.h2h.reversals} full reversals across ${m.h2h.halfTimeGames} known half-time results.</p><p>Home-perspective HT/FT paths: ${Object.entries(m.h2h.htftCounts||{}).map(([k,v])=>`${esc(k)}: ${v}`).join(' · ')}. H = home, A = away, D = draw.</p>`:''}
-    <h3>Probability, value & uncertainty</h3><p>Estimated chance of a positive return: <b>${pct(p.probability)}</b>. Estimated chance of losing money: <b>${pct(p.lossProbability)}</b>. Push probability: <b>${pct(p.push)}</b>. Estimated return per unit staked: <b class="${p.expectedReturn<0?'negative':'positive'}">${signed(p.expectedReturn)}</b>.</p>
-    <p>Sampling range: ${pct(p.probabilityRange[0])}–${pct(p.probabilityRange[1])}; ${p.sampleCount} usable historical matches. ${esc(p.method)}. Risk factors: ${esc(p.risk.factors.join('; ')||'Normal model and match uncertainty')}.</p>
-    <h3>Best candidate in each market category</h3><div class="table-wrap"><table><thead><tr><th>Market & selection</th><th>Odds</th><th>Model chance</th><th>Loss chance</th><th>Est. return</th></tr></thead><tbody>${m.categoryTips.map(c=>`<tr><td><b>${esc(c.selection)}</b><small>${esc(c.market)} ${esc(c.specifier)}</small></td><td>${c.odds.toFixed(2)}</td><td>${pct(c.probability)}</td><td>${pct(c.lossProbability)}</td><td class="${c.expectedReturn<0?'negative':'positive'}">${signed(c.expectedReturn)}</td></tr>`).join('')}</tbody></table></div>
-    ${p.scenarios?.length?`<h3>What happens if the match goes wrong?</h3><div class="scenario-grid">${p.scenarios.map(s=>`<div class="scenario"><span>${esc(s.label)}</span><strong>${pct(s.survivalProbability)}</strong><small>Conditional chance of avoiding a loss · scenario chance ${pct(s.scenarioProbability)}</small></div>`).join('')}</div>`:''}
-    <h3>League & market coverage</h3><p>${m.coverage?.markets||0} markets fetched; ${m.coverage?.underCap||0} outcomes within the 1.20–1.50 odds range. League stability checked against ${m.leagueReliability?.forecastChecks||0} historical forecasts. Observed upset rate: ${pct(m.leagueReliability?.upsetRate)}.</p>
-    ${m.excludedMarkets?.length?`<details><summary>${m.excludedMarkets.length} market outcomes excluded from analysis</summary><ul>${m.excludedMarkets.map(c=>`<li>${esc(c.market)} — ${esc(c.selection)} (${c.odds.toFixed(2)}): ${esc(c.reason)}</li>`).join('')}</ul></details>`:''}
-    <p class="analysis-note">${esc(m.probabilityNotice)} Half-win and half-loss settlement is included for supported Asian lines. Sportybet odds checked ${esc(new Date(m.oddsFetchedAt).toLocaleString())}.</p>
-  </div>`;
+function placeName(name) {
+  const words = wordsOf(name);
+  return words.length ? words.join(" ") : String(name);
 }
-function openPick(id) {
-  const m=state.board?.matches.map(effective).find(m=>m.id===id);
-  if(!m?.tip){render();return;}
-  state.dialogMatchId=id;
-  $('pick-title').textContent=`${m.home.name} v ${m.away.name}`;
-  $('pick-subtitle').textContent=`${m.tip.selection} · ${m.tip.market} · Odds ${m.tip.odds.toFixed(2)}`;
-  $('pick-content').innerHTML=detail(m);
-  $('pick-dialog').showModal();document.body.classList.add('dialog-open');
-  $('pick-content').scrollTop=0;
+function fitPlace(place) {
+  const max = 24;
+  if (place.length <= max) return place;
+  const cut = place.slice(0, max);
+  const last = cut.lastIndexOf(" ");
+  return `${(last > 8 ? cut.slice(0, last) : cut).trim()}…`;
 }
-function matchCard(m) {
-  const p=m.tip;
-  return `<article class="match ${p?'':'skipped'}"><div class="match-top"><span class="competition">${esc(m.league.country)} · ${esc(m.league.name)}</span><span>${esc(localTime(m.kickoff))}${m.gate?.mismatch?' · Mismatch':''}</span></div><div class="match-body">${teams(m)}${p?`<div class="pick"><span class="label">FINAL PICK <span class="price">${p.odds.toFixed(2)}</span></span><div class="selection">${esc(p.selection)}</div><span class="market-name">${esc(p.market)} ${esc(p.specifier)}</span></div><div class="stats"><div class="chance"><strong>${pct(p.probability)}</strong><span>MODEL CHANCE</span></div><div><span class="risk ${p.risk.label.toLowerCase()}">${esc(p.risk.label)} risk</span><span class="risk-score">${p.risk.score}/100 risk score</span></div></div>`:`<div class="skipped-reason"><span class="label">EXCLUDED</span><br>${m.reasons.map(esc).join('<br>')}</div>`}</div>${p?`<button type="button" class="why-pick" data-match-id="${esc(m.id)}" aria-haspopup="dialog" aria-controls="pick-dialog">Why this pick <span aria-hidden="true">↗</span></button>`:''}</article>`;
+function clipPlace(name) {
+  const place = placeName(name);
+  return place.length > 16 ? `${place.slice(0, 15).trim()}…` : place;
+}
+function clock(iso) {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
+}
+function dayCode(isoDate) {
+  return new Date(`${isoDate}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" }).slice(0, 3).toUpperCase();
+}
+function dayPlace(isoDate) {
+  return new Date(`${isoDate}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "UTC" });
+}
+function pct(value) { return Number.isFinite(value) ? `${Math.round(value * 100)}%` : "—"; }
+function oddsText(value) { return Number.isFinite(value) ? value.toFixed(2) : "—"; }
+function clip(value, max) {
+  const clean = String(value).replace(/\s+/g, " ").trim();
+  return clean.length > max ? `${clean.slice(0, max - 1).trim()}…` : clean;
+}
+function marketLines(market) {
+  const clean = String(market).replace(/both teams to score/gi, "BTTS").replace(/gg\/ng/gi, "GG").replace(/over\/under/gi, "Total").replace(/\s+/g, " ").trim();
+  const parts = clean.split(/\s[-–/]\s/);
+  if (parts.length >= 2) return [clip(parts[0], 18), clip(parts.slice(1).join(" "), 18)];
+  const words = clean.split(" ");
+  if (words.length < 2) return [clip(clean, 18), ""];
+  const mid = Math.ceil(words.length / 2);
+  return [clip(words.slice(0, mid).join(" "), 18), clip(words.slice(mid).join(" "), 18)];
+}
+function carrier(tip) {
+  const selection = String(tip.selection || "").trim();
+  if (/^(yes|no)$/i.test(selection)) return `${selection} · ${marketLines(tip.market)[0]}`;
+  return selection;
+}
+async function get(path) {
+  const response = await fetch(`${path}?t=${Date.now()}`, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Data request failed (${response.status})`);
+  return response.json();
+}
+function effective(match) {
+  if (!match.tip || !state.board) return match;
+  const min = state.board.policy?.minimumOdds ?? 1.2;
+  const maxOdds = state.board.policy?.maximumOdds ?? 1.5;
+  if (!Number.isFinite(match.tip.odds) || match.tip.odds < min || match.tip.odds > maxOdds) {
+    return { ...match, tip: null, reasons: [`Odds must be between ${min.toFixed(2)} and ${maxOdds.toFixed(2)}.`] };
+  }
+  if (Date.parse(match.kickoff) <= Date.now()) return { ...match, tip: null, reasons: ["Match has started. The pre-match tip is closed."] };
+  const age = Date.now() - Date.parse(match.oddsFetchedAt || "");
+  const max = state.board.policy?.maximumOddsAgeMinutes || 90;
+  if (!Number.isFinite(age) || age > max * 60000) return { ...match, tip: null, reasons: ["Odds snapshot has expired. Waiting for a fresh scan."] };
+  return match;
+}
+function fresh() {
+  return Boolean(state.board?.generatedAt) && Date.now() - Date.parse(state.board.generatedAt) < 90 * 60000;
+}
+function matches() {
+  return (state.board?.matches || []).map(effective);
+}
+function visible() {
+  const needle = $("search").value.trim().toLowerCase();
+  const league = $("league").value;
+  const skipped = $("show-skipped").checked;
+  const rows = matches().filter((match) => {
+    if (!skipped && !match.tip) return false;
+    if (league && match.league.id !== league) return false;
+    if (!needle) return true;
+    return `${match.home.name} ${match.away.name} ${match.league.name}`.toLowerCase().includes(needle);
+  });
+  const sort = $("sort").value;
+  rows.sort((a, b) => sort === "kickoff" ? Date.parse(a.kickoff) - Date.parse(b.kickoff) : sort === "risk" ? (a.tip?.risk.score ?? 100) - (b.tip?.risk.score ?? 100) : sort === "value" ? (b.tip?.expectedReturn ?? -9) - (a.tip?.expectedReturn ?? -9) : (b.tip?.probability ?? -1) - (a.tip?.probability ?? -1));
+  return rows;
+}
+function current() {
+  const rows = visible();
+  return rows.find((match) => match.id === state.matchId) || rows.find((match) => match.tip) || rows[0] || null;
+}
+function orderedTips(match) {
+  const rest = (match.categoryTips || []).filter((tip) => tip.id !== match.tip?.id).sort((a, b) => b.probability - a.probability);
+  return match.tip ? [match.tip, ...rest].slice(0, 5) : rest.slice(0, 5);
+}
+function ticket(top, air, price, attrs, dim = false) {
+  return `<button type="button" class="ticket${dim ? " dim" : ""}" ${attrs}><div class="ticket-top">${top}</div><div class="ticket-bot"><p class="t-air">${air}</p><p class="t-price">${price}</p></div></button>`;
+}
+function side(big, sub, end = false) {
+  return `<div class="${end ? "t-end" : ""}"><p class="t-big">${big}</p><p class="t-sub">${sub}</p></div>`;
+}
+function matchTicket(match) {
+  if (!match.tip) {
+    return ticket(
+      `${side(esc(teamCode(match.home.name)), esc(clipPlace(match.home.name)))}<p class="t-mid">${esc(clock(match.kickoff))}<br>Excluded</p>${side(esc(teamCode(match.away.name)), esc(clipPlace(match.away.name)), true)}`,
+      esc(match.reasons?.[0] || "Excluded"),
+      "—",
+      `data-open="${esc(match.id)}"`,
+      true,
+    );
+  }
+  const [line] = marketLines(match.tip.market);
+  return ticket(
+    `${side(esc(teamCode(match.home.name)), esc(clipPlace(match.home.name)))}<p class="t-mid">${esc(clock(match.kickoff))}<br>${esc(line)}</p>${side(esc(teamCode(match.away.name)), esc(clipPlace(match.away.name)), true)}`,
+    esc(carrier(match.tip)),
+    esc(oddsText(match.tip.odds)),
+    `data-open="${esc(match.id)}"`,
+  );
+}
+function optionTicket(match, tip, index) {
+  const [a, b] = marketLines(tip.market);
+  return ticket(
+    `${side(esc(clock(match.kickoff)), "Kickoff")}<p class="t-mid">${esc(a)}${b ? `<br>${esc(b)}` : ""}</p>${side(esc(pct(tip.probability)), "Model", true)}`,
+    esc(carrier(tip)),
+    esc(oddsText(tip.odds)),
+    `data-why="${index}"`,
+  );
+}
+function header() {
+  const match = current();
+  if (state.mode === "route" && match) {
+    $("from-code").textContent = teamCode(match.home.name);
+    $("from-place").textContent = `, ${fitPlace(placeName(match.home.name))}`;
+    $("to-code").textContent = teamCode(match.away.name);
+    $("to-place").textContent = `, ${fitPlace(placeName(match.away.name))}`;
+    return;
+  }
+  const league = $("league").selectedOptions[0];
+  const date = state.board?.date || new Date().toISOString().slice(0, 10);
+  $("from-code").textContent = $("league").value ? teamCode(league?.textContent || "League") : "ALL";
+  $("from-place").textContent = `, ${league && $("league").value ? league.textContent : "Every league"}`;
+  $("to-code").textContent = dayCode(date);
+  $("to-place").textContent = `, ${dayPlace(date)}`;
+}
+function warn() {
+  const board = state.board;
+  if (!board) return "";
+  if (!fresh() && board.generatedAt) return "Refresh overdue. Prices may be stale.";
+  if (board.status === "pending" || board.status === "unavailable") return "Waiting for the Sportybet scan.";
+  return board.diagnostics?.[0] || "";
 }
 function render() {
-  if(!state.board)return;
-  const all=state.board.matches.map(effective),search=$('search').value.toLowerCase(),league=$('league').value,market=$('market').value,skipped=$('show-skipped').checked;
-  if(state.dialogMatchId&&!all.some(m=>m.id===state.dialogMatchId&&m.tip))$('pick-dialog').close();
-  const active=all.filter(m=>m.tip).length;
-  const expired=state.board.matches.some(m=>m.tip&&Date.parse(m.kickoff)>Date.now()&&!effective(m).tip&&
-    effective(m).reasons[0].startsWith('Odds snapshot has expired'));
-  const fresh=state.board.generatedAt&&Date.now()-Date.parse(state.board.generatedAt)<90*60000;
-  $('source-status').textContent=!fresh&&state.board.generatedAt?'Refresh overdue':expired?'Odds expired':state.board.status==='ready'?'Sportybet snapshot':state.board.status==='partial'?'Partial scan':'Feed unavailable';
-  $('source-status').classList.toggle('live',state.board.status==='ready'&&fresh&&!expired);
-  const warnings=[...(state.board.diagnostics||[])];
-  if(!fresh&&state.board.generatedAt)warnings.unshift('The scheduled scan is overdue. Refresh checks for a newer published scan; expired odds remain excluded.');
-  else if(expired)warnings.unshift('Some odds have expired. Waiting for the next Sportybet scan.');
-  if(state.board.busyDay)warnings.unshift(`${state.board.leagueCount} leagues on this date: only clear table and form mismatches can qualify.`);
-  $('notice').hidden=!warnings.length;$('notice').textContent=warnings.slice(0,3).join(' · ');
-  const summary=state.board.summary||{};
-  $('metrics').innerHTML=[[summary.fixtures||0,'Fixtures scanned'],[active,'Active selections'],[summary.markets||0,'Markets collected'],[state.board.leagueCount||0,state.board.busyDay?'Leagues · mismatch mode':'Leagues today']].map(([v,label])=>`<div class="metric"><strong>${Number(v).toLocaleString()}</strong><span>${esc(label)}</span></div>`).join('');
-  const dateCount=[...document.querySelectorAll('#dates button')].find(b=>b.dataset.date===state.date)?.querySelector('small');
-  if(dateCount)dateCount.textContent=`${active} active ${active===1?'pick':'picks'}`;
-  const matches=all.filter(m=>(m.tip||skipped)&&(!league||m.league.id===league)&&(!market||m.tip?.category===market)&&(!search||`${m.home.name} ${m.away.name} ${m.league.name}`.toLowerCase().includes(search)));
-  const sort=$('sort').value;
-  matches.sort((a,b)=>sort==='kickoff'?Date.parse(a.kickoff)-Date.parse(b.kickoff):sort==='risk'?(a.tip?.risk.score??100)-(b.tip?.risk.score??100):sort==='value'?(b.tip?.expectedReturn??-9)-(a.tip?.expectedReturn??-9):(b.tip?.probability??-1)-(a.tip?.probability??-1));
-  $('result-count').textContent=`${matches.length} shown · ${active} active picks`;
-  if(matches.length)$('board').innerHTML=matches.map(matchCard).join('');
-  else {
-    const unavailable=['unavailable','pending'].includes(state.board.status),filtered=Boolean(search||league||market);
-    $('board').innerHTML=`<div class="empty"><h3>${unavailable?'Waiting for verified data':expired&&!filtered?'Waiting for fresh odds':filtered?'No matches for these filters':'No matches qualify right now'}</h3><p>${unavailable?'The current Sportybet feed is unavailable or the first scan has not completed. The board will populate after a successful refresh.':expired&&!filtered?'The published selections have expired. They will return only after a new scan confirms qualifying odds.':filtered?'Change the team, league or market filters to see more matches.':'Matches must pass the odds, standings, form and league checks. Open excluded matches to see the reasons.'}</p><button id="empty-action">${filtered?'Clear filters':unavailable?'Check again':'View excluded matches'}</button></div>`;
-    $('empty-action').onclick=()=>{if(filtered){$('search').value='';$('league').value='';$('market').value='';render();}else if(unavailable)load();else{$('show-skipped').checked=true;render();}};
-  }
-  document.querySelectorAll('img.crest').forEach(img=>{img.onerror=()=>{const node=document.createElement('span');node.className='crest initial';node.textContent=img.dataset.initial;node.setAttribute('aria-hidden','true');img.replaceWith(node);};});
+  if (!state.board) return;
+  header();
+  const warning = warn();
+  $("note").hidden = !warning;
+  $("note").textContent = warning;
+  const rows = visible();
+  const match = current();
+  if (state.mode === "board") {
+    if (!rows.length) {
+      const filtered = Boolean($("search").value || $("league").value);
+      $("results").innerHTML = `<div class="empty"><h3>${filtered ? "No matches for these filters" : "No matches qualify right now"}</h3><p>${filtered ? "Clear the team or league filter to see the shortlist." : "Open excluded matches to see why they missed the cut."}</p><button type="button" id="empty-action">${filtered ? "Clear filters" : "View excluded"}</button></div>`;
+      $("empty-action").onclick = () => {
+        if (filtered) { $("search").value = ""; $("league").value = ""; }
+        else $("show-skipped").checked = true;
+        render();
+      };
+    } else $("results").innerHTML = rows.map(matchTicket).join("");
+  } else if (!match) {
+    $("results").innerHTML = `<div class="empty"><h3>No matchups qualify</h3><p>Nothing in the 1.20–1.50 band cleared the table and form checks.</p><button type="button" id="empty-action">View excluded</button></div>`;
+    $("empty-action").onclick = () => { $("show-skipped").checked = true; state.mode = "board"; render(); };
+  } else if (!match.tip) {
+    $("results").innerHTML = `<div class="empty"><h3>Excluded</h3><p>${esc(match.reasons?.[0] || "This matchup did not clear the shortlist.")}</p></div>`;
+  } else $("results").innerHTML = orderedTips(match).map((tip, index) => optionTicket(match, tip, index)).join("");
+  $("jumps").innerHTML = rows.map((row) => `<button type="button" data-open="${esc(row.id)}"><span>${esc(teamCode(row.home.name))} — ${esc(teamCode(row.away.name))}<small> · ${esc(placeName(row.home.name))} v ${esc(placeName(row.away.name))}</small></span><strong>${row.tip ? esc(oddsText(row.tip.odds)) : "—"}</strong></button>`).join("");
+  if (state.whyKey != null && match?.tip) fillWhy(match, orderedTips(match)[state.whyKey]);
+}
+function fillWhy(match, tip) {
+  if (!tip) { $("why").hidden = true; state.whyKey = null; return; }
+  const form = match.form || {};
+  const letters = (sideName) => (form[sideName]?.form || []).slice(0, 5).map((letter) => `<span class="${esc(letter)}">${esc(letter)}</span>`).join("");
+  $("why-body").innerHTML = `<p class="why-kicker">WHY THIS PICK</p><h2 class="route-line"><span class="code">${esc(oddsText(tip.odds))}</span><span class="place">, ${esc(carrier(tip))}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)}</p>${optionTicket(match, tip, 0).replace("data-why=\"0\"", "disabled")}<div class="stat-row"><div><strong>${esc(pct(tip.probability))}</strong><span>Model chance</span></div><div><strong>${esc(tip.risk?.score ?? "—")}</strong><span>${esc(tip.risk?.label || "Open")} risk / 100</span></div></div><h3>Why this price</h3><ul>${(match.reasons?.length ? match.reasons : ["No extra matchup note."]).slice(0, 6).map((reason) => `<li>${esc(reason)}</li>`).join("")}</ul><h3>Form</h3><div class="stat-row"><div><strong>${esc(teamCode(match.home.name))}</strong><span>home form</span><div class="form-row">${letters("home")}</div></div><div><strong>${esc(teamCode(match.away.name))}</strong><span>away form</span><div class="form-row">${letters("away")}</div></div></div>${match.h2h?.games ? `<p>${match.h2h.games} recent meetings. Both teams scored in ${esc(pct(match.h2h.bttsRate))}. Over 2.5 in ${esc(pct(match.h2h.over25Rate))}.</p>` : ""}<h3>If the match goes wrong</h3>${tip.scenarios?.length ? `<div class="stat-row">${tip.scenarios.slice(0, 4).map((scenario) => `<div><strong>${esc(pct(scenario.survivalProbability))}</strong><span>${esc(scenario.label)}</span></div>`).join("")}</div>` : "<p>No extra failure scenario for this market.</p>"}<p class="fine">Estimated return ${tip.expectedReturn >= 0 ? "+" : ""}${(tip.expectedReturn * 100).toFixed(1)}% per unit. Sample ${esc(tip.sampleCount)}. ${esc(tip.method)}</p>`;
+  $("why").hidden = false;
+}
+function openMatch(id) {
+  state.matchId = id;
+  state.mode = "route";
+  state.whyKey = null;
+  $("why").hidden = true;
+  $("sheet").hidden = true;
+  $("menu").setAttribute("aria-expanded", "false");
+  render();
+}
+function setSheet(open) {
+  $("sheet").hidden = !open;
+  $("menu").setAttribute("aria-expanded", String(open));
 }
 async function selectDate(date) {
-  if($('pick-dialog').open)$('pick-dialog').close();
-  const request=++state.request;state.date=date;
-  document.querySelectorAll('#dates button').forEach(b=>{b.classList.toggle('active',b.dataset.date===date);b.setAttribute('aria-pressed',String(b.dataset.date===date));});
-  $('board').innerHTML='<div class="empty"><div class="loading-ring"></div><h3>Loading matches…</h3></div>';
+  const request = ++state.request;
+  state.date = date;
+  state.whyKey = null;
+  $("why").hidden = true;
+  document.querySelectorAll("#dates button").forEach((button) => button.classList.toggle("active", button.dataset.date === date));
+  $("results").innerHTML = `<div class="empty"><h3>Loading matches…</h3></div>`;
   try {
-    const board=await get(`./data/board-${date}.json`);if(request!==state.request)return;
-    if(!Array.isArray(board.matches))throw new Error('The board data is incomplete');
-    state.board=board;
-    $('statistics-source').textContent=`Statistics: ${board.statisticsSource||'Awaiting data'}`;
-    $('updated').textContent=board.generatedAt?`Updated ${new Date(board.generatedAt).toLocaleString()}`:'Awaiting first scan';
-    const leagues=new Map(board.matches.map(m=>[m.league.id,m.league.name]));
-    $('league').innerHTML='<option value="">All leagues</option>'+[...leagues].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');
-    const markets=new Map(board.matches.filter(m=>m.tip).map(m=>[m.tip.category,m.tip.market]));
-    $('market').innerHTML='<option value="">All final markets</option>'+[...markets].map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');
-    $('market-download').hidden=board.status==='pending';$('market-download').href=`./data/markets-${date}.json`;
+    const board = await get(`./data/board-${date}.json`);
+    if (request !== state.request) return;
+    if (!Array.isArray(board.matches)) throw new Error("The board data is incomplete");
+    state.board = board;
+    $("statistics-source").textContent = `Statistics: ${board.statisticsSource || "Awaiting data"}`;
+    $("updated").textContent = board.generatedAt ? `Updated ${new Date(board.generatedAt).toLocaleString()}` : "Awaiting first scan";
+    const leagues = new Map(board.matches.map((match) => [match.league.id, match.league.name]));
+    const selected = $("league").value;
+    $("league").innerHTML = `<option value="">All leagues</option>${[...leagues].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => `<option value="${esc(id)}">${esc(name)}</option>`).join("")}`;
+    if ([...leagues.keys()].includes(selected)) $("league").value = selected;
+    $("market-download").hidden = board.status === "pending";
+    $("market-download").href = `./data/markets-${date}.json`;
     render();
-  }catch(e){if(request!==state.request)return;state.board=null;$('board').innerHTML=`<div class="empty"><h3>Unable to load this board</h3><p>${esc(e.message)}</p><button id="retry-date">Try again</button></div>`;$('retry-date').onclick=()=>selectDate(date);$('source-status').textContent='Feed unavailable';$('source-status').classList.remove('live');}
+  } catch (error) {
+    if (request !== state.request) return;
+    state.board = null;
+    $("results").innerHTML = `<div class="empty"><h3>Unable to load this board</h3><p>${esc(error.message)}</p><button type="button" id="retry-date">Try again</button></div>`;
+    $("retry-date").onclick = () => selectDate(date);
+  }
 }
 async function load() {
-  $('refresh').disabled=true;
+  $("refresh").disabled = true;
+  $("refresh-icon").classList.add("spin");
   try {
-    state.index=await get('./data/index.json');
-    const days=state.index.dates||[];if(!days.length)throw new Error('No dates have been published yet');
-    $('dates').innerHTML=days.map(d=>`<button data-date="${esc(d.date)}">${d.date===utcDay()?'Today':new Date(`${d.date}T12:00:00Z`).toLocaleDateString([],{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'})}<small>${d.qualified||0} at last scan</small></button>`).join('');
-    document.querySelectorAll('#dates button').forEach(b=>b.onclick=()=>selectDate(b.dataset.date));
-    await selectDate(days.some(d=>d.date===state.date)?state.date:days.find(d=>d.date===utcDay())?.date||days[0].date);
-  }catch(e){$('notice').hidden=false;$('notice').textContent=`The board could not be loaded: ${e.message}. Use Refresh to try again.`;$('source-status').textContent='Feed unavailable';$('board').innerHTML='<div class="empty"><h3>The board is temporarily unavailable</h3><p>Please refresh in a moment.</p></div>';}
-  finally{$('refresh').disabled=false;}
+    state.index = await get("./data/index.json");
+    const days = state.index.dates || [];
+    if (!days.length) throw new Error("No dates have been published yet");
+    $("dates").innerHTML = days.map((day) => `<button type="button" data-date="${esc(day.date)}">${esc(day.date)}<small> · ${day.qualified || 0} picks</small></button>`).join("");
+    $("dates").querySelectorAll("button").forEach((button) => { button.onclick = () => selectDate(button.dataset.date); });
+    const today = new Date().toISOString().slice(0, 10);
+    await selectDate(days.some((day) => day.date === state.date) ? state.date : days.find((day) => day.date === today)?.date || days[0].date);
+  } catch (error) {
+    $("note").hidden = false;
+    $("note").textContent = `The board could not be loaded: ${error.message}`;
+    $("results").innerHTML = `<div class="empty"><h3>The board is temporarily unavailable</h3><p>Please refresh in a moment.</p></div>`;
+  } finally {
+    $("refresh").disabled = false;
+    $("refresh-icon").classList.remove("spin");
+  }
 }
-for(const id of ['search','league','market','sort','show-skipped'])$(id).addEventListener(id==='search'?'input':'change',render);
-$('board').addEventListener('click',event=>{const button=event.target.closest('.why-pick');if(button)openPick(button.dataset.matchId);});
-$('pick-close').onclick=()=>$('pick-dialog').close();
-$('pick-dialog').addEventListener('click',event=>{
-  if(event.target!==$('pick-dialog'))return;
-  const r=event.target.getBoundingClientRect();
-  if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)event.target.close();
+$("results").addEventListener("click", (event) => {
+  const open = event.target.closest("[data-open]");
+  if (open) { openMatch(open.dataset.open); return; }
+  const why = event.target.closest("[data-why]");
+  if (!why) return;
+  state.whyKey = Number(why.dataset.why);
+  const match = current();
+  if (match) fillWhy(match, orderedTips(match)[state.whyKey]);
 });
-$('pick-dialog').addEventListener('close',()=>{
-  const id=state.dialogMatchId;state.dialogMatchId=null;document.body.classList.remove('dialog-open');
-  [...document.querySelectorAll('.why-pick')].find(b=>b.dataset.matchId===id)?.focus();
+$("jumps").addEventListener("click", (event) => {
+  const open = event.target.closest("[data-open]");
+  if (open) openMatch(open.dataset.open);
 });
-$('refresh').onclick=load;
-setInterval(render,60000);setInterval(()=>{if(!document.hidden)load();},5*60000);
+$("back").onclick = () => {
+  if (!$("sheet").hidden) { setSheet(false); return; }
+  if (!$("why").hidden) { $("why").hidden = true; state.whyKey = null; return; }
+  state.mode = state.mode === "route" ? "board" : "route";
+  render();
+};
+$("menu").onclick = () => setSheet($("sheet").hidden);
+$("sheet-close").onclick = () => setSheet(false);
+$("why-close").onclick = () => { $("why").hidden = true; state.whyKey = null; };
+$("swap").onclick = () => {
+  const rows = visible();
+  if (!rows.length) return;
+  const index = Math.max(0, rows.findIndex((match) => match.id === current()?.id));
+  openMatch(rows[(index + 1) % rows.length].id);
+};
+for (const id of ["search", "league", "sort", "show-skipped"]) $(id).addEventListener(id === "search" ? "input" : "change", render);
+$("refresh").onclick = () => load();
+setInterval(render, 60000);
+setInterval(() => { if (!document.hidden) load(); }, 5 * 60000);
 load();

@@ -1,30 +1,79 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#121916"><meta name="description" content="Betynz compares Sportybet markets with football form, head-to-head evidence and matchup risk.">
-  <title>Betynz · The daily shortlist</title><link rel="icon" href="./icon.svg" type="image/svg+xml"><link rel="stylesheet" href="./styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="Betynz compares Sportybet markets with football form, head-to-head evidence and matchup risk.">
+  <title>Betynz · The daily shortlist</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
   <script src="./app.js" type="module"></script>
 </head>
 <body>
-  <header class="masthead"><div class="nav wrap"><a class="brand" href="./" aria-label="Betynz home"><img src="./icon.svg" alt="" width="34" height="34">BETYNZ<span>THE DAILY SHORTLIST</span></a><div class="nav-right"><span id="source-status" class="source-status">Checking feed</span><button id="refresh" class="quiet">↻ <span>Refresh</span></button></div></div></header>
-  <main class="wrap">
-    <section class="intro"><div><p class="eyebrow">FOOTBALL INTELLIGENCE</p><h1>Every matchup.<br><span>One considered pick.</span></h1><p class="intro-copy">Sportybet markets from 1.20 to 1.50, weighed against form, head-to-head evidence and the ways a match could go wrong.</p></div><aside class="principles"><span class="rule-number">1.20–1.50</span><p>Accepted decimal odds</p><div>Top four & bottom three teams</div><div>No top-five or bottom-three clashes</div><div>Extra mismatch filter on busy days</div></aside></section>
-    <div id="notice" class="notice" role="status" hidden></div>
-    <section class="workspace" aria-label="Daily predictions">
-      <div class="board-heading"><div><p class="eyebrow">THE MATCHDAY BOARD</p><h2>Your daily shortlist</h2></div><span id="updated" class="muted"></span></div>
-      <nav id="dates" class="dates" aria-label="Select fixture date"></nav>
-      <div id="metrics" class="metrics" aria-label="Coverage summary"></div>
-      <div class="toolbar"><label class="search"><span class="sr-only">Search teams or leagues</span><input id="search" type="search" placeholder="Search a team or league…"></label><label><span class="sr-only">League</span><select id="league"><option value="">All leagues</option></select></label><label><span class="sr-only">Market</span><select id="market"><option value="">All final markets</option></select></label><label><span class="sr-only">Sort matches</span><select id="sort"><option value="probability">Highest probability</option><option value="risk">Lowest risk score</option><option value="kickoff">Kickoff time</option><option value="value">Highest estimated return</option></select></label></div>
-      <div class="board-meta"><label class="toggle"><input id="show-skipped" type="checkbox"> Show excluded matches</label><a id="market-download" href="#" download hidden>Download full market list ↗</a><span id="result-count" class="muted"></span></div>
-      <div id="board" class="board" aria-live="polite"><div class="empty"><div class="loading-ring"></div><h3>Loading the daily board</h3><p>Checking the latest Sportybet market snapshot.</p></div></div>
+  <main class="stage">
+    <section class="phone" aria-label="Betynz shortlist">
+      <header class="topbar">
+        <button type="button" id="back" class="orb" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5 L8 12 L15 19" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" id="menu" class="orb" aria-label="Matchday filters" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="8" cy="8" r="1.4"/><circle cx="16" cy="8" r="1.4"/><circle cx="8" cy="16" r="1.4"/><circle cx="16" cy="16" r="1.4"/></svg>
+        </button>
+      </header>
+      <div class="route">
+        <p class="kicker">From</p>
+        <h1 class="route-line"><span class="code" id="from-code">—</span><span class="place" id="from-place"></span></h1>
+        <div class="rule"><i></i>
+          <button type="button" id="swap" class="swap" aria-label="Next matchup">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 7 V17" stroke-linecap="round"/><path d="M8 17 L5.5 14.2" stroke-linecap="round"/><path d="M8 17 L10.5 14.2" stroke-linecap="round"/><path d="M16 17 V7" stroke-linecap="round"/><path d="M16 7 L13.5 9.8" stroke-linecap="round"/><path d="M16 7 L18.5 9.8" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <p class="kicker to">TO</p>
+        <h1 class="route-line"><span class="code" id="to-code">—</span><span class="place" id="to-place"></span></h1>
+      </div>
+      <h2 class="results-label">Search result</h2>
+      <p id="note" class="note" hidden></p>
+      <div id="results" class="results" aria-live="polite">
+        <div class="empty"><h3>Loading the daily board</h3><p>Checking the latest Sportybet market snapshot.</p></div>
+      </div>
+      <div id="sheet" class="sheet" hidden>
+        <header class="topbar">
+          <button type="button" id="sheet-close" class="orb" aria-label="Close filters">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5 L8 12 L15 19" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button type="button" id="refresh" class="orb" aria-label="Refresh feed">
+            <svg id="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 12 a8 8 0 1 1 -2.2 -5.5" stroke-linecap="round"/><path d="M20 5 V10 H15" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </header>
+        <div class="sheet-body">
+          <h2 class="results-label">Matchday</h2>
+          <p id="updated" class="fine"></p>
+          <label class="field">Search<input id="search" type="search" placeholder="Team or league"></label>
+          <label class="field">League<select id="league"><option value="">All leagues</option></select></label>
+          <label class="field">Sort<select id="sort"><option value="probability">Highest probability</option><option value="risk">Lowest risk score</option><option value="kickoff">Kickoff time</option><option value="value">Highest estimated return</option></select></label>
+          <div id="dates" class="jump" aria-label="Select fixture date"></div>
+          <label class="check"><input id="show-skipped" type="checkbox"> Show excluded matches</label>
+          <div id="jumps" class="jump"></div>
+          <ol class="steps">
+            <li><b>Compare the available markets</b><p>Eligible Sportybet outcomes stay active and priced from 1.20 to 1.50.</p></li>
+            <li><b>Read the matchup</b><p>Form, table position, head-to-head and score transitions set the estimate.</p></li>
+            <li><b>Choose one final market</b><p>The highest estimated chance is the pick. The other prices stay on the ticket.</p></li>
+          </ol>
+          <p class="fine">Probabilities are model estimates, not guarantees. Low odds can still lose. <span id="statistics-source">Statistics: Sportybet</span> · Odds: Sportybet. Kickoffs shown in UTC. <a href="https://github.com/riddimbossy-prog/Betynz-v2" target="_blank" rel="noopener noreferrer">Method & source</a></p>
+          <a id="market-download" class="fine" href="#" download hidden>Download full market list</a>
+        </div>
+      </div>
+      <div id="why" class="why" hidden>
+        <header class="topbar">
+          <button type="button" id="why-close" class="orb" aria-label="Back to prices">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5 L8 12 L15 19" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <span></span>
+        </header>
+        <div id="why-body" class="why-body"></div>
+      </div>
     </section>
-    <section class="method"><div><p class="eyebrow">HOW THE SHORTLIST WORKS</p><h2>Evidence first.<br>Risk stays visible.</h2></div><ol><li><b>Compare the available markets</b><p>Every returned Sportybet market is retained. Eligible outcomes must be active and priced from 1.20 to 1.50, including both limits.</p></li><li><b>Read the matchup</b><p>Home and away form, league positions, H2H, score transitions and available advanced statistics inform the estimate.</p></li><li><b>Choose one final market</b><p>The highest estimated chance wins the comparison. Value, uncertainty and failure scenarios remain visible alongside it.</p></li></ol></section>
   </main>
-  <dialog id="pick-dialog" class="pick-dialog" aria-labelledby="pick-title" aria-describedby="pick-subtitle">
-    <div class="dialog-header"><div><p class="eyebrow">WHY THIS PICK</p><h2 id="pick-title"></h2><p id="pick-subtitle"></p></div><button id="pick-close" type="button" class="dialog-close" aria-label="Close explanation" autofocus>Close <span aria-hidden="true">×</span></button></div>
-    <div id="pick-content" class="dialog-content"></div>
-  </dialog>
-  <footer class="wrap"><strong>BETYNZ</strong><p>Probabilities are model estimates, not guarantees. Low odds can still lose. <span id="statistics-source">Statistics: Sportybet / Sportradar</span> · Odds and fixture discovery: Sportybet · All dates use UTC; kickoffs use your local time.</p><a href="https://github.com/riddimbossy-prog/Betynz-v2" target="_blank" rel="noopener noreferrer">Method & source ↗</a></footer>
 </body>
 </html>
