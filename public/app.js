@@ -54,14 +54,29 @@ function render() {
   if(!state.board)return;
   const all=state.board.matches.map(effective),search=$('search').value.toLowerCase(),league=$('league').value,market=$('market').value,skipped=$('show-skipped').checked;
   if(state.dialogMatchId&&!all.some(m=>m.id===state.dialogMatchId&&m.tip))$('pick-dialog').close();
+  const active=all.filter(m=>m.tip).length;
+  const expired=state.board.matches.some(m=>m.tip&&Date.parse(m.kickoff)>Date.now()&&!effective(m).tip&&
+    effective(m).reasons[0].startsWith('Odds snapshot has expired'));
+  const fresh=state.board.generatedAt&&Date.now()-Date.parse(state.board.generatedAt)<90*60000;
+  $('source-status').textContent=!fresh&&state.board.generatedAt?'Refresh overdue':expired?'Odds expired':state.board.status==='ready'?'Sportybet snapshot':state.board.status==='partial'?'Partial scan':'Feed unavailable';
+  $('source-status').classList.toggle('live',state.board.status==='ready'&&fresh&&!expired);
+  const warnings=[...(state.board.diagnostics||[])];
+  if(!fresh&&state.board.generatedAt)warnings.unshift('The scheduled scan is overdue. Refresh checks for a newer published scan; expired odds remain excluded.');
+  else if(expired)warnings.unshift('Some odds have expired. Waiting for the next Sportybet scan.');
+  if(state.board.busyDay)warnings.unshift(`${state.board.leagueCount} leagues on this date: only clear table and form mismatches can qualify.`);
+  $('notice').hidden=!warnings.length;$('notice').textContent=warnings.slice(0,3).join(' · ');
+  const summary=state.board.summary||{};
+  $('metrics').innerHTML=[[summary.fixtures||0,'Fixtures scanned'],[active,'Active selections'],[summary.markets||0,'Markets collected'],[state.board.leagueCount||0,state.board.busyDay?'Leagues · mismatch mode':'Leagues today']].map(([v,label])=>`<div class="metric"><strong>${Number(v).toLocaleString()}</strong><span>${esc(label)}</span></div>`).join('');
+  const dateCount=[...document.querySelectorAll('#dates button')].find(b=>b.dataset.date===state.date)?.querySelector('small');
+  if(dateCount)dateCount.textContent=`${active} active ${active===1?'pick':'picks'}`;
   const matches=all.filter(m=>(m.tip||skipped)&&(!league||m.league.id===league)&&(!market||m.tip?.category===market)&&(!search||`${m.home.name} ${m.away.name} ${m.league.name}`.toLowerCase().includes(search)));
   const sort=$('sort').value;
   matches.sort((a,b)=>sort==='kickoff'?Date.parse(a.kickoff)-Date.parse(b.kickoff):sort==='risk'?(a.tip?.risk.score??100)-(b.tip?.risk.score??100):sort==='value'?(b.tip?.expectedReturn??-9)-(a.tip?.expectedReturn??-9):(b.tip?.probability??-1)-(a.tip?.probability??-1));
-  $('result-count').textContent=`${matches.length} shown · ${all.filter(m=>m.tip).length} active picks`;
+  $('result-count').textContent=`${matches.length} shown · ${active} active picks`;
   if(matches.length)$('board').innerHTML=matches.map(matchCard).join('');
   else {
     const unavailable=['unavailable','pending'].includes(state.board.status),filtered=Boolean(search||league||market);
-    $('board').innerHTML=`<div class="empty"><h3>${unavailable?'Waiting for verified data':filtered?'No matches for these filters':'No matches qualify right now'}</h3><p>${unavailable?'The current Sportybet feed is unavailable or the first scan has not completed. The board will populate after a successful refresh.':filtered?'Change the team, league or market filters to see more matches.':'Matches must pass the odds, standings, form and league checks. Open excluded matches to see the reasons.'}</p><button id="empty-action">${filtered?'Clear filters':unavailable?'Check again':'View excluded matches'}</button></div>`;
+    $('board').innerHTML=`<div class="empty"><h3>${unavailable?'Waiting for verified data':expired&&!filtered?'Waiting for fresh odds':filtered?'No matches for these filters':'No matches qualify right now'}</h3><p>${unavailable?'The current Sportybet feed is unavailable or the first scan has not completed. The board will populate after a successful refresh.':expired&&!filtered?'The published selections have expired. They will return only after a new scan confirms qualifying odds.':filtered?'Change the team, league or market filters to see more matches.':'Matches must pass the odds, standings, form and league checks. Open excluded matches to see the reasons.'}</p><button id="empty-action">${filtered?'Clear filters':unavailable?'Check again':'View excluded matches'}</button></div>`;
     $('empty-action').onclick=()=>{if(filtered){$('search').value='';$('league').value='';$('market').value='';render();}else if(unavailable)load();else{$('show-skipped').checked=true;render();}};
   }
   document.querySelectorAll('img.crest').forEach(img=>{img.onerror=()=>{const node=document.createElement('span');node.className='crest initial';node.textContent=img.dataset.initial;node.setAttribute('aria-hidden','true');img.replaceWith(node);};});
@@ -76,20 +91,12 @@ async function selectDate(date) {
     if(!Array.isArray(board.matches))throw new Error('The board data is incomplete');
     state.board=board;
     $('statistics-source').textContent=`Statistics: ${board.statisticsSource||'Awaiting data'}`;
-    const warnings=[...(board.diagnostics||[])];
-    if(board.generatedAt&&Date.now()-Date.parse(board.generatedAt)>90*60000)warnings.unshift('This board is older than 90 minutes. Expired odds and started matches are excluded.');
-    if(board.busyDay)warnings.unshift(`${board.leagueCount} leagues on this date: only clear table and form mismatches can qualify.`);
-    $('notice').hidden=!warnings.length;$('notice').textContent=warnings.slice(0,3).join(' · ');
     $('updated').textContent=board.generatedAt?`Updated ${new Date(board.generatedAt).toLocaleString()}`:'Awaiting first scan';
-    const summary=board.summary||{};
-    $('metrics').innerHTML=[[summary.fixtures||0,'Fixtures scanned'],[board.matches.filter(m=>effective(m).tip).length,'Active selections'],[summary.markets||0,'Markets collected'],[board.leagueCount||0,board.busyDay?'Leagues · mismatch mode':'Leagues today']].map(([v,label])=>`<div class="metric"><strong>${Number(v).toLocaleString()}</strong><span>${esc(label)}</span></div>`).join('');
     const leagues=new Map(board.matches.map(m=>[m.league.id,m.league.name]));
     $('league').innerHTML='<option value="">All leagues</option>'+[...leagues].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');
     const markets=new Map(board.matches.filter(m=>m.tip).map(m=>[m.tip.category,m.tip.market]));
     $('market').innerHTML='<option value="">All final markets</option>'+[...markets].map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');
     $('market-download').hidden=board.status==='pending';$('market-download').href=`./data/markets-${date}.json`;
-    const fresh=board.generatedAt&&Date.now()-Date.parse(board.generatedAt)<90*60000;
-    $('source-status').textContent=board.status==='ready'&&fresh?'Sportybet snapshot':board.status==='partial'?'Partial scan':'Feed unavailable';$('source-status').classList.toggle('live',board.status==='ready'&&fresh);
     render();
   }catch(e){if(request!==state.request)return;state.board=null;$('board').innerHTML=`<div class="empty"><h3>Unable to load this board</h3><p>${esc(e.message)}</p><button id="retry-date">Try again</button></div>`;$('retry-date').onclick=()=>selectDate(date);$('source-status').textContent='Feed unavailable';$('source-status').classList.remove('live');}
 }
@@ -98,7 +105,7 @@ async function load() {
   try {
     state.index=await get('./data/index.json');
     const days=state.index.dates||[];if(!days.length)throw new Error('No dates have been published yet');
-    $('dates').innerHTML=days.map(d=>`<button data-date="${esc(d.date)}">${d.date===utcDay()?'Today':new Date(`${d.date}T12:00:00Z`).toLocaleDateString([],{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'})}<small>${d.qualified||0} picks</small></button>`).join('');
+    $('dates').innerHTML=days.map(d=>`<button data-date="${esc(d.date)}">${d.date===utcDay()?'Today':new Date(`${d.date}T12:00:00Z`).toLocaleDateString([],{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'})}<small>${d.qualified||0} at last scan</small></button>`).join('');
     document.querySelectorAll('#dates button').forEach(b=>b.onclick=()=>selectDate(b.dataset.date));
     await selectDate(days.some(d=>d.date===state.date)?state.date:days.find(d=>d.date===utcDay())?.date||days[0].date);
   }catch(e){$('notice').hidden=false;$('notice').textContent=`The board could not be loaded: ${e.message}. Use Refresh to try again.`;$('source-status').textContent='Feed unavailable';$('board').innerHTML='<div class="empty"><h3>The board is temporarily unavailable</h3><p>Please refresh in a moment.</p></div>';}

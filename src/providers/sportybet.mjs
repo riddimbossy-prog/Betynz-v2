@@ -14,6 +14,10 @@ export function normalizeEvent(ev,tournament={},fetchedAt=new Date().toISOString
     status:ev.status, matchStatus:ev.matchStatus||'', markets:Array.isArray(ev.markets)?ev.markets:[],oddsFetchedAt:fetchedAt,source:'Sportybet'};
 }
 export function flattenPage(data,at) {
+  // FactsCenter returns data:{} when a page has no remaining events.
+  // It is a valid empty book/page, not a changed fixture schema.
+  if(data && typeof data==='object' && !Array.isArray(data) &&
+    (Object.keys(data).length===0 || (number(data.totalNum)===0 && data.tournaments===undefined))) return [];
   if(!data || !Array.isArray(data.tournaments)) throw new Error('Sportybet fixture schema changed');
   return data.tournaments.flatMap(t=>(t.events||[]).map(e=>normalizeEvent(e,t,at)));
 }
@@ -40,7 +44,9 @@ export class Sportybet {
         try {
           const data=await this.call('pcUpcomingEvents',{sportId:'sr:sport:1',marketId:DISCOVERY_MARKET,pageSize:100,pageNum:page,...(today?{todayGames:true}:{})});
           const rows=flattenPage(data,new Date().toISOString());
-          expected=number(data.totalNum);
+          // The terminal {} response has no total. Keep the previous total so
+          // an actually truncated book still reports incomplete coverage.
+          expected=number(data.totalNum)??expected;
           let added=0;
           for(const row of rows) { if(!row.id || !row.kickoff) continue; if(!seen.has(row.id)) added++; seen.add(row.id); records.set(row.id,row); }
           if(expected!==null && seen.size>=expected) break;

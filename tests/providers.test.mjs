@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import { Sportybet,normalizeEvent } from '../src/providers/sportybet.mjs';
+import { Sportybet,normalizeEvent,flattenPage } from '../src/providers/sportybet.mjs';
 import { matchFixture,resultRecord,nameSimilarity,normalizeStats } from '../src/providers/football.mjs';
 test('fixture matching requires both team identities and close kickoff; never swaps teams',()=>{
   const s={home:{name:'Alpha FC'},away:{name:'Beta FC'},kickoff:'2026-09-23T20:00:00Z'};
@@ -49,4 +49,22 @@ test('incomplete pagination and blocked feeds report incomplete, never false suc
 });
 test('normalization preserves unknown markets and requires a real kickoff',()=>{
   const r=normalizeEvent({eventId:'m',estimateStartTime:null,markets:[{id:12345}]});assert.equal(r.kickoff,null);assert.equal(r.markets.length,1);
+});
+test('FactsCenter empty books are valid but unknown populated schemas are rejected',()=>{
+  assert.deepEqual(flattenPage({}),[]);
+  assert.deepEqual(flattenPage({totalNum:0}),[]);
+  assert.throws(()=>flattenPage({unexpectedEvents:[{}]}),/schema changed/);
+  assert.throws(()=>flattenPage({totalNum:10}),/schema changed/);
+});
+test('an empty terminal page preserves the advertised total and reports truncation',async()=>{
+  const client={async json(url) {
+    const u=new URL(url),page=Number(u.searchParams.get('pageNum'));
+    const data=page===1?{totalNum:2,tournaments:[{events:[{eventId:'sr:match:1',estimateStartTime:Date.parse('2026-10-02T20:00:00Z')}]}]}:{};
+    return {bizCode:10000,data};
+  }};
+  const result=await new Sportybet({client}).fixtures();
+  assert.equal(result.complete,false);
+  assert.ok(result.diagnostics.every(s=>/Incomplete .* book: 1\/2/.test(s)));
+  const empty=await new Sportybet({client:{json:async()=>({bizCode:10000,data:{}})}}).fixtures();
+  assert.equal(empty.complete,true);assert.deepEqual(empty.fixtures,[]);
 });
