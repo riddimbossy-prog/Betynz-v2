@@ -4,6 +4,7 @@ on:
     branches: [main]
   schedule:
     - cron: '7,22,37,52 * * * *'
+    - cron: '0 21 * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -34,7 +35,14 @@ jobs:
           API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
           SPORTYBET_COUNTRY: ${{ vars.SPORTYBET_COUNTRY || 'gh' }}
           BOARD_DAYS: ${{ vars.BOARD_DAYS || '1' }}
-        run: npm run refresh
+        run: |
+          hour=$(date -u +%H)
+          if [ "$hour" -ge 21 ]; then
+            export BOARD_DAYS=2
+            echo "9pm Accra window: scanning today and tomorrow"
+          fi
+          echo "BOARD_DAYS=$BOARD_DAYS at ${hour}:00 UTC"
+          npm run refresh
       - uses: actions/cache/save@v4
         if: always()
         with:
