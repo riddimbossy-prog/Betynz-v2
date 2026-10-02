@@ -27,7 +27,7 @@ export function compileSelection(m,o,fixture={}) {
   if(outcome===clean(fixture.home?.name)) outcome='home';
   if(outcome===clean(fixture.away?.name)) outcome='away';
   const period=/1st half|first half|half time|halftime/.test(name)?'ht':/2nd half|second half/.test(name)?'sh':'ft';
-  const stat=/corner/.test(name)?'corners':/yellow cards?/.test(name)?'yellow':/red cards?/.test(name)?'red':/cards?|booking/.test(name)?'unsupported-cards':'goals';
+  const stat=/fouls?/.test(name)?'fouls':/corner/.test(name)?'corners':/yellow cards?/.test(name)?'yellow':/red cards?/.test(name)?'red':/cards?|booking/.test(name)?'unsupported-cards':'goals';
   // Goals data never stands in for player, timing, corner, card or sequence data.
   if(/player|scorer|assist|minute|next |first goal|last goal|first team|last team|in a row|consecutive|penalty|penalties|extra time|qualify|substitution|offside|throw.?in|goal kick|free kick|shot/.test(name)) return null;
   if(stat==='unsupported-cards') return null; // Provider card-points rules differ from yellow+red counts.

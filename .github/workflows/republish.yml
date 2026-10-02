@@ -1,0 +1,35 @@
+name: Republish corrected market estimates
+on:
+  push:
+    branches: [main]
+    paths:
+      - src/engine/markets.mjs
+      - scripts/republish.mjs
+      - .github/workflows/republish.yml
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: betynz-corrected-snapshot
+  cancel-in-progress: true
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run check && npm test
+      - run: node scripts/republish.mjs
+      - run: npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - uses: actions/deploy-pages@v4
