@@ -14,5 +14,6 @@
   "maximumLeagueBrier": 0.75,
   "maximumOddsAgeMinutes": 90,
   "blockedLeagueIds": [],
-  "blockedLeaguePatterns": ["friendl", "simulated", "esoccer", "virtual", "amateur", "reserve", "u17", "u19", "u20", "u21", "u23", "youth"]
+  "blockedLeaguePatterns": [],
+  "publishAllMatches": true
 }

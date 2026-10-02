@@ -28,7 +28,6 @@ export function sportyTable(data,fixture) {
   if(tables.length!==1)throw new Error('Comparable official league standings unavailable');
   const table=tables[0].tablerows.map(r=>({rank:number(r.pos),team:{id:teamId(r.team),name:r.team.name},
     points:number(r.pointsTotal),goalsDiff:number(r.goalDiffTotal),all:{played:number(r.total),win:number(r.winTotal),draw:number(r.drawTotal),lose:number(r.lossTotal),goals:{for:number(r.goalsForTotal),against:number(r.goalsAgainstTotal)}}}));
-  if(table.length<8)throw new Error('Comparable league standings require at least eight teams');
   if(table.some(t=>!t.team.id||!t.rank||t.rank>table.length||t.points===null||t.all.played===null)||new Set(table.map(t=>t.team.id)).size!==table.length)throw new Error('Incomplete official league standings');
   return table.sort((a,b)=>a.rank-b.rank);
 }
@@ -51,7 +50,6 @@ export class SportyStats {
     const m=await this.get(`stats_match_get/${id}`,10*60000);
     const h=teamId(m.teams?.home),a=teamId(m.teams?.away),kickoff=number(m.time?.uts);
     if(statsId(m._id)!==id||!h||!a||h!==statsId(sporty.home.id)||a!==statsId(sporty.away.id)||kickoff===null||Math.abs(kickoff*1000-Date.parse(sporty.kickoff))>5*60000)throw new Error('Sportybet statistics fixture identity mismatch');
-    if(m.teams.home.virtual||m.teams.away.virtual||m.tournament?.friendly||m.season?.friendly)throw new Error('Excluded competition type');
     if(['canceled','postponed','walkover','retired'].some(k=>m[k]))throw new Error('Match is not available pre-match');
     if(!statsId(m._seasonid)||!statsId(m._tid)||!statsId(m._utid))throw new Error('Statistics season identity unavailable');
     return {fixture:{id,date:new Date(kickoff*1000).toISOString()},
@@ -78,7 +76,7 @@ export class SportyStats {
     table ||= await this.standings(f);leagueHistory ||= await this.leagueHistory(f);
     const h=f.teams.home.id,a=f.teams.away.id,cutoff=Math.min(Date.now(),Date.parse(f.fixture.date)),diagnostics=[];
     const [homeRows,awayRows,h2hRows]=await Promise.all([
-      this.get(`stats_team_lastx/${h}/80`),this.get(`stats_team_lastx/${a}/80`),
+      this.get(`stats_team_lastx/${h}/80`).catch(e=>{diagnostics.push(`Home form unavailable: ${e.message}`);return {matches:[]};}),this.get(`stats_team_lastx/${a}/80`).catch(e=>{diagnostics.push(`Away form unavailable: ${e.message}`);return {matches:[]};}),
       this.get(`stats_team_versus/${h}/${a}`).catch(e=>{diagnostics.push(`H2H unavailable: ${e.message}`);return {matches:[]};})
     ]);
     const normalize=data=>rows(data).map(m=>sportyResult(m)).filter(r=>r&&Date.parse(r.date)<cutoff);

@@ -4,7 +4,8 @@ import { eligibility,analyse } from '../src/engine/analyse.mjs';
 import { scoreGrid,leagueReliability,modelFor,estimate,orient } from '../src/engine/model.mjs';
 import { selections } from '../src/engine/markets.mjs';
 import { fixture,now,standing,record,stable,market } from './helpers.mjs';
-const policy=JSON.parse(await readFile('config/policy.json','utf8'));
+const openPolicy=JSON.parse(await readFile('config/policy.json','utf8'));
+const policy={...openPolicy,publishAllMatches:false,blockedLeaguePatterns:['friendl']};
 test('only top four or bottom three; both-top-five and both-bottom-three are excluded',()=>{
   const f=fixture();assert.equal(eligibility(f,policy,20,now).eligible,true);
   f.homeStanding=standing(1,4);f.awayStanding=standing(18,5);assert.match(eligibility(f,policy,20,now).reasons.join(),/Top-five/);
@@ -59,4 +60,23 @@ test('goals cannot manufacture corners; small advanced samples are rejected',()=
 test('unproven leagues do not inherit a hard-coded reliable-country label',()=>{
   assert.equal(leagueReliability([],policy).reliable,false);
   assert.equal(leagueReliability(fixture().leagueHistory,policy).reliable,false);
+});
+
+test('all matches publish regardless of standings, league type, sample size or league stability',()=>{
+  for(const ranks of [[4,5],[18,20],[8,10]]) {
+    const f=fixture();f.homeStanding=standing(1,ranks[0]);f.awayStanding=standing(18,ranks[1]);
+    f.homeStanding.all.played=1;f.awayStanding.all.played=1;f.homeHistory=f.homeHistory.slice(0,1);f.awayHistory=f.awayHistory.slice(0,1);
+    f.league.name='U19 Club Friendly';
+    const r=analyse(f,openPolicy,{now,leagueCount:100,reliability:{reliable:false,reason:'Unstable'}});
+    assert.ok(r.tip);assert.equal(r.gate.busy,false);assert.ok(r.tip.risk.factors.includes('Unproven or unstable league'));
+  }
+});
+test('missing standings do not block history; missing form publishes an explicit odds-based pick',()=>{
+  const f=fixture();f.homeStanding=null;f.awayStanding=null;f.table=[];
+  assert.ok(analyse(f,openPolicy,{now}).tip);
+  f.homeHistory=[];f.awayHistory=[];
+  const r=analyse(f,openPolicy,{now});assert.ok(r.tip);assert.equal(r.tip.probabilityBasis,'odds');
+  assert.equal(r.tip.sampleCount,0);assert.equal(r.tip.risk.score,null);assert.equal(r.tip.expectedReturn,null);
+  assert.match(r.reasons.join(' '),/not a statistical forecast/);
+  f.oddsFetchedAt='2026-09-23T07:00:00Z';assert.equal(analyse(f,openPolicy,{now}).tip,null);
 });

@@ -8,6 +8,7 @@ export function eligibility(f,policy,leagueCount,now=Date.now()) {
   if(f.status!==undefined&&f.status!==null&&String(f.status)!=='0') reasons.push('Match is not available pre-match');
   if(/postpon|cancel|abandon|live|finish|ended/i.test(f.matchStatus||'')) reasons.push('Match is not available pre-match');
   if(!f.oddsFetchedAt||now-Date.parse(f.oddsFetchedAt)>policy.maximumOddsAgeMinutes*60000) reasons.push('Sportybet odds are stale');
+  if(policy.publishAllMatches) return {eligible:!reasons.length,busy:false,mismatch:false,reasons};
   if(policy.blockedLeagueIds.includes(String(f.league.apiId||f.league.id)))reasons.push('League is excluded');
   if(policy.blockedLeaguePatterns.some(p=>new RegExp(p,'i').test(`${f.league.name} ${f.league.country||''}`)))reasons.push('Excluded competition type');
   if(!h||!a||!size) return {eligible:false,busy,mismatch:false,reasons:[...reasons,'League standings unavailable']};
@@ -28,7 +29,7 @@ function explain(f,m,p,policy) {
   const home=m.home,away=m.away;
   const reasons=[`${f.home.name} earns ${home.ppg.toFixed(2)} points per home game across its last ${home.games}; ${f.away.name} earns ${away.ppg.toFixed(2)} away.`,
     `The home side scores ${home.gf.toFixed(1)} and concedes ${home.ga.toFixed(1)} at home; the away side scores ${away.gf.toFixed(1)} and concedes ${away.ga.toFixed(1)} away.`,
-    `Their table positions are ${f.homeStanding.rank} and ${f.awayStanding.rank} out of ${f.league.size}.`];
+    f.homeStanding&&f.awayStanding?`Their table positions are ${f.homeStanding.rank} and ${f.awayStanding.rank} out of ${f.league.size}.`:'League standings are unavailable; they did not prevent this pick.'];
   if(home.scoringTrend!==null&&away.scoringTrend!==null)reasons.push(`Compared with the previous five venue matches, home scoring changed by ${home.scoringTrend>=0?'+':''}${home.scoringTrend.toFixed(1)} goals per game and away scoring by ${away.scoringTrend>=0?'+':''}${away.scoringTrend.toFixed(1)}.`);
   if(m.h2h.length) {
     const venue=m.h2h.filter(r=>r.venueMatch).length;
@@ -43,29 +44,43 @@ function explain(f,m,p,policy) {
   return reasons;
 }
 export function analyse(f,policy,{leagueCount=0,now=Date.now(),reliability}={}) {
+  f={table:[],homeHistory:[],awayHistory:[],h2h:[],leagueHistory:[],...f};
   const gate=eligibility(f,policy,leagueCount,now),book=selections(f,policy.maximumOdds,policy.minimumOdds);
   const basic={id:f.id,kickoff:f.kickoff,home:f.home,away:f.away,league:f.league,oddsFetchedAt:f.oddsFetchedAt,gate,coverage:book.counts,
     excludedMarkets:book.excluded,diagnostics:f.diagnostics||[],statsSource:f.statsSource,statsFetchedAt:f.statsFetchedAt,standings:{home:f.homeStanding?.rank,away:f.awayStanding?.rank,size:f.league.size}};
   if(!gate.eligible)return {...basic,status:'skipped',reasons:gate.reasons,categoryTips:[],tip:null};
   const league=reliability||leagueReliability(f.leagueHistory,policy);
-  if(!league.reliable)return {...basic,status:'skipped',leagueReliability:league,reasons:[`League reliability: ${league.reason}`],categoryTips:[],tip:null};
+  if(!league.reliable&&!policy.publishAllMatches)return {...basic,status:'skipped',leagueReliability:league,reasons:[`League reliability: ${league.reason}`],categoryTips:[],tip:null};
+  if(policy.publishAllMatches&&(!f.homeHistory.length||!f.awayHistory.length))return oddsOnly(f,policy,basic,book,league);
   const model=modelFor(f),candidates=[];
   for(const candidate of book.candidates) {
-    const estimation=estimate(candidate,model);
+    const estimation=estimate(candidate,model,{minimumSamples:policy.publishAllMatches?1:undefined});
     if(estimation.error) {basic.excludedMarkets.push({...candidate,reason:estimation.error});continue;}
     const gaps=(model.h2h.length<3?0.1:0)+(model.home.xg===null&&model.away.xg===null?0.05:0);
     const riskIndex=clamp(estimation.lossProbability*0.55+estimation.disagreement*0.2+(1/Math.sqrt(estimation.sampleCount||1))*0.1+gaps+((1-(league.score||0)/100)*0.1))*100;
     candidates.push({...candidate,...estimation,risk:{score:round(riskIndex,0),label:riskIndex<25?'Lower':riskIndex<45?'Moderate':'Higher',lossProbability:round(estimation.lossProbability),
-      factors:[...(estimation.disagreement>0.15?['Model/history disagreement']:[]),...(model.h2h.length<3?['Limited H2H sample']:[]),...(model.home.xg===null&&model.away.xg===null?['No xG coverage']:[]),...(estimation.sampleCount<10?['Small statistical sample']:[])]}});
+      factors:[...(!league.reliable?['Unproven or unstable league']:[]),...(estimation.disagreement>0.15?['Model/history disagreement']:[]),...(model.h2h.length<3?['Limited H2H sample']:[]),...(model.home.xg===null&&model.away.xg===null?['No xG coverage']:[]),...(estimation.sampleCount<10?['Small statistical sample']:[])]}});
   }
   // Highest estimated win probability first; value and risk break ties.
   const ranked=candidates.sort((a,b)=>b.probability-a.probability||b.expectedReturn-a.expectedReturn||a.risk.score-b.risk.score);
   const categories=new Map();for(const c of ranked)if(!categories.has(c.category))categories.set(c.category,c);
   const categoryTips=[...categories.values()];let tip=categoryTips[0]||null;
+  if(!tip&&policy.publishAllMatches)return oddsOnly(f,policy,basic,book,league);
   if(tip)tip={...tip,scenarios:failureScenarios(tip.compiled,model)};
   return {...basic,status:tip?'qualified':'skipped',leagueReliability:league,categoryTips,tip,
     reasons:tip?explain(f,model,tip,policy):[`No supported market at odds ${(policy.minimumOdds??1.2).toFixed(2)}–${policy.maximumOdds.toFixed(2)} has sufficient data`],
     form:{home:model.home,away:model.away},h2h:{...advancedH2H(f),sameVenue:model.h2h.filter(r=>r.venueMatch).length},
     expectedGoals:{home:round(model.lambdaHome),away:round(model.lambdaAway)},
     probabilityNotice:'Model estimates, not calibrated guarantees. The range is a sampling-uncertainty indicator and does not include every source of error.'};
+}
+function oddsOnly(f,policy,basic,book,league) {
+  const ranked=book.candidates.map(c=>({...c,probability:1/c.odds,lossProbability:null,push:null,expectedReturn:null,
+    probabilityRange:[null,null],sampleCount:0,method:'Sportybet implied odds; no statistical probability available',
+    probabilityBasis:'odds',scenarios:[],risk:{score:null,label:'Unrated',factors:['Historical evidence unavailable']}})).sort((a,b)=>b.probability-a.probability);
+  const categories=new Map();for(const c of ranked)if(!categories.has(c.category))categories.set(c.category,c);
+  const categoryTips=[...categories.values()],tip=categoryTips[0]||null;
+  return {...basic,status:tip?'qualified':'skipped',leagueReliability:league,categoryTips,tip,
+    reasons:tip?[`${tip.selection} in ${tip.market} has the highest implied chance among supported active prices from ${policy.minimumOdds.toFixed(2)} to ${policy.maximumOdds.toFixed(2)}.`,
+      'Published from Sportybet odds because usable home/away history is missing. The displayed percentage is 1 divided by the odds, includes bookmaker margin and is not a statistical forecast.',...(f.diagnostics||[])]:['No supported active market in the requested odds range'],
+    probabilityNotice:'Odds-based selection; statistical probability, return and risk score are unavailable.'};
 }

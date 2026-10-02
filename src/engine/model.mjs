@@ -80,14 +80,14 @@ function distribution(rows,selection) {
   if(d.weight)for(const k of ['win','push','loss','halfWin','halfLoss'])d[k]/=d.weight;
   return d;
 }
-export function estimate(candidate,model) {
+export function estimate(candidate,model,{minimumSamples}={}) {
   const selection=candidate.compiled;
   // Deduplicate a match appearing in both split form and H2H; overlapping evidence is not independent.
   const distinct=[...new Map(model.samples.map(r=>[r.id,r])).values()];
   const empirical=distribution(distinct,selection);
   const goal=selection.stat==='goals';
-  if(!goal && empirical.count<8) return {error:`Only ${empirical.count} relevant ${selection.stat} records; at least 8 required`};
-  if((selection.period!=='ft'||/half|htft/.test(selection.kind))&&empirical.count<5) return {error:'Insufficient half-time score history'};
+  if(!goal && empirical.count<(minimumSamples??8)) return {error:`Only ${empirical.count} relevant ${selection.stat} records; at least ${minimumSamples??8} required`};
+  if((selection.period!=='ft'||/half|htft/.test(selection.kind))&&empirical.count<(minimumSamples??5)) return {error:'Insufficient half-time score history'};
   const predicted=goal?distribution(model.grid,selection):null;
   if(goal && !predicted.weight) return {error:'Unsupported settlement boundary'};
   const priorWeight=goal?12:4;

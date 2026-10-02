@@ -20,7 +20,7 @@ test('official positions and deducted points survive normalization; regional tab
   const table=sportyTable(data,f);assert.equal(table.length,10);assert.equal(table[0].points,21);assert.equal(table[0].rank,1);
   assert.throws(()=>sportyTable({tables:[data.tables[0]]},f),/Comparable official/);
   assert.throws(()=>sportyTable({tables:[data.tables[1],data.tables[1]]},f),/Comparable official/);
-  assert.throws(()=>sportyTable({tables:[{tournamentid:2,tablerows:tablerows.slice(0,3)}]},{...f,teams:{home:{id:'1'},away:{id:'2'}}}),/eight teams/);
+  assert.equal(sportyTable({tables:[{tournamentid:2,tablerows:tablerows.slice(0,3)}]},{...f,teams:{home:{id:'1'},away:{id:'2'}}}).length,3);
 });
 test('exact Sportybet identity joins reject swapped competitor IDs even when names look similar',async()=>{
   const m=match();const provider=new SportyStats({client:{json:async()=>({doc:[{data:m}]})}});

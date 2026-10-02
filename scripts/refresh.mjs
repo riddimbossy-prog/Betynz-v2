@@ -23,10 +23,18 @@ export async function refresh({sporty=new Sportybet(),football=process.env.STATI
   async function leagueInfo(f) {
     const key=`${f.league.id}:${f.league.season}:${f.league.groupId||''}`;
     if(!leagueCache.has(key))leagueCache.set(key,(async()=>{
-      const [table,leagueHistory]=await Promise.all([football.standings(f),football.leagueHistory(f)]);
+      const [table,leagueHistory]=await Promise.all([football.standings(f).catch(()=>[]),football.leagueHistory(f).catch(()=>[])]);
       return {table,leagueHistory,reliability:leagueReliability(leagueHistory,policy)};
     })());
     return leagueCache.get(key);
+  }
+  async function fallback(f,reason,leagueCount) {
+    let enriched={...f,homeHistory:[],awayHistory:[],h2h:[],leagueHistory:[],diagnostics:[reason]};
+    if(betexplorer.enrich) {
+      try {enriched=await betexplorer.enrich(f);}
+      catch(e) {enriched.diagnostics.push(`BetExplorer statistics unavailable: ${e.message}`);}
+    }
+    return analyse(enriched,policy,{leagueCount});
   }
   const daily=[];
   for(const date of dates) {
@@ -38,9 +46,9 @@ export async function refresh({sporty=new Sportybet(),football=process.env.STATI
       try {
         if(Date.parse(f.kickoff)<=Date.now())return skipped('Match has already started');
         if(f.marketFetchStatus!=='complete')return skipped('Full Sportybet market list unavailable');
-        if(policy.blockedLeaguePatterns.some(p=>new RegExp(p,'i').test(`${f.league.name} ${f.league.country}`)))return skipped('Excluded competition type');
+        if(!policy.publishAllMatches&&policy.blockedLeaguePatterns.some(p=>new RegExp(p,'i').test(`${f.league.name} ${f.league.country}`)))return skipped('Excluded competition type');
         const matched=football.matchFixture?{fixture:await football.matchFixture(f)}:matchFixture(f,statsByDay.get(date)||[],aliases);
-        if(!matched.fixture)return skipped(matched.reason);
+        if(!matched.fixture)return policy.publishAllMatches?fallback(f,matched.reason,leagueCount):skipped(matched.reason);
         matchedCount++;
         const info=await leagueInfo(matched.fixture);
         const homeId=String(matched.fixture.teams.home.id),awayId=String(matched.fixture.teams.away.id);
@@ -49,11 +57,12 @@ export async function refresh({sporty=new Sportybet(),football=process.env.STATI
         const earlyGate=eligibility(skeleton,policy,leagueCount);
         const structural=earlyGate.reasons.filter(r=>!['Insufficient home/away form','Busy-day filter: no clear table and split-form mismatch'].includes(r));
         if(structural.length)return {...skipped(structural[0]),reasons:structural};
-        if(!info.reliability.reliable)return {...skipped(`League reliability: ${info.reliability.reason}`),leagueReliability:info.reliability};
+        if(!policy.publishAllMatches&&!info.reliability.reliable)return {...skipped(`League reliability: ${info.reliability.reason}`),leagueReliability:info.reliability};
         const enriched=await football.enrich(f,matched.fixture,info);
         analysisCount++;
+        if(policy.publishAllMatches&&(!enriched.homeHistory?.length||!enriched.awayHistory?.length))return fallback(f,'Split form unavailable',leagueCount);
         return analyse(enriched,policy,{leagueCount,reliability:info.reliability});
-      } catch(e) { return skipped(`Analysis unavailable: ${e.message}`); }
+      } catch(e) { return policy.publishAllMatches?fallback(f,`Historical analysis unavailable: ${e.message}`,leagueCount):skipped(`Analysis unavailable: ${e.message}`); }
       finally { processed++; if(processed%20===0)console.log(`${date}: analysed ${processed}/${fixtures.length}`); }
     });
     const marketsById=new Map(fixtures.map(f=>[f.id,f.markets]));
@@ -74,11 +83,11 @@ export async function refresh({sporty=new Sportybet(),football=process.env.STATI
       row.htft=applyHtft({homeRow:findTeam(table.home,row.home.name),awayRow:findTeam(table.away,row.away.name),homeName:row.home.name,awayName:row.away.name,markets:marketsById.get(row.id)||[],minimumOdds:policy.minimumOdds,maximumOdds:policy.maximumOdds,venueConfirmed:table.venueConfirmed});
     }
     const qualified=results.filter(r=>r.tip).sort((a,b)=>b.tip.probability-a.tip.probability);
-    const statisticsErrors=results.filter(r=>r.reasons.some(s=>s.startsWith('Analysis unavailable:')||s==='No verified statistics fixture match')).length;
+    const statisticsErrors=results.filter(r=>r.tip?.probabilityBasis==='odds'||r.reasons.some(s=>s.startsWith('Analysis unavailable:')||s==='No verified statistics fixture match')).length;
     const scanComplete=books.complete&&statisticsErrors===0;
-    const board={version:8,date,generatedAt:new Date().toISOString(),oddsSource:'Sportybet',statisticsSource:football.source||'API-Football',htftSource:'BetExplorer',
+    const board={version:8,date,generatedAt:new Date().toISOString(),oddsSource:'Sportybet',statisticsSource:[...new Set(results.map(r=>r.statsSource).filter(Boolean))].join(' / ')||football.source||'API-Football',htftSource:'BetExplorer',
       statistics:{matched:matchedCount,analysed:analysisCount,unavailable:statisticsErrors},
-      status:scanComplete?'ready':fixtures.length?'partial':'unavailable',complete:scanComplete,oddsComplete:books.complete,leagueCount,busyDay:leagueCount>=policy.busyDayLeagueCount,
+      status:scanComplete?'ready':fixtures.length?'partial':'unavailable',complete:scanComplete,oddsComplete:books.complete,leagueCount,busyDay:!policy.publishAllMatches&&leagueCount>=policy.busyDayLeagueCount,
       summary:{fixtures:fixtures.length,qualified:qualified.length,skipped:results.length-qualified.length,markets:fixtures.reduce((s,f)=>s+f.markets.length,0),htft:qualified.filter(r=>r.htft?.pick).length},
       matches:[...qualified,...results.filter(r=>!r.tip)],diagnostics,policy};
     await writeJSON(`${dataDir}/board-${date}.json`,board);

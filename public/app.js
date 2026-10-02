@@ -117,8 +117,8 @@ function side(big, sub, end = false) {
 function matchTicket(match) {
   if (!match.tip) {
     return ticket(
-      `${side(esc(teamCode(match.home.name)), esc(clipPlace(match.home.name)))}<p class="t-mid">${esc(clock(match.kickoff))}<br>Excluded</p>${side(esc(teamCode(match.away.name)), esc(clipPlace(match.away.name)), true)}`,
-      esc(match.reasons?.[0] || "Excluded"),
+      `${side(esc(teamCode(match.home.name)), esc(clipPlace(match.home.name)))}<p class="t-mid">${esc(clock(match.kickoff))}<br>Unavailable</p>${side(esc(teamCode(match.away.name)), esc(clipPlace(match.away.name)), true)}`,
+      esc(match.reasons?.[0] || "Unavailable"),
       "—",
       `data-open="${esc(match.id)}"`,
       true,
@@ -135,7 +135,7 @@ function matchTicket(match) {
 function optionTicket(match, tip, index) {
   const [a, b] = marketLines(tip.market);
   return ticket(
-    `${side(esc(clock(match.kickoff)), "Kickoff")}<p class="t-mid">${esc(a)}${b ? `<br>${esc(b)}` : ""}</p>${side(esc(pct(tip.probability)), "Model", true)}`,
+    `${side(esc(clock(match.kickoff)), "Kickoff")}<p class="t-mid">${esc(a)}${b ? `<br>${esc(b)}` : ""}</p>${side(esc(pct(tip.probability)), tip.probabilityBasis === "odds" ? "Implied odds" : "Model", true)}`,
     esc(carrier(tip)),
     esc(oddsText(tip.odds)),
     `data-why="${index}"`,
@@ -175,7 +175,7 @@ function render() {
   if (state.mode === "board") {
     if (!rows.length) {
       const filtered = Boolean($("search").value || $("league").value);
-      $("results").innerHTML = `<div class="empty"><h3>${filtered ? "No matches for these filters" : "No matches qualify right now"}</h3><p>${filtered ? "Clear the team or league filter to see the shortlist." : "Open excluded matches to see why they missed the cut."}</p><button type="button" id="empty-action">${filtered ? "Clear filters" : "View excluded"}</button></div>`;
+      $("results").innerHTML = `<div class="empty"><h3>${filtered ? "No matches for these filters" : "No matches qualify right now"}</h3><p>${filtered ? "Clear the team or league filter to see the shortlist." : "Open unavailable matches to see missing prices or data."}</p><button type="button" id="empty-action">${filtered ? "Clear filters" : "View unavailable"}</button></div>`;
       $("empty-action").onclick = () => {
         if (filtered) { $("search").value = ""; $("league").value = ""; }
         else $("show-skipped").checked = true;
@@ -183,10 +183,10 @@ function render() {
       };
     } else $("results").innerHTML = rows.map(matchTicket).join("");
   } else if (!match) {
-    $("results").innerHTML = `<div class="empty"><h3>No matchups qualify</h3><p>Nothing in the 1.20–1.50 band cleared the table and form checks.</p><button type="button" id="empty-action">View excluded</button></div>`;
+    $("results").innerHTML = `<div class="empty"><h3>No matchups qualify</h3><p>No current active market is available in the 1.20–1.50 odds range.</p><button type="button" id="empty-action">View unavailable</button></div>`;
     $("empty-action").onclick = () => { $("show-skipped").checked = true; state.mode = "board"; render(); };
   } else if (!match.tip) {
-    $("results").innerHTML = `<div class="empty"><h3>Excluded</h3><p>${esc(match.reasons?.[0] || "This matchup did not clear the shortlist.")}</p></div>`;
+    $("results").innerHTML = `<div class="empty"><h3>Unavailable</h3><p>${esc(match.reasons?.[0] || "This matchup did not clear the shortlist.")}</p></div>`;
   } else $("results").innerHTML = orderedTips(match).map((tip, index) => optionTicket(match, tip, index)).join("");
   $("jumps").innerHTML = rows.map((row) => `<button type="button" data-open="${esc(row.id)}"><span>${esc(teamCode(row.home.name))} — ${esc(teamCode(row.away.name))}<small> · ${esc(placeName(row.home.name))} v ${esc(placeName(row.away.name))}</small></span><strong>${row.tip ? esc(oddsText(row.tip.odds)) : "—"}</strong></button>`).join("");
   if (state.whyKey != null && match?.tip) fillWhy(match, orderedTips(match)[state.whyKey]);
@@ -195,7 +195,7 @@ function fillWhy(match, tip) {
   if (!tip) { $("why").hidden = true; state.whyKey = null; return; }
   const form = match.form || {};
   const letters = (sideName) => (form[sideName]?.form || []).slice(0, 5).map((letter) => `<span class="${esc(letter)}">${esc(letter)}</span>`).join("");
-  $("why-body").innerHTML = `<p class="why-kicker">WHY THIS PICK</p><h2 class="route-line"><span class="code">${esc(oddsText(tip.odds))}</span><span class="place">, ${esc(carrier(tip))}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)}</p>${optionTicket(match, tip, 0).replace("data-why=\"0\"", "disabled")}<div class="stat-row"><div><strong>${esc(pct(tip.probability))}</strong><span>Model chance</span></div><div><strong>${esc(tip.risk?.score ?? "—")}</strong><span>${esc(tip.risk?.label || "Open")} risk / 100</span></div></div><h3>Why this price</h3><ul>${(match.reasons?.length ? match.reasons : ["No extra matchup note."]).slice(0, 6).map((reason) => `<li>${esc(reason)}</li>`).join("")}</ul><h3>Form</h3><div class="stat-row"><div><strong>${esc(teamCode(match.home.name))}</strong><span>home form</span><div class="form-row">${letters("home")}</div></div><div><strong>${esc(teamCode(match.away.name))}</strong><span>away form</span><div class="form-row">${letters("away")}</div></div></div>${match.h2h?.games ? `<p>${match.h2h.games} recent meetings. Both teams scored in ${esc(pct(match.h2h.bttsRate))}. Over 2.5 in ${esc(pct(match.h2h.over25Rate))}.</p>` : ""}<h3>If the match goes wrong</h3>${tip.scenarios?.length ? `<div class="stat-row">${tip.scenarios.slice(0, 4).map((scenario) => `<div><strong>${esc(pct(scenario.survivalProbability))}</strong><span>${esc(scenario.label)}</span></div>`).join("")}</div>` : "<p>No extra failure scenario for this market.</p>"}<p class="fine">Estimated return ${tip.expectedReturn >= 0 ? "+" : ""}${(tip.expectedReturn * 100).toFixed(1)}% per unit. Sample ${esc(tip.sampleCount)}. ${esc(tip.method)}</p>`;
+  $("why-body").innerHTML = `<p class="why-kicker">WHY THIS PICK</p><h2 class="route-line"><span class="code">${esc(oddsText(tip.odds))}</span><span class="place">, ${esc(carrier(tip))}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)}</p>${optionTicket(match, tip, 0).replace("data-why=\"0\"", "disabled")}<div class="stat-row"><div><strong>${esc(pct(tip.probability))}</strong><span>${tip.probabilityBasis === "odds" ? "Implied odds" : "Model chance"}</span></div><div><strong>${esc(tip.risk?.score ?? "—")}</strong><span>${esc(tip.risk?.label || "Open")} risk / 100</span></div></div><h3>Why this price</h3><ul>${(match.reasons?.length ? match.reasons : ["No extra matchup note."]).slice(0, 6).map((reason) => `<li>${esc(reason)}</li>`).join("")}</ul><h3>Form</h3><div class="stat-row"><div><strong>${esc(teamCode(match.home.name))}</strong><span>home form</span><div class="form-row">${letters("home")}</div></div><div><strong>${esc(teamCode(match.away.name))}</strong><span>away form</span><div class="form-row">${letters("away")}</div></div></div>${match.h2h?.games ? `<p>${match.h2h.games} recent meetings. Both teams scored in ${esc(pct(match.h2h.bttsRate))}. Over 2.5 in ${esc(pct(match.h2h.over25Rate))}.</p>` : ""}<h3>If the match goes wrong</h3>${tip.scenarios?.length ? `<div class="stat-row">${tip.scenarios.slice(0, 4).map((scenario) => `<div><strong>${esc(pct(scenario.survivalProbability))}</strong><span>${esc(scenario.label)}</span></div>`).join("")}</div>` : "<p>No extra failure scenario for this market.</p>"}<p class="fine">${Number.isFinite(tip.expectedReturn) ? `Estimated return ${tip.expectedReturn >= 0 ? "+" : ""}${(tip.expectedReturn * 100).toFixed(1)}% per unit.` : "Estimated return unavailable."} Sample ${esc(tip.sampleCount)}. ${esc(tip.method)}</p>`;
   $("why").hidden = false;
 }
 function openMatch(id) {

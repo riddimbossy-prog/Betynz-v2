@@ -1,3 +1,4 @@
+import { nameSimilarity } from './football.mjs';
 const ALIASES = {
   'england|premier league': 'england/premier-league',
   'england|championship': 'england/championship',
@@ -46,6 +47,35 @@ export function findTeam(rows, name) {
   return rows.find(row => teamKey(row.name) === key) || rows.find(row => teamKey(row.name).includes(key) || key.includes(teamKey(row.name))) || null;
 }
 
+export function parseResults(html,anchor=new Date()) {
+  const records=[];
+  const clean=value=>String(value).replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/&#39;|&apos;/g,"'").replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
+  for(const row of String(html).match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)||[]) {
+    const cells=[...row.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m=>m[1]);
+    if(cells.length<3)continue;
+    const teams=cells[0].match(/class=["']in-match["'][^>]*>([\s\S]*?)<\/a>/i);
+    const names=teams?clean(teams[1]).split(/\s+-\s+/):[];
+    const score=clean(cells[1]).match(/^(\d+):(\d+)$/);
+    const date=clean(cells.at(-1)).match(/^(\d{1,2})\.(\d{1,2})\.(?:(\d{4}))?$/);
+    const path=cells[0].match(/href=["']([^"']+)["']/)?.[1];
+    if(names.length!==2||!score||!date||!path||/aet|penalt|awarded|walkover/i.test(row))continue;
+    let year=Number(date[3])||anchor.getUTCFullYear();
+    let at=new Date(Date.UTC(year,Number(date[2])-1,Number(date[1])));
+    if(!date[3]&&at>anchor)at=new Date(Date.UTC(--year,Number(date[2])-1,Number(date[1])));
+    if(at.getUTCMonth()!==Number(date[2])-1||at.getUTCDate()!==Number(date[1])||at>=anchor)continue;
+    records.push({id:`betexplorer:${path}`,date:at.toISOString(),homeName:names[0],awayName:names[1],
+      homeId:`be:${teamKey(names[0])}`,awayId:`be:${teamKey(names[1])}`,home:Number(score[1]),away:Number(score[2]),htHome:null,htAway:null,stats:null});
+  }
+  return [...new Map(records.map(r=>[r.id,r])).values()].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date));
+}
+
+function resolveTeam(records,name) {
+  const names=[...new Set(records.flatMap(r=>[r.homeName,r.awayName]))];
+  const ranked=names.map(n=>({name:n,score:teamKey(n)===teamKey(name)?1:nameSimilarity(n,name)})).sort((a,b)=>b.score-a.score);
+  if(!ranked.length||ranked[0].score<0.8||(ranked[1]&&ranked[0].score-ranked[1].score<0.08))throw new Error(`BetExplorer team identity not verified: ${name}`);
+  return `be:${teamKey(ranked[0].name)}`;
+}
+
 export class BetexplorerHtft {
   constructor({ fetchImpl = fetch, interval = 400 } = {}) {
     this.fetchImpl = fetchImpl;
@@ -57,7 +87,7 @@ export class BetexplorerHtft {
     const slot = Math.max(Date.now(), this.next);
     this.next = slot + this.interval;
     if (slot > Date.now()) await new Promise(resolve => setTimeout(resolve, slot - Date.now()));
-    const response = await this.fetchImpl(url, { headers: { accept: 'text/html', 'user-agent': 'Betynz/1.0' }, signal: AbortSignal.timeout(25000) });
+    const response = await this.fetchImpl(url, { headers: { accept: 'text/html', 'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36' }, signal: AbortSignal.timeout(25000) });
     if (!response.ok) throw new Error(`BetExplorer HTTP ${response.status}`);
     return response.text();
   }
@@ -67,6 +97,18 @@ export class BetexplorerHtft {
     const run = this.load(path);
     this.cache.set(path, run);
     return run;
+  }
+  async enrich(fixture) {
+    const path=leaguePath(fixture.league),key=`results:${path}`;
+    if(!this.cache.has(key))this.cache.set(key,this.text(`https://www.betexplorer.com/football/${path}/results/`));
+    const history=parseResults(await this.cache.get(key),new Date(Math.min(Date.now(),Date.parse(fixture.kickoff))));
+    const home=resolveTeam(history,fixture.home.name),away=resolveTeam(history,fixture.away.name);
+    const homeHistory=history.filter(r=>r.homeId===home).slice(0,10),awayHistory=history.filter(r=>r.awayId===away).slice(0,10);
+    if(!homeHistory.length||!awayHistory.length)throw new Error('BetExplorer home/away results unavailable');
+    return {...fixture,table:[],homeStanding:null,awayStanding:null,home:{...fixture.home,apiId:home},away:{...fixture.away,apiId:away},
+      homeHistory,awayHistory,leagueHistory:history,h2h:history.filter(r=>(r.homeId===home&&r.awayId===away)||(r.homeId===away&&r.awayId===home)),
+      statsSource:'BetExplorer',statsFetchedAt:new Date().toISOString(),diagnostics:['BetExplorer completed results supplied the home/away form. Half-time and advanced statistics are unavailable in this fallback.'],
+      statisticsUrl:`https://www.betexplorer.com/football/${path}/results/`};
   }
   async load(path) {
     const page = await this.text(`https://www.betexplorer.com/football/${path}/`);
