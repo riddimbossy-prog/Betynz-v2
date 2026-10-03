@@ -299,6 +299,36 @@ select:focus-visible {
   right: -11px;
 }
 
+.ticket.won {
+  background: #d4ff4a;
+  color: #172006;
+}
+
+.ticket.won .t-sub,
+.ticket.won .t-mid {
+  color: #3d5214;
+}
+
+.ticket.lost {
+  background: #e10600;
+  color: #fff7f6;
+}
+
+.ticket.lost .t-sub,
+.ticket.lost .t-mid {
+  color: #ffd0cb;
+}
+
+.ticket.lost .t-price { color: #fff; }
+
+.ticket.push {
+  background: #242424;
+  color: var(--color-paper);
+}
+
+.ticket.push .t-sub,
+.ticket.push .t-mid { color: var(--color-fog); }
+
 .ticket.dim {
   background: var(--color-dim);
   color: var(--color-paper);

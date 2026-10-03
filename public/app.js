@@ -1,3 +1,4 @@
+import { resultLabel, settleMatches, toneOf } from "./settle.js";
 const $ = (id) => document.getElementById(id);
 const AMP = "&" + "amp;";
 const LT = "&" + "lt;";
@@ -74,11 +75,13 @@ function effective(match) {
   if (!Number.isFinite(match.tip.odds) || match.tip.odds < min || match.tip.odds > maxOdds) {
     return { ...match, tip: null, reasons: [`Odds must be between ${min.toFixed(2)} and ${maxOdds.toFixed(2)}.`] };
   }
-  if (Date.parse(match.kickoff) <= Date.now()) return { ...match, tip: null, reasons: ["Match has started. The pre-match tip is closed."] };
-  const age = Date.now() - Date.parse(match.oddsFetchedAt || "");
-  const max = state.board.policy?.maximumOddsAgeMinutes || 90;
-  if (!Number.isFinite(age) || age > max * 60000) return { ...match, tip: null, reasons: ["Odds snapshot has expired. Waiting for a fresh scan."] };
-  return match;
+  const started = Date.parse(match.kickoff) <= Date.now();
+  if (!started) {
+    const age = Date.now() - Date.parse(match.oddsFetchedAt || "");
+    const max = state.board.policy?.maximumOddsAgeMinutes || 90;
+    if (!Number.isFinite(age) || age > max * 60000) return { ...match, tip: null, reasons: ["Odds snapshot has expired. Waiting for a fresh scan."] };
+  }
+  return { ...match, started };
 }
 function fresh() {
   return Boolean(state.board?.generatedAt) && Date.now() - Date.parse(state.board.generatedAt) < 90 * 60000;
@@ -108,8 +111,9 @@ function orderedTips(match) {
   const rest = (match.categoryTips || []).filter((tip) => tip.id !== match.tip?.id).sort((a, b) => b.probability - a.probability);
   return match.tip ? [match.tip, ...rest].slice(0, 5) : rest.slice(0, 5);
 }
-function ticket(top, air, price, attrs, dim = false) {
-  return `<button type="button" class="ticket${dim ? " dim" : ""}" ${attrs}><div class="ticket-top">${top}</div><div class="ticket-bot"><p class="t-air">${air}</p><p class="t-price">${price}</p></div></button>`;
+function ticket(top, air, price, attrs, dim = false, tone = "") {
+  const toneClass = tone ? ` ${tone}` : "";
+  return `<button type="button" class="ticket${dim ? " dim" : ""}${toneClass}" ${attrs}><div class="ticket-top">${top}</div><div class="ticket-bot"><p class="t-air">${air}</p><p class="t-price">${price}</p></div></button>`;
 }
 function side(big, sub, end = false) {
   return `<div class="${end ? "t-end" : ""}"><p class="t-big">${big}</p><p class="t-sub">${sub}</p></div>`;
@@ -124,21 +128,28 @@ function matchTicket(match) {
       true,
     );
   }
+  const label = resultLabel(match.tip.settlement);
+  const scored = label && label !== "Live";
   const [line] = marketLines(match.tip.market);
   return ticket(
-    `${side(esc(teamCode(match.home.name)), esc(clipPlace(match.home.name)))}<p class="t-mid">${esc(clock(match.kickoff))}<br>${esc(line)}</p>${side(esc(teamCode(match.away.name)), esc(clipPlace(match.away.name)), true)}`,
-    esc(carrier(match.tip)),
+    `${side(esc(teamCode(match.home.name)), esc(clipPlace(match.home.name)))}<p class="t-mid">${esc(scored ? label : label || clock(match.kickoff))}<br>${esc(scored ? "Full time" : line)}</p>${side(esc(teamCode(match.away.name)), esc(clipPlace(match.away.name)), true)}`,
+    esc(label ? `${carrier(match.tip)} · ${label}` : carrier(match.tip)),
     esc(oddsText(match.tip.odds)),
     `data-open="${esc(match.id)}"`,
+    false,
+    toneOf(match.tip.settlement),
   );
 }
 function optionTicket(match, tip, index) {
   const [a, b] = marketLines(tip.market);
+  const label = resultLabel(tip.settlement);
   return ticket(
-    `${side(esc(clock(match.kickoff)), "Kickoff")}<p class="t-mid">${esc(a)}${b ? `<br>${esc(b)}` : ""}</p>${side(esc(pct(tip.probability)), tip.probabilityBasis === "odds" ? "Implied odds" : "Model", true)}`,
-    esc(carrier(tip)),
+    `${side(esc(clock(match.kickoff)), "Kickoff")}<p class="t-mid">${esc(label || a)}${!label && b ? `<br>${esc(b)}` : ""}</p>${side(esc(pct(tip.probability)), tip.probabilityBasis === "odds" ? "Implied odds" : "Model", true)}`,
+    esc(label ? `${carrier(tip)} · ${label}` : carrier(tip)),
     esc(oddsText(tip.odds)),
     `data-why="${index}"`,
+    false,
+    toneOf(tip.settlement),
   );
 }
 function header() {
@@ -164,6 +175,7 @@ function warn() {
   if (board.status === "pending" || board.status === "unavailable") return "Waiting for the Sportybet scan.";
   return board.diagnostics?.[0] || "";
 }
+let settling = false;
 function render() {
   if (!state.board) return;
   header();
@@ -190,6 +202,31 @@ function render() {
   } else $("results").innerHTML = orderedTips(match).map((tip, index) => optionTicket(match, tip, index)).join("");
   $("jumps").innerHTML = rows.map((row) => `<button type="button" data-open="${esc(row.id)}"><span>${esc(teamCode(row.home.name))} — ${esc(teamCode(row.away.name))}<small> · ${esc(placeName(row.home.name))} v ${esc(placeName(row.away.name))}</small></span><strong>${row.tip ? esc(oddsText(row.tip.odds)) : "—"}</strong></button>`).join("");
   if (state.whyKey != null && match?.tip) fillWhy(match, orderedTips(match)[state.whyKey]);
+  if (!settling) queueSettle();
+}
+function needsScore(match) {
+  if (!match?.tip || Date.parse(match.kickoff) > Date.now()) return false;
+  const settlement = match.tip.settlement;
+  if (!settlement) return true;
+  return settlement.verdict === "pending" && Date.now() - settlement.at > 45000;
+}
+async function queueSettle() {
+  const jobs = [];
+  const seen = new Set();
+  for (const match of state.board?.matches || []) {
+    if (!needsScore(match) || seen.has(match.id)) continue;
+    seen.add(match.id);
+    jobs.push(match);
+  }
+  if (!jobs.length || settling) return;
+  settling = true;
+  try {
+    await settleMatches(jobs);
+  } finally {
+    settling = false;
+  }
+  if (document.querySelector("#stamps button.active")) return;
+  render();
 }
 function fillWhy(match, tip) {
   if (!tip) { $("why").hidden = true; state.whyKey = null; return; }
