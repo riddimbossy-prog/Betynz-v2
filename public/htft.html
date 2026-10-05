@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="Betynz half-time / full-time board. One gated pick per match from the HT/FT table.">
+  <title>Betynz · HT/FT</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./htft-page.js" type="module"></script>
+</head>
+<body>
+  <main class="stage">
+    <section class="phone" aria-label="Betynz HT/FT board">
+      <header class="topbar">
+        <a class="orb" href="./index.html" aria-label="Back to the shortlist">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5 L8 12 L15 19" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a class="htft-nav" href="./index.html">Shortlist</a>
+        <span class="orb" aria-hidden="true"></span>
+      </header>
+      <div class="route">
+        <p class="kicker">From</p>
+        <h1 class="route-line"><span class="code">HT</span><span class="place">, half-time</span></h1>
+        <div class="rule"><i></i></div>
+        <p class="kicker to">TO</p>
+        <h1 class="route-line"><span class="code">FT</span><span class="place">, full-time</span></h1>
+      </div>
+      <div id="stamps" class="stamps" aria-label="Fixture dates"></div>
+      <h2 class="results-label">HT/FT board</h2>
+      <p id="note" class="note">Loading the HT/FT cards.</p>
+      <div id="results" class="results" aria-live="polite">
+        <div class="empty"><h3>Loading HT/FT</h3><p>Reading the published cards.</p></div>
+      </div>
+      <div id="why" class="why" hidden>
+        <header class="topbar">
+          <button type="button" id="why-close" class="orb" aria-label="Back to the board">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5 L8 12 L15 19" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <span></span>
+        </header>
+        <div id="why-body" class="why-body"></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

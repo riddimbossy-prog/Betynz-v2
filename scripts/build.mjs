@@ -4,12 +4,18 @@ import { day,readJSON,writeJSON } from '../src/util.mjs';
 await rm('dist',{recursive:true,force:true});await mkdir('dist/data',{recursive:true});
 await cp('public','dist',{recursive:true});
 // A new HTML page must never reuse an older cached interface script or styles.
-let html=await readFile('dist/index.html','utf8');
-for(const asset of ['app.js','styles.css']) {
-  const hash=createHash('sha256').update(await readFile(`dist/${asset}`)).digest('hex').slice(0,12);
-  html=html.replaceAll(`./${asset}"`,`./${asset}?v=${hash}"`);
+let html = await readFile('dist/index.html', 'utf8');
+let htftHtml = await readFile('dist/htft.html', 'utf8');
+for (const asset of ['app.js', 'styles.css', 'dates.js', 'htft-card.js']) {
+  const hash = createHash('sha256').update(await readFile(`dist/${asset}`)).digest('hex').slice(0, 12);
+  html = html.replaceAll(`./${asset}"`, `./${asset}?v=${hash}"`);
 }
-await writeFile('dist/index.html',html);
+for (const asset of ['htft-page.js', 'styles.css']) {
+  const hash = createHash('sha256').update(await readFile(`dist/${asset}`)).digest('hex').slice(0, 12);
+  htftHtml = htftHtml.replaceAll(`./${asset}"`, `./${asset}?v=${hash}"`);
+}
+await writeFile('dist/index.html', html);
+await writeFile('dist/htft.html', htftHtml);
 const index=await readJSON('data/index.json');
 if(index) {
   await writeJSON('dist/data/index.json',index);

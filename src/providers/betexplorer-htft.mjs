@@ -6,6 +6,8 @@ const ALIASES = {
   'england|league two': 'england/league-two',
   'spain|la liga': 'spain/laliga',
   'spain|laliga': 'spain/laliga',
+  'spain|laliga hypermotion': 'spain/laliga2',
+  'spain|laliga 2': 'spain/laliga2',
   'italy|serie a': 'italy/serie-a',
   'germany|bundesliga': 'germany/bundesliga',
   'france|ligue 1': 'france/ligue-1',
@@ -13,7 +15,21 @@ const ALIASES = {
   'portugal|primeira liga': 'portugal/liga-portugal',
   'scotland|premiership': 'scotland/premiership',
   'ghana|premier league': 'ghana/premier-league',
+  'brazil|brasileiro serie a': 'brazil/serie-a-betano',
+  'brazil|serie a': 'brazil/serie-a-betano',
+  'brazil|brasileiro serie b': 'brazil/serie-b',
+  'brazil|serie b': 'brazil/serie-b',
+  'international|uefa nations league': 'europe/uefa-nations-league',
+  'china|chinese super league': 'china/super-league',
+  'saudi arabia|saudi pro league': 'saudi-arabia/saudi-professional-league',
+  'saudi arabia|pro league': 'saudi-arabia/saudi-professional-league',
+  'colombia|liga dimayor': 'colombia/primera-a',
+  'colombia|primera a': 'colombia/primera-a',
+  'czechia|fnl': 'czech-republic/chnl',
+  'czech republic|fnl': 'czech-republic/chnl',
+  'czechia|chance liga': 'czech-republic/chance-liga',
 };
+const COUNTRY = { turkiye: 'turkey', czechia: 'czech-republic' };
 
 function slug(value) {
   return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -21,7 +37,9 @@ function slug(value) {
 
 export function leaguePath(league) {
   const key = `${league.country || ''}|${league.name || ''}`.toLowerCase();
-  return ALIASES[key] || `${slug(league.country)}/${slug(league.name)}`;
+  if (ALIASES[key]) return ALIASES[key];
+  const country = COUNTRY[slug(league.country)] || slug(league.country);
+  return `${country}/${slug(league.name)}`;
 }
 
 export function teamKey(name) {
@@ -77,24 +95,34 @@ function resolveTeam(records,name) {
 }
 
 export class BetexplorerHtft {
-  constructor({ fetchImpl = fetch, interval = 400 } = {}) {
+  constructor({ fetchImpl = fetch, interval = 400, retryWait = 1500 } = {}) {
     this.fetchImpl = fetchImpl;
     this.interval = interval;
+    this.retryWait = retryWait;
     this.next = 0;
     this.cache = new Map();
   }
-  async text(url) {
+  async text(url, attempt = 0) {
     const slot = Math.max(Date.now(), this.next);
     this.next = slot + this.interval;
     if (slot > Date.now()) await new Promise(resolve => setTimeout(resolve, slot - Date.now()));
     const response = await this.fetchImpl(url, { headers: { accept: 'text/html', 'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36' }, signal: AbortSignal.timeout(25000) });
+    if (response.status === 429 && attempt < 3) {
+      const wait = this.retryWait * (attempt + 1);
+      this.next = Math.max(this.next, Date.now() + wait);
+      if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+      return this.text(url, attempt + 1);
+    }
     if (!response.ok) throw new Error(`BetExplorer HTTP ${response.status}`);
     return response.text();
   }
   async leagueTables(league) {
     const path = leaguePath(league);
     if (this.cache.has(path)) return this.cache.get(path);
-    const run = this.load(path);
+    const run = this.load(path).catch(error => {
+      this.cache.delete(path);
+      throw error;
+    });
     this.cache.set(path, run);
     return run;
   }
