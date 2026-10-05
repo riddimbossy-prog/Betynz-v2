@@ -71,6 +71,14 @@ test('all matches publish regardless of standings, league type, sample size or l
     assert.ok(r.tip);assert.equal(r.gate.busy,false);assert.ok(r.tip.risk.factors.includes('Unproven or unstable league'));
   }
 });
+test('simulated reality matches are never analysed, even in all-matches mode',()=>{
+  for(const league of [{country:'Simulated Reality League',name:'UEFA Nations League SRL'},{country:'World',name:'SRL Club Friendlies'}]) {
+    const f=fixture();f.league={...f.league,...league};
+    const r=analyse(f,openPolicy,{now,leagueCount:10,reliability:{reliable:true,score:90}});
+    assert.equal(r.tip,null);assert.equal(r.status,'skipped');assert.match(r.reasons.join(' '),/Simulated match/);
+  }
+  const real=fixture();assert.ok(analyse(real,openPolicy,{now}).tip);
+});
 test('missing standings do not block history; missing form publishes an explicit odds-based pick',()=>{
   const f=fixture();f.homeStanding=null;f.awayStanding=null;f.table=[];
   assert.ok(analyse(f,openPolicy,{now}).tip);

@@ -2,7 +2,7 @@ import { Sportybet } from '../src/providers/sportybet.mjs';
 import { Football,matchFixture } from '../src/providers/football.mjs';
 import { SportyStats } from '../src/providers/sporty-stats.mjs';
 import { BetexplorerHtft, findTeam } from '../src/providers/betexplorer-htft.mjs';
-import { analyse,eligibility } from '../src/engine/analyse.mjs';
+import { analyse,eligibility,isSimulated } from '../src/engine/analyse.mjs';
 import { applyHtft } from '../src/engine/htft.mjs';
 import { leagueReliability } from '../src/engine/model.mjs';
 import { day,addDays,readJSON,writeJSON,mapLimit,unique } from '../src/util.mjs';
@@ -38,7 +38,10 @@ export async function refresh({sporty=new Sportybet(),football=process.env.STATI
   }
   const daily=[];
   for(const date of dates) {
-    const fixtures=books.fixtures.filter(f=>day(f.kickoff)===date);
+    const listed=books.fixtures.filter(f=>day(f.kickoff)===date);
+    const simulated=listed.filter(f=>isSimulated(f.league));
+    const fixtures=listed.filter(f=>!isSimulated(f.league));
+    if(simulated.length) diagnostics.push(`Skipped ${simulated.length} simulated ${date} fixtures`);
     const leagueCount=unique(fixtures.map(f=>f.league.id||`${f.league.country}:${f.league.name}`)).length;
     let processed=0,matchedCount=0,analysisCount=0;
     const results=await mapLimit(fixtures,2,async f=>{
@@ -91,7 +94,7 @@ export async function refresh({sporty=new Sportybet(),football=process.env.STATI
       summary:{fixtures:fixtures.length,qualified:qualified.length,skipped:results.length-qualified.length,markets:fixtures.reduce((s,f)=>s+f.markets.length,0),htft:qualified.filter(r=>r.htft?.pick).length},
       matches:[...qualified,...results.filter(r=>!r.tip)],diagnostics,policy};
     await writeJSON(`${dataDir}/board-${date}.json`,board);
-    await writeJSON(`${dataDir}/markets-${date}.json`,{date,fetchedAt:start,source:'Sportybet',complete:books.complete,fixtures:fixtures.map(f=>({id:f.id,kickoff:f.kickoff,home:f.home.name,away:f.away.name,league:f.league,oddsFetchedAt:f.oddsFetchedAt,status:f.marketFetchStatus,markets:f.markets}))});
+    await writeJSON(`${dataDir}/markets-${date}.json`,{date,fetchedAt:start,source:'Sportybet',complete:books.complete,fixtures:listed.map(f=>({id:f.id,kickoff:f.kickoff,home:f.home.name,away:f.away.name,league:f.league,oddsFetchedAt:f.oddsFetchedAt,status:f.marketFetchStatus,markets:f.markets}))});
     daily.push({date,...board.summary,status:board.status,leagueCount});
     console.log(`${date}: ${fixtures.length} fixtures, ${leagueCount} leagues, ${qualified.length} selected, ${board.summary.htft} HT/FT cards`);
   }

@@ -1,9 +1,13 @@
 import { selections } from './markets.mjs';
 import { profile,modelFor,estimate,failureScenarios,leagueReliability,advancedH2H } from './model.mjs';
 import { clamp,round } from '../util.mjs';
+export function isSimulated(league) {
+  return /simulated reality|\bSRL\b/i.test(`${league?.country || ''} ${league?.name || ''}`);
+}
 export function eligibility(f,policy,leagueCount,now=Date.now()) {
   const reasons=[];const size=f.league.size,h=f.homeStanding,a=f.awayStanding;
   const busy=leagueCount>=policy.busyDayLeagueCount;
+  if(isSimulated(f.league)) reasons.push('Simulated match');
   if(!f.kickoff||Date.parse(f.kickoff)<=now) reasons.push('Match has already started');
   if(f.status!==undefined&&f.status!==null&&String(f.status)!=='0') reasons.push('Match is not available pre-match');
   if(/postpon|cancel|abandon|live|finish|ended/i.test(f.matchStatus||'')) reasons.push('Match is not available pre-match');

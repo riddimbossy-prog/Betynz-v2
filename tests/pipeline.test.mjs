@@ -27,6 +27,25 @@ test('provider outage publishes explicit unavailable state with no synthetic or 
   } finally {await rm(directory,{recursive:true,force:true});}
 });
 
+test('SRL fixtures are dropped before statistics or HT/FT lookups',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'betynz-srl-'));
+  try {
+    const real=fixture(),date=addDays(day(),1);real.kickoff=`${date}T20:00:00Z`;real.oddsFetchedAt=new Date().toISOString();real.marketFetchStatus='complete';
+    const srl=fixture();srl.id='sr:match:srl';srl.kickoff=real.kickoff;srl.oddsFetchedAt=real.oddsFetchedAt;srl.marketFetchStatus='complete';
+    srl.league={...srl.league,country:'Simulated Reality League',name:'SRL Club Friendlies'};
+    const seen=[];
+    const sporty={country:'test',dailyBooks:async()=>({fixtures:[real,srl],complete:true,diagnostics:[]})};
+    const football={fixtures:async()=>[],standings:async(f)=>{seen.push(f?.league?.name||f?.id);return [];},leagueHistory:async()=>[],enrich:async(f)=>{seen.push(f.id);return f;}};
+    const betexplorer={leagueTables:async(league)=>{seen.push(league.name);return {home:[],away:[],venueConfirmed:true};}};
+    await refresh({sporty,football,betexplorer,dataDir:directory,today:date,days:1});
+    const board=await readJSON(`${directory}/board-${date}.json`);
+    assert.equal(board.matches.some(m=>m.id==='sr:match:srl'),false);
+    assert.equal(board.summary.fixtures,1);
+    assert.equal(seen.includes('sr:match:srl'),false);
+    assert.equal(seen.includes('SRL Club Friendlies'),false);
+    assert.match((await readJSON(`${directory}/index.json`)).diagnostics.join(' '),/Skipped 1 simulated/);
+  } finally {await rm(directory,{recursive:true,force:true});}
+});
 test('statistics outage still publishes a labelled odds pick in all-matches mode',async()=>{
   const directory=await mkdtemp(join(tmpdir(),'betynz-all-'));
   try {
