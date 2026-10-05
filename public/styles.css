@@ -190,6 +190,16 @@ select:focus-visible {
   height: 1.15rem;
 }
 
+.group-label {
+  margin: 18px 0 8px;
+  padding: 0 var(--pad);
+  color: var(--color-fog);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 .results-label {
   margin: 10px 0 0;
   padding: 4px var(--pad) 10px;

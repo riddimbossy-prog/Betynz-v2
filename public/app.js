@@ -263,7 +263,7 @@ function render() {
         else $("show-skipped").checked = true;
         render();
       };
-    } else $("results").innerHTML = rows.map(listTicket).join("");
+    } else $("results").innerHTML = boardList(rows);
   } else if (!match) {
     $("results").innerHTML = `<div class="empty"><h3>Match unavailable</h3><p>This matchup is no longer on the board.</p></div>`;
   } else if (state.model === "htft" && hasHtft(match)) {
@@ -278,6 +278,17 @@ function render() {
   else if (state.whyKey === "htft" && match && hasHtft(match)) showHtftWhy(match);
   syncBack();
   if (!settling) queueSettle();
+}
+function boardList(rows) {
+  const now = Date.now();
+  const upcoming = [];
+  const settled = [];
+  for (const row of rows) (Date.parse(row.kickoff) <= now ? settled : upcoming).push(row);
+  settled.sort((a, b) => Date.parse(b.kickoff) - Date.parse(a.kickoff));
+  const blocks = [];
+  if (upcoming.length) blocks.push(upcoming.map(listTicket).join(""));
+  if (settled.length) blocks.push(`<h3 class="group-label">Settled</h3>${settled.map(listTicket).join("")}`);
+  return blocks.join("");
 }
 function paintModels() {
   const rows = matches();

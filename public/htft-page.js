@@ -86,8 +86,15 @@ async function openDate(date, button, days) {
     $("note").textContent = noteFor(day, rows, published);
     const paint = () => {
       if (activeDate !== date) return;
+      const now = Date.now();
+      const upcoming = published.filter((match) => Date.parse(match.kickoff) > now);
+      const settled = published.filter((match) => Date.parse(match.kickoff) <= now);
+      const html = [
+        upcoming.map(ticket).join(""),
+        settled.length ? `<h3 class="group-label">Settled</h3>${settled.map(ticket).join("")}` : "",
+      ].join("");
       $("results").innerHTML = published.length
-        ? published.map(ticket).join("")
+        ? html
         : `<div class="empty"><h3>No HT/FT card for ${esc(date.slice(8))}</h3><p>The formula ran. Nothing cleared an active 1.20–1.50 price.</p><a class="htft-nav" href="./index.html">Back to the shortlist</a></div>`;
     };
     paint();

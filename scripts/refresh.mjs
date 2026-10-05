@@ -6,6 +6,23 @@ import { analyse,eligibility,isSimulated } from '../src/engine/analyse.mjs';
 import { applyHtft } from '../src/engine/htft.mjs';
 import { leagueReliability } from '../src/engine/model.mjs';
 import { day,addDays,readJSON,writeJSON,mapLimit,unique } from '../src/util.mjs';
+async function publishedBoard(date, dataDir) {
+  const local = await readJSON(`${dataDir}/board-${date}.json`);
+  if (local?.matches?.length) return local;
+  if (dataDir !== 'data') return null;
+  try {
+    const response = await fetch(`https://betynz.com/data/board-${date}.json`, { signal: AbortSignal.timeout(20000) });
+    if (!response.ok) return null;
+    const body = await response.json();
+    return Array.isArray(body.matches) ? body : null;
+  } catch { return null; }
+}
+function carryStarted(prior) {
+  if (!prior?.tip && !prior?.htft?.pick) return null;
+  const { settlement, ...tip } = prior.tip || {};
+  const htft = prior.htft ? { ...prior.htft, settlement: undefined } : prior.htft;
+  return { ...prior, tip: prior.tip ? tip : null, htft, started: true, status: prior.tip ? 'qualified' : prior.status };
+}
 export async function refresh({sporty=new Sportybet(),football=process.env.STATISTICS_PROVIDER==='api-football'?new Football():new SportyStats(),betexplorer=new BetexplorerHtft(),dataDir='data',today=day(),days=Number(process.env.BOARD_DAYS||1)}={}) {
   const policy=await readJSON('config/policy.json'),aliases=await readJSON('config/team-aliases.json');
   const dates=Array.from({length:Math.max(1,Math.min(7,days))},(_,n)=>addDays(today,n));
@@ -43,11 +60,13 @@ export async function refresh({sporty=new Sportybet(),football=process.env.STATI
     const fixtures=listed.filter(f=>!isSimulated(f.league));
     if(simulated.length) diagnostics.push(`Skipped ${simulated.length} simulated ${date} fixtures`);
     const leagueCount=unique(fixtures.map(f=>f.league.id||`${f.league.country}:${f.league.name}`)).length;
+    const previous=fixtures.length ? await publishedBoard(date, dataDir) : null;
+    const carried=new Map((previous?.matches || []).map(match => [match.id, match]));
     let processed=0,matchedCount=0,analysisCount=0;
     const results=await mapLimit(fixtures,2,async f=>{
       const skipped=reason=>({id:f.id,kickoff:f.kickoff,home:f.home,away:f.away,league:f.league,oddsFetchedAt:f.oddsFetchedAt,status:'skipped',tip:null,categoryTips:[],reasons:[reason],coverage:{markets:f.markets.length}});
       try {
-        if(Date.parse(f.kickoff)<=Date.now())return skipped('Match has already started');
+        if(Date.parse(f.kickoff)<=Date.now()) return carryStarted(carried.get(f.id)) || skipped('Match has already started');
         if(f.marketFetchStatus!=='complete')return skipped('Full Sportybet market list unavailable');
         if(!policy.publishAllMatches&&policy.blockedLeaguePatterns.some(p=>new RegExp(p,'i').test(`${f.league.name} ${f.league.country}`)))return skipped('Excluded competition type');
         const matched=football.matchFixture?{fixture:await football.matchFixture(f)}:matchFixture(f,statsByDay.get(date)||[],aliases);
@@ -68,14 +87,20 @@ export async function refresh({sporty=new Sportybet(),football=process.env.STATI
       } catch(e) { return policy.publishAllMatches?fallback(f,`Historical analysis unavailable: ${e.message}`,leagueCount):skipped(`Analysis unavailable: ${e.message}`); }
       finally { processed++; if(processed%20===0)console.log(`${date}: analysed ${processed}/${fixtures.length}`); }
     });
+    const seen=new Set(results.map(row => row.id));
+    for (const prior of carried.values()) {
+      if (seen.has(prior.id) || Date.parse(prior.kickoff) > Date.now()) continue;
+      const kept = carryStarted(prior);
+      if (kept) results.push(kept);
+    }
     const marketsById=new Map(fixtures.map(f=>[f.id,f.markets]));
     const tables=new Map();
-    for(const row of results.filter(r=>r.tip)) {
+    for(const row of results.filter(r=>r.tip && !r.started)) {
       const key=`${row.league.country||''}|${row.league.name||''}`;
       if(!tables.has(key)) tables.set(key,betexplorer.leagueTables(row.league).catch(e=>({error:e.message})));
     }
     for(const row of results) {
-      if(!row.tip) continue;
+      if(!row.tip || row.started) continue;
       const key=`${row.league.country||''}|${row.league.name||''}`;
       const table=await tables.get(key);
       if(!table||table.error) {
@@ -86,7 +111,7 @@ export async function refresh({sporty=new Sportybet(),football=process.env.STATI
       row.htft=applyHtft({homeRow:findTeam(table.home,row.home.name),awayRow:findTeam(table.away,row.away.name),homeName:row.home.name,awayName:row.away.name,markets:marketsById.get(row.id)||[],minimumOdds:policy.minimumOdds,maximumOdds:policy.maximumOdds,venueConfirmed:table.venueConfirmed});
     }
     const qualified=results.filter(r=>r.tip).sort((a,b)=>b.tip.probability-a.tip.probability);
-    const statisticsErrors=results.filter(r=>r.tip?.probabilityBasis==='odds'||r.reasons.some(s=>s.startsWith('Analysis unavailable:')||s==='No verified statistics fixture match')).length;
+    const statisticsErrors=results.filter(r=>!r.started && (r.tip?.probabilityBasis==='odds'||r.reasons.some(s=>s.startsWith('Analysis unavailable:')||s==='No verified statistics fixture match'))).length;
     const scanComplete=books.complete&&statisticsErrors===0;
     const board={version:8,date,generatedAt:new Date().toISOString(),oddsSource:'Sportybet',statisticsSource:[...new Set(results.map(r=>r.statsSource).filter(Boolean))].join(' / ')||football.source||'API-Football',htftSource:'BetExplorer',
       statistics:{matched:matchedCount,analysed:analysisCount,unavailable:statisticsErrors},

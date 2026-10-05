@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import { mkdtemp,rm } from 'node:fs/promises';import { tmpdir } from 'node:os';import { join } from 'node:path';
-import { refresh } from '../scripts/refresh.mjs';import { readJSON,day,addDays } from '../src/util.mjs';
+import { refresh } from '../scripts/refresh.mjs';import { readJSON,writeJSON,day,addDays } from '../src/util.mjs';
 import { fixture } from './helpers.mjs';
 test('full pipeline writes one prediction plus every raw market; statistics IDs stay separate from Sportybet',async()=>{
   const directory=await mkdtemp(join(tmpdir(),'betynz-pipeline-'));
@@ -27,6 +27,30 @@ test('provider outage publishes explicit unavailable state with no synthetic or 
   } finally {await rm(directory,{recursive:true,force:true});}
 });
 
+test('a started match keeps the pick already published for that day',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'betynz-settled-'));
+  try {
+    const played=fixture(),date=day();
+    played.kickoff=new Date(Date.now()-60*60000).toISOString();
+    played.oddsFetchedAt=new Date().toISOString();
+    played.marketFetchStatus='complete';
+    const gone={...played,id:'sr:match:gone',home:{...played.home,name:'Earlier FC'},tip:{selection:'Away',market:'1X2',odds:1.25,probability:0.6},categoryTips:[],htft:{pick:{label:'Away X2',odds:1.33,selection:'Draw or Away',market:'Double Chance'}},reasons:['Kept']};
+    await writeJSON(`${directory}/board-${date}.json`,{matches:[
+      {...played,status:'qualified',tip:{selection:'Home',market:'1X2',odds:1.4,probability:0.7},categoryTips:[],htft:{pick:{label:'Home 1X',odds:1.3,selection:'Home or Draw',market:'Double Chance'}},reasons:['Kept']},
+      gone,
+    ]});
+    let analysed=0;
+    const sporty={country:'test',dailyBooks:async()=>({fixtures:[played],complete:true,diagnostics:[]})};
+    const football={fixtures:async()=>[],enrich:async()=>{analysed+=1;return played;}};
+    const betexplorer={leagueTables:async()=>{analysed+=1;return {home:[],away:[],venueConfirmed:true};}};
+    await refresh({sporty,football,betexplorer,dataDir:directory,today:date,days:1});
+    const board=await readJSON(`${directory}/board-${date}.json`);
+    assert.equal(analysed,0);
+    assert.equal(board.matches.find(match=>match.id==='sr:match:1').tip.selection,'Home');
+    assert.equal(board.matches.find(match=>match.id==='sr:match:gone').htft.pick.label,'Away X2');
+    assert.equal(board.summary.qualified,2);
+  } finally {await rm(directory,{recursive:true,force:true});}
+});
 test('SRL fixtures are dropped before statistics or HT/FT lookups',async()=>{
   const directory=await mkdtemp(join(tmpdir(),'betynz-srl-'));
   try {
