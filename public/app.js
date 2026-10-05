@@ -7,7 +7,9 @@ const GT = "&" + "gt;";
 const QUOT = "&" + "quot;";
 const APOS = "&" + "#39;";
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": AMP, "<": LT, ">": GT, '"': QUOT, "'": APOS }[c]));
-const state = { index: null, board: null, date: null, request: 0, mode: "route", matchId: null, whyKey: null };
+const models = ["shortlist", "htft", "banker"];
+const openedModel = models.includes(location.hash.slice(1)) ? location.hash.slice(1) : "shortlist";
+const state = { index: null, board: null, date: null, request: 0, mode: "board", model: openedModel, matchId: null, whyKey: null };
 const STOP = new Set(["fc","cf","cd","sc","ac","afc","wfc","fk","sk","bk","if","de","da","do","del","la","el","the","of","and","w","women","club"]);
 
 function wordsOf(name) {
@@ -90,12 +92,19 @@ function fresh() {
 function matches() {
   return (state.board?.matches || []).map(effective);
 }
+function hasHtft(match) {
+  return Boolean(match.htft?.pick);
+}
+function isBanker(match) {
+  return Boolean(match.tip && hasHtft(match));
+}
 function visible() {
   const needle = $("search").value.trim().toLowerCase();
   const league = $("league").value;
-  const skipped = $("show-skipped").checked;
+  const skipped = $("show-skipped").checked && state.model === "shortlist";
   const rows = matches().filter((match) => {
-    if (!skipped && !match.tip) return false;
+    const shown = state.model === "htft" ? hasHtft(match) : state.model === "banker" ? isBanker(match) : Boolean(match.tip);
+    if (!skipped && !shown) return false;
     if (league && match.league.id !== league) return false;
     if (!needle) return true;
     return `${match.home.name} ${match.away.name} ${match.league.name}`.toLowerCase().includes(needle);
@@ -105,8 +114,9 @@ function visible() {
   return rows;
 }
 function current() {
-  const rows = visible();
-  return rows.find((match) => match.id === state.matchId) || rows.find((match) => match.tip) || rows[0] || null;
+  const pool = matches();
+  if (state.matchId) return pool.find((match) => match.id === state.matchId) || null;
+  return null;
 }
 function orderedTips(match) {
   const rest = (match.categoryTips || []).filter((tip) => tip.id !== match.tip?.id).sort((a, b) => b.probability - a.probability);
@@ -144,6 +154,39 @@ function matchTicket(match) {
     toneOf(match.tip.settlement),
   );
 }
+function htftListTicket(match) {
+  const pick = match.htft.pick;
+  const label = resultLabel(match.htft.settlement);
+  const scored = label && label !== "Live";
+  const thin = !(Number(pick.s) >= 0.4) && !label;
+  return ticket(
+    `${teamSide(match.home, match.league)}<p class="t-mid">${esc(scored ? label : clock(match.kickoff))}<br>${esc(scored ? "Full time" : pick.label)}</p>${teamSide(match.away, match.league, true)}`,
+    esc(`${pick.label}${label ? ` · ${label}` : thin ? " · thin read" : ""} · ${match.htft.route || "no combo"}`),
+    esc(Number(pick.odds).toFixed(2)),
+    `data-open="${esc(match.id)}" data-kind="htft"`,
+    thin,
+    toneOf(match.htft.settlement),
+  );
+}
+function bankerListTicket(match) {
+  const tip = match.tip;
+  const pick = match.htft.pick;
+  const label = resultLabel(tip.settlement) || resultLabel(match.htft.settlement);
+  const scored = label && label !== "Live";
+  return ticket(
+    `${teamSide(match.home, match.league)}<p class="t-mid">${esc(scored ? label : clock(match.kickoff))}<br>Banker</p>${teamSide(match.away, match.league, true)}`,
+    esc(`Shortlist ${tip.selection} ${oddsText(tip.odds)} · HT/FT ${pick.label} ${Number(pick.odds).toFixed(2)}`),
+    esc(oddsText(tip.odds)),
+    `data-open="${esc(match.id)}"`,
+    false,
+    toneOf(tip.settlement) || toneOf(match.htft.settlement),
+  );
+}
+function listTicket(match) {
+  if (state.model === "htft" && hasHtft(match)) return htftListTicket(match);
+  if (state.model === "banker" && isBanker(match)) return bankerListTicket(match);
+  return matchTicket(match);
+}
 function optionTicket(match, tip, index) {
   const [a, b] = marketLines(tip.market);
   const label = resultLabel(tip.settlement);
@@ -165,6 +208,20 @@ function header() {
     $("to-place").textContent = `, ${fitPlace(placeName(match.away.name))}`;
     return;
   }
+  if (state.model === "htft") {
+    $("from-code").textContent = "HT";
+    $("from-place").textContent = ", half-time";
+    $("to-code").textContent = "FT";
+    $("to-place").textContent = ", full-time";
+    return;
+  }
+  if (state.model === "banker") {
+    $("from-code").textContent = "BOTH";
+    $("from-place").textContent = ", shortlist";
+    $("to-code").textContent = "BOTH";
+    $("to-place").textContent = ", HT/FT";
+    return;
+  }
   const league = $("league").selectedOptions[0];
   const date = state.board?.date || new Date().toISOString().slice(0, 10);
   $("from-code").textContent = $("league").value ? teamCode(league?.textContent || "League") : "ALL";
@@ -183,36 +240,60 @@ let settling = false;
 function render() {
   if (!state.board) return;
   header();
+  paintModels();
   const warning = warn();
   $("note").hidden = !warning;
   $("note").textContent = warning;
   const rows = visible();
   const match = current();
+  const labels = { shortlist: "Shortlist", htft: "HT/FT", banker: "Banker" };
+  $("board-label").textContent = state.mode === "route" ? "Match" : labels[state.model] || "Shortlist";
   if (state.mode === "board") {
     if (!rows.length) {
       const filtered = Boolean($("search").value || $("league").value);
-      $("results").innerHTML = `<div class="empty"><h3>${filtered ? "No matches for these filters" : "No matches qualify right now"}</h3><p>${filtered ? "Clear the team or league filter to see the shortlist." : "Open unavailable matches to see missing prices or data."}</p><button type="button" id="empty-action">${filtered ? "Clear filters" : "View unavailable"}</button></div>`;
-      $("empty-action").onclick = () => {
+      const empty = state.model === "banker"
+        ? ["No banker", "Both models have to select the same match."]
+        : state.model === "htft"
+          ? ["No HT/FT card", "The table model ran. Nothing cleared 1.20–1.50."]
+          : [filtered ? "No matches for these filters" : "No matches qualify right now", filtered ? "Clear the team or league filter to see the shortlist." : "Open unavailable matches to see missing prices or data."];
+      const action = state.model === "shortlist" ? `<button type="button" id="empty-action">${filtered ? "Clear filters" : "View unavailable"}</button>` : "";
+      $("results").innerHTML = `<div class="empty"><h3>${empty[0]}</h3><p>${empty[1]}</p>${action}</div>`;
+      if ($("empty-action")) $("empty-action").onclick = () => {
         if (filtered) { $("search").value = ""; $("league").value = ""; }
         else $("show-skipped").checked = true;
         render();
       };
-    } else $("results").innerHTML = rows.map(matchTicket).join("");
+    } else $("results").innerHTML = rows.map(listTicket).join("");
   } else if (!match) {
-    $("results").innerHTML = `<div class="empty"><h3>No matchups qualify</h3><p>No current active market is available in the 1.20–1.50 odds range.</p><button type="button" id="empty-action">View unavailable</button></div>`;
-    $("empty-action").onclick = () => { $("show-skipped").checked = true; state.mode = "board"; render(); };
+    $("results").innerHTML = `<div class="empty"><h3>Match unavailable</h3><p>This matchup is no longer on the board.</p></div>`;
+  } else if (state.model === "htft" && hasHtft(match)) {
+    $("results").innerHTML = htftListTicket(match);
+  } else if (state.model === "banker" && isBanker(match)) {
+    $("results").innerHTML = `${orderedTips(match).map((tip, index) => optionTicket(match, tip, index)).join("")}${htftListTicket(match)}`;
   } else if (!match.tip) {
     $("results").innerHTML = `<div class="empty"><h3>Unavailable</h3><p>${esc(match.reasons?.[0] || "This matchup did not clear the shortlist.")}</p></div>`;
   } else $("results").innerHTML = orderedTips(match).map((tip, index) => optionTicket(match, tip, index)).join("");
-  $("jumps").innerHTML = rows.map((row) => `<button type="button" data-open="${esc(row.id)}"><span>${esc(teamCode(row.home.name))} — ${esc(teamCode(row.away.name))}<small> · ${esc(placeName(row.home.name))} v ${esc(placeName(row.away.name))}</small></span><strong>${row.tip ? esc(oddsText(row.tip.odds)) : "—"}</strong></button>`).join("");
-  if (state.whyKey != null && match?.tip) fillWhy(match, orderedTips(match)[state.whyKey]);
+  $("jumps").innerHTML = rows.map((row) => `<button type="button" data-open="${esc(row.id)}"><span>${esc(teamCode(row.home.name))} — ${esc(teamCode(row.away.name))}<small> · ${esc(placeName(row.home.name))} v ${esc(placeName(row.away.name))}</small></span><strong>${row.tip ? esc(oddsText(row.tip.odds)) : row.htft?.pick ? Number(row.htft.pick.odds).toFixed(2) : "—"}</strong></button>`).join("");
+  if (typeof state.whyKey === "number" && match?.tip) fillWhy(match, orderedTips(match)[state.whyKey]);
+  else if (state.whyKey === "htft" && match && hasHtft(match)) showHtftWhy(match);
+  syncBack();
   if (!settling) queueSettle();
 }
+function paintModels() {
+  const rows = matches();
+  const counts = { shortlist: rows.filter((match) => match.tip).length, htft: rows.filter(hasHtft).length, banker: rows.filter(isBanker).length };
+  document.querySelectorAll("[data-model]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.model === state.model);
+    const small = button.querySelector("small");
+    if (small) small.textContent = String(counts[button.dataset.model] ?? 0);
+  });
+}
 function needsScore(match) {
-  if (!match?.tip || Date.parse(match.kickoff) > Date.now()) return false;
-  const settlement = match.tip.settlement;
-  if (!settlement) return true;
-  return settlement.verdict === "pending" && Date.now() - settlement.at > 45000;
+  const kickoff = Date.parse(match?.kickoff || "");
+  if (!Number.isFinite(kickoff) || kickoff > Date.now()) return false;
+  const pending = (settlement) => !settlement || (settlement.verdict === "pending" && Date.now() - settlement.at > 45000);
+  if (match.tip && pending(match.tip.settlement)) return true;
+  return hasHtft(match) && pending(match.htft.settlement);
 }
 async function queueSettle() {
   const jobs = [];
@@ -239,26 +320,83 @@ function fillWhy(match, tip) {
   $("why-body").innerHTML = `<p class="why-kicker">WHY THIS PICK</p><h2 class="route-line"><span class="code">${esc(oddsText(tip.odds))}</span><span class="place">, ${esc(carrier(tip))}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)}</p>${optionTicket(match, tip, 0).replace("data-why=\"0\"", "disabled")}<div class="stat-row"><div><strong>${esc(pct(tip.probability))}</strong><span>${tip.probabilityBasis === "odds" ? "Implied odds" : "Model chance"}</span></div><div><strong>${esc(tip.risk?.score ?? "—")}</strong><span>${esc(tip.risk?.label || "Open")} risk / 100</span></div></div><h3>Why this price</h3><ul>${(match.reasons?.length ? match.reasons : ["No extra matchup note."]).slice(0, 6).map((reason) => `<li>${esc(reason)}</li>`).join("")}</ul><h3>Form</h3><div class="stat-row"><div><strong>${esc(teamCode(match.home.name))}</strong><span>home form</span><div class="form-row">${letters("home")}</div></div><div><strong>${esc(teamCode(match.away.name))}</strong><span>away form</span><div class="form-row">${letters("away")}</div></div></div>${match.h2h?.games ? `<p>${match.h2h.games} recent meetings. Both teams scored in ${esc(pct(match.h2h.bttsRate))}. Over 2.5 in ${esc(pct(match.h2h.over25Rate))}.</p>` : ""}<h3>If the match goes wrong</h3>${tip.scenarios?.length ? `<div class="stat-row">${tip.scenarios.slice(0, 4).map((scenario) => `<div><strong>${esc(pct(scenario.survivalProbability))}</strong><span>${esc(scenario.label)}</span></div>`).join("")}</div>` : "<p>No extra failure scenario for this market.</p>"}<p class="fine">${Number.isFinite(tip.expectedReturn) ? `Estimated return ${tip.expectedReturn >= 0 ? "+" : ""}${(tip.expectedReturn * 100).toFixed(1)}% per unit.` : "Estimated return unavailable."} Sample ${esc(tip.sampleCount)}. ${esc(tip.method)}</p>`;
   $("why").hidden = false;
 }
-function openMatch(id) {
-  state.matchId = id;
-  state.mode = "route";
-  state.whyKey = null;
-  $("why").hidden = true;
-  $("sheet").hidden = true;
-  $("menu").setAttribute("aria-expanded", "false");
+function showHtftWhy(match) {
+  const card = match.htft;
+  const pick = card?.pick;
+  if (!pick) { $("why").hidden = true; state.whyKey = null; return; }
+  const label = resultLabel(card.settlement);
+  $("why-body").innerHTML = `<p class="why-kicker">HT/FT</p><h2 class="route-line"><span class="code">${Number(pick.odds).toFixed(2)}</span><span class="place">, ${esc(pick.label)}${label ? ` · ${esc(label)}` : ""}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)}</p><div class="stat-row"><div><strong>${esc(pct(pick.s))}</strong><span>Table support</span></div><div><strong>${esc(card.route || "no combo")}</strong><span>Route</span></div></div><p>Home win ${esc(pct(card.support?.homeWin))} · Draw ${esc(pct(card.support?.draw))} · Away win ${esc(pct(card.support?.awayWin))}</p><p>Over 1.5 ${esc(pct(card.support?.over15))} · GG ${esc(pct(card.support?.gg))} · Over 2.5 ${esc(pct(card.support?.over25))}</p><p class="fine">${esc(card.caveat || "Published only when the formula has an active Sportybet price from 1.20 to 1.50.")}</p>`;
+  $("why").hidden = false;
+}
+function snapshot() {
+  return { mode: state.mode, model: state.model, matchId: state.matchId, whyKey: state.whyKey, sheet: !$("sheet").hidden, date: state.date, root: false };
+}
+function publish(replace) {
+  const data = snapshot();
+  data.root = replace;
+  history[replace ? "replaceState" : "pushState"](data, "", `#${state.model}`);
+  syncBack();
+}
+function syncBack() {
+  $("back").disabled = !history.state || history.state.root === true;
+}
+async function restore(saved) {
+  if (!saved) return;
+  state.mode = saved.mode || "board";
+  state.model = models.includes(saved.model) ? saved.model : "shortlist";
+  state.matchId = saved.matchId || null;
+  state.whyKey = saved.whyKey ?? null;
+  $("why").hidden = saved.whyKey == null;
+  setSheet(Boolean(saved.sheet));
+  if (saved.date && saved.date !== state.date) await selectDate(saved.date, { fromHistory: true });
+  else render();
+  syncBack();
+}
+function go(change) {
+  change();
+  publish(false);
   render();
+}
+function openMatch(id) {
+  if (state.mode === "route" && state.matchId === id && state.whyKey == null && $("sheet").hidden) return;
+  go(() => {
+    state.matchId = id;
+    state.mode = "route";
+    state.whyKey = null;
+    $("why").hidden = true;
+    setSheet(false);
+  });
+}
+function setModel(model) {
+  if (!models.includes(model)) return;
+  if (model === state.model && state.mode === "board" && state.whyKey == null && $("sheet").hidden) return;
+  go(() => {
+    state.model = model;
+    state.mode = "board";
+    state.matchId = null;
+    state.whyKey = null;
+    $("why").hidden = true;
+    setSheet(false);
+  });
 }
 function setSheet(open) {
   $("sheet").hidden = !open;
   $("menu").setAttribute("aria-expanded", String(open));
 }
-async function selectDate(date) {
+async function selectDate(date, { fromHistory = false } = {}) {
   const request = ++state.request;
+  const first = !state.date;
+  const changed = Boolean(state.date && state.date !== date);
   state.date = date;
-  state.whyKey = null;
-  $("why").hidden = true;
-  document.querySelectorAll("#dates button").forEach((button) => button.classList.toggle("active", button.dataset.date === date));
-  $("results").innerHTML = `<div class="empty"><h3>Loading matches…</h3></div>`;
+  if (changed && !fromHistory) {
+    state.mode = "board";
+    state.matchId = null;
+    state.whyKey = null;
+    $("why").hidden = true;
+    setSheet(false);
+  }
+  document.querySelectorAll("#dates button, #stamps button").forEach((button) => button.classList.toggle("active", button.dataset.date === date));
+  if (first || changed) $("results").innerHTML = `<div class="empty"><h3>Loading matches…</h3></div>`;
   try {
     const board = await get(`./data/board-${date}.json`);
     if (request !== state.request) return;
@@ -273,6 +411,7 @@ async function selectDate(date) {
     $("market-download").hidden = board.status === "pending";
     $("market-download").href = `./data/markets-${date}.json`;
     render();
+    if (!fromHistory && (first || changed)) publish(first);
   } catch (error) {
     if (request !== state.request) return;
     state.board = null;
@@ -302,34 +441,53 @@ async function load() {
 }
 $("results").addEventListener("click", (event) => {
   const open = event.target.closest("[data-open]");
-  if (open) { openMatch(open.dataset.open); return; }
+  if (open) {
+    if (open.dataset.kind === "htft" && state.mode === "route") {
+      go(() => { state.whyKey = "htft"; });
+      return;
+    }
+    openMatch(open.dataset.open);
+    return;
+  }
   const why = event.target.closest("[data-why]");
   if (!why) return;
-  state.whyKey = Number(why.dataset.why);
-  const match = current();
-  if (match) fillWhy(match, orderedTips(match)[state.whyKey]);
+  go(() => { state.whyKey = Number(why.dataset.why); });
 });
 $("jumps").addEventListener("click", (event) => {
   const open = event.target.closest("[data-open]");
   if (open) openMatch(open.dataset.open);
 });
-$("back").onclick = () => {
-  if (!$("sheet").hidden) { setSheet(false); return; }
-  if (!$("why").hidden) { $("why").hidden = true; state.whyKey = null; return; }
-  state.mode = state.mode === "route" ? "board" : "route";
-  render();
+$("back").onclick = () => { if (history.state && !history.state.root) history.back(); };
+window.addEventListener("popstate", (event) => {
+  if (event.state) restore(event.state);
+  else syncBack();
+});
+document.querySelector(".models").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-model]");
+  if (button) setModel(button.dataset.model);
+});
+$("menu").onclick = () => {
+  if ($("sheet").hidden) go(() => setSheet(true));
+  else if (history.state && !history.state.root) history.back();
 };
-$("menu").onclick = () => setSheet($("sheet").hidden);
-$("sheet-close").onclick = () => setSheet(false);
-$("why-close").onclick = () => { $("why").hidden = true; state.whyKey = null; };
+$("sheet-close").onclick = () => { if (history.state && !history.state.root) history.back(); else setSheet(false); };
+$("why-close").onclick = () => { if (history.state && !history.state.root) history.back(); else { $("why").hidden = true; state.whyKey = null; } };
 $("swap").onclick = () => {
   const rows = visible();
-  if (!rows.length) return;
-  const index = Math.max(0, rows.findIndex((match) => match.id === current()?.id));
-  openMatch(rows[(index + 1) % rows.length].id);
+  if (rows.length < 2) return;
+  const index = Math.max(0, rows.findIndex((match) => match.id === state.matchId));
+  const next = rows[(index + 1) % rows.length].id;
+  if (state.mode !== "route") { openMatch(next); return; }
+  state.matchId = next;
+  state.whyKey = null;
+  $("why").hidden = true;
+  render();
 };
 for (const id of ["search", "league", "sort", "show-skipped"]) $(id).addEventListener(id === "search" ? "input" : "change", render);
 $("refresh").onclick = () => load();
+window.betynzSelectDate = (date) => selectDate(date);
+window.betynzDate = () => state.date;
+syncBack();
 setInterval(render, 60000);
 setInterval(() => { if (!document.hidden) load(); }, 5 * 60000);
 load();

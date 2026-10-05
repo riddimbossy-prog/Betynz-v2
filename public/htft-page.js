@@ -118,6 +118,10 @@ async function start() {
   }
 }
 
+document.getElementById("back").addEventListener("click", (event) => {
+  if (!$("why").hidden) { event.preventDefault(); $("why").hidden = true; return; }
+  if (history.length > 1) { event.preventDefault(); history.back(); }
+});
 $("results").addEventListener("click", (event) => {
   const button = event.target.closest("[data-id]");
   if (!button) return;

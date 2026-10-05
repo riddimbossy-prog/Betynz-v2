@@ -729,6 +729,59 @@ select:focus-visible {
   color: inherit;
 }
 
+.brand {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.models {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px var(--pad) 0;
+  flex-shrink: 0;
+}
+
+.models button,
+.models a {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0;
+  min-height: 2.65rem;
+  padding: 6px 8px 5px;
+  border: 0;
+  border-radius: 999px;
+  background: #1c1c1e;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.models button small {
+  color: var(--color-fog);
+  font-size: 0.66rem;
+  font-weight: 650;
+}
+
+.models button.active,
+.models a[aria-current="page"] {
+  background: var(--color-yellow);
+  color: #111;
+}
+
+.models button.active small {
+  color: #111;
+}
+
+.orb:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
 .htft-nav {
   color: var(--color-yellow);
   font-size: 0.82rem;
