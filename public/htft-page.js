@@ -1,4 +1,5 @@
 import { resultLabel, settleMatches, toneOf } from "./settle.js";
+import { badgeHtml, bindBadges } from "./badges.js";
 
 const AMP = "&" + "amp;";
 const LT = "&" + "lt;";
@@ -39,7 +40,9 @@ function ticket(match) {
   const tone = toneOf(match.htft.settlement);
   const weak = thin(match) && !tone;
   const air = `${pick.label}${label ? ` · ${label}` : weak ? " · thin read" : ""}`;
-  return `<button type="button" class="ticket${weak ? " dim" : ""}${tone ? ` ${tone}` : ""}" data-id="${esc(match.id)}"><div class="ticket-top"><div><p class="t-big">${esc(match.home.name.slice(0, 3).toUpperCase())}</p><p class="t-sub">${esc(match.home.name)}</p></div><p class="t-mid">${esc(clock(match.kickoff))}<br>${esc(match.league?.name || "League")}</p><div class="t-end"><p class="t-big">${esc(match.away.name.slice(0, 3).toUpperCase())}</p><p class="t-sub">${esc(match.away.name)}</p></div></div><div class="ticket-bot"><p class="t-air">${esc(air)}</p><p class="t-price">${Number(pick.odds).toFixed(2)}</p></div><p class="t-sub">Table support ${esc(pct(pick.s))} · ${esc(match.htft.route || "no combo")}</p></button>`;
+  const home = badgeHtml(match.home, match.league) || esc(match.home.name.slice(0, 3).toUpperCase());
+  const away = badgeHtml(match.away, match.league) || esc(match.away.name.slice(0, 3).toUpperCase());
+  return `<button type="button" class="ticket${weak ? " dim" : ""}${tone ? ` ${tone}` : ""}" data-id="${esc(match.id)}"><div class="ticket-top"><div><p class="t-big">${home}</p><p class="t-sub">${esc(match.home.name)}</p></div><p class="t-mid">${esc(clock(match.kickoff))}<br>${esc(match.league?.name || "League")}</p><div class="t-end"><p class="t-big">${away}</p><p class="t-sub">${esc(match.away.name)}</p></div></div><div class="ticket-bot"><p class="t-air">${esc(air)}</p><p class="t-price">${Number(pick.odds).toFixed(2)}</p></div><p class="t-sub">Table support ${esc(pct(pick.s))} · ${esc(match.htft.route || "no combo")}</p></button>`;
 }
 
 function columnLine(column) {
@@ -125,6 +128,7 @@ $("results").addEventListener("click", (event) => {
 });
 
 $("why-close").onclick = () => { $("why").hidden = true; };
+bindBadges();
 
 start().catch((error) => {
   $("note").textContent = error.message;

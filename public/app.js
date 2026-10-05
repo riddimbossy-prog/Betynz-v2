@@ -1,4 +1,5 @@
 import { resultLabel, settleMatches, toneOf } from "./settle.js";
+import { badgeHtml, bindBadges } from "./badges.js";
 const $ = (id) => document.getElementById(id);
 const AMP = "&" + "amp;";
 const LT = "&" + "lt;";
@@ -118,10 +119,13 @@ function ticket(top, air, price, attrs, dim = false, tone = "") {
 function side(big, sub, end = false) {
   return `<div class="${end ? "t-end" : ""}"><p class="t-big">${big}</p><p class="t-sub">${sub}</p></div>`;
 }
+function teamSide(team, league, end = false) {
+  return side(badgeHtml(team, league) || esc(teamCode(team.name)), esc(clipPlace(team.name)), end);
+}
 function matchTicket(match) {
   if (!match.tip) {
     return ticket(
-      `${side(esc(teamCode(match.home.name)), esc(clipPlace(match.home.name)))}<p class="t-mid">${esc(clock(match.kickoff))}<br>Unavailable</p>${side(esc(teamCode(match.away.name)), esc(clipPlace(match.away.name)), true)}`,
+      `${teamSide(match.home, match.league)}<p class="t-mid">${esc(clock(match.kickoff))}<br>Unavailable</p>${teamSide(match.away, match.league, true)}`,
       esc(match.reasons?.[0] || "Unavailable"),
       "—",
       `data-open="${esc(match.id)}"`,
@@ -132,7 +136,7 @@ function matchTicket(match) {
   const scored = label && label !== "Live";
   const [line] = marketLines(match.tip.market);
   return ticket(
-    `${side(esc(teamCode(match.home.name)), esc(clipPlace(match.home.name)))}<p class="t-mid">${esc(scored ? label : label || clock(match.kickoff))}<br>${esc(scored ? "Full time" : line)}</p>${side(esc(teamCode(match.away.name)), esc(clipPlace(match.away.name)), true)}`,
+    `${teamSide(match.home, match.league)}<p class="t-mid">${esc(scored ? label : label || clock(match.kickoff))}<br>${esc(scored ? "Full time" : line)}</p>${teamSide(match.away, match.league, true)}`,
     esc(label ? `${carrier(match.tip)} · ${label}` : carrier(match.tip)),
     esc(oddsText(match.tip.odds)),
     `data-open="${esc(match.id)}"`,
@@ -155,9 +159,9 @@ function optionTicket(match, tip, index) {
 function header() {
   const match = current();
   if (state.mode === "route" && match) {
-    $("from-code").textContent = teamCode(match.home.name);
+    $("from-code").innerHTML = badgeHtml(match.home, match.league) || esc(teamCode(match.home.name));
     $("from-place").textContent = `, ${fitPlace(placeName(match.home.name))}`;
-    $("to-code").textContent = teamCode(match.away.name);
+    $("to-code").innerHTML = badgeHtml(match.away, match.league) || esc(teamCode(match.away.name));
     $("to-place").textContent = `, ${fitPlace(placeName(match.away.name))}`;
     return;
   }
@@ -329,3 +333,4 @@ $("refresh").onclick = () => load();
 setInterval(render, 60000);
 setInterval(() => { if (!document.hidden) load(); }, 5 * 60000);
 load();
+bindBadges();

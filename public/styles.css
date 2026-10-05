@@ -685,6 +685,50 @@ select:focus-visible {
   .route { padding-top: 0; }
 }
 
+.crest {
+  display: block;
+  width: 2.35rem;
+  height: 2.35rem;
+  object-fit: contain;
+  border-radius: 0.35rem;
+}
+
+.code .crest {
+  width: clamp(2.5rem, 9vw, 3.5rem);
+  height: clamp(2.5rem, 9vw, 3.5rem);
+}
+
+.t-big:has(.crest),
+.code:has(.crest) {
+  font-size: 0;
+  line-height: 0;
+}
+
+.t-end .t-big:has(.crest) {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.crest-fallback {
+  display: inline-grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 0.45rem;
+  background: #1c1c1e;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.ticket.lost .crest-fallback,
+.ticket.won .crest-fallback {
+  background: rgba(0, 0, 0, 0.16);
+  color: inherit;
+}
+
 .htft-nav {
   color: var(--color-yellow);
   font-size: 0.82rem;

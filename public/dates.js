@@ -1,4 +1,5 @@
 import { resultLabel, settleMatches, toneOf } from "./settle.js";
+import { badgeHtml, bindBadges } from "./badges.js";
 const AMP = "&" + "amp;";
 const LT = "&" + "lt;";
 const GT = "&" + "gt;";
@@ -15,7 +16,9 @@ function ticket(match) {
   const air = label && tip ? `${line} · ${esc(label)}` : line;
   const mid = scored ? esc(label) : esc((match.kickoff || "").slice(11, 16));
   const tone = toneOf(tip?.settlement);
-  return `<button type="button" class="ticket${tip ? "" : " dim"}${tone ? ` ${tone}` : ""}" data-open="${esc(match.id)}"><div class="ticket-top"><div><p class="t-big">${esc(match.home.name.slice(0, 3).toUpperCase())}</p><p class="t-sub">${esc(match.home.name)}</p></div><p class="t-mid">${mid}${scored ? "<br>Full time" : ""}</p><div class="t-end"><p class="t-big">${esc(match.away.name.slice(0, 3).toUpperCase())}</p><p class="t-sub">${esc(match.away.name)}</p></div></div><div class="ticket-bot"><p class="t-air">${air}</p><p class="t-price">${tip ? Number(tip.odds).toFixed(2) : "—"}</p></div></button>`;
+  const home = badgeHtml(match.home, match.league) || esc(match.home.name.slice(0, 3).toUpperCase());
+  const away = badgeHtml(match.away, match.league) || esc(match.away.name.slice(0, 3).toUpperCase());
+  return `<button type="button" class="ticket${tip ? "" : " dim"}${tone ? ` ${tone}` : ""}" data-open="${esc(match.id)}"><div class="ticket-top"><div><p class="t-big">${home}</p><p class="t-sub">${esc(match.home.name)}</p></div><p class="t-mid">${mid}${scored ? "<br>Full time" : ""}</p><div class="t-end"><p class="t-big">${away}</p><p class="t-sub">${esc(match.away.name)}</p></div></div><div class="ticket-bot"><p class="t-air">${air}</p><p class="t-price">${tip ? Number(tip.odds).toFixed(2) : "—"}</p></div></button>`;
 }
 let stampDate = "";
 async function openDate(date, button) {
@@ -38,3 +41,4 @@ async function stamps() {
   root.querySelectorAll("button").forEach((button) => { button.onclick = () => openDate(button.dataset.date, button); });
 }
 stamps();
+bindBadges();

@@ -16,6 +16,12 @@ for (const asset of ['htft-page.js', 'styles.css']) {
 }
 await writeFile('dist/index.html', html);
 await writeFile('dist/htft.html', htftHtml);
+const badgeHash = createHash('sha256').update(await readFile('dist/badges.js')).digest('hex').slice(0, 12);
+for (const file of ['app.js', 'dates.js', 'htft-page.js']) {
+  const path = `dist/${file}`;
+  const source = await readFile(path, 'utf8');
+  await writeFile(path, source.replaceAll('./badges.js"', `./badges.js?v=${badgeHash}"`));
+}
 const index=await readJSON('data/index.json');
 if(index) {
   await writeJSON('dist/data/index.json',index);
