@@ -100,12 +100,18 @@ function norm(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9. ]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function inBand(odds, min, max) {
-  return Number.isFinite(odds) && odds >= min && odds <= max;
+function priced(odds) {
+  return Number.isFinite(odds) && odds > 1;
 }
 
-export function gatePick(pick, markets, { minimumOdds = 1.2, maximumOdds = 1.5 } = {}) {
+export function gatePick(pick, markets, { minimumSurety = 0.9, maximumSurety = 1 } = {}) {
   if (!pick) return null;
+  const sure = Number(pick.s);
+  const low = Math.round(minimumSurety * 100);
+  const high = Math.round(maximumSurety * 100);
+  if (!Number.isFinite(sure) || sure < minimumSurety || sure > maximumSurety) {
+    return { ...pick, odds: null, gated: false, gateReason: `Surity ${Number.isFinite(sure) ? Math.round(sure * 100) : 'unknown'} is outside ${low}–${high}` };
+  }
   const wantedMarket = norm(pick.market);
   const wantedSelection = norm(pick.selection);
   for (const market of markets || []) {
@@ -117,27 +123,27 @@ export function gatePick(pick, markets, { minimumOdds = 1.2, maximumOdds = 1.5 }
       const odds = Number(outcome.odds);
       const marketHit = name.includes(wantedMarket) || wantedMarket.includes(name);
       const selectionHit = label === wantedSelection || label.includes(wantedSelection) || wantedSelection.includes(label);
-      if (active && marketHit && selectionHit && inBand(odds, minimumOdds, maximumOdds)) {
+      if (active && marketHit && selectionHit && priced(odds)) {
         return { ...pick, odds, sportybetMarket: market.desc || market.name, sportybetSelection: outcome.desc || outcome.name, gated: true };
       }
     }
   }
-  return { ...pick, odds: null, gated: false, gateReason: `No active Sportybet price from ${minimumOdds.toFixed(2)} to ${maximumOdds.toFixed(2)}` };
+  return { ...pick, odds: null, gated: false, gateReason: 'No active Sportybet price for this sure market' };
 }
 
-export function applyHtft({ homeRow, awayRow, homeName, awayName, markets, minimumOdds, maximumOdds, venueConfirmed = true }) {
+export function applyHtft({ homeRow, awayRow, homeName, awayName, markets, minimumSurety = 0.9, maximumSurety = 1, venueConfirmed = true }) {
   if (!homeRow || !awayRow) {
     return { status: 'unavailable', route: 'no combo', pick: null, caveat: 'BetExplorer home or away HT/FT column was not found.' };
   }
   const home = columnFromCounts(mapTeamRow(homeRow, 'home'), { side: 'home', team: homeName, venueConfirmed });
   const away = columnFromCounts(mapTeamRow(awayRow, 'away'), { side: 'away', team: awayName, venueConfirmed });
   const combined = combineColumns(home, away);
-  const result = gatePick(combined.result, markets, { minimumOdds, maximumOdds });
-  const goals = gatePick(combined.goals, markets, { minimumOdds, maximumOdds });
+  const result = gatePick(combined.result, markets, { minimumSurety, maximumSurety });
+  const goals = gatePick(combined.goals, markets, { minimumSurety, maximumSurety });
   const published = [result, goals].filter(item => item?.gated).sort((a, b) => b.s - a.s)[0] || null;
   const caveat = [
     venueConfirmed ? 'Home column is BetExplorer home HT/FT. Away column is BetExplorer away HT/FT, translated into match codes.' : 'Venue filtering was not confirmed.',
-    `Sample ${home.N} home and ${away.N} away. The average is a ranking aid, not a probability.`,
+    `Sample ${home.N} home and ${away.N} away. Published only when surity is ${Math.round(minimumSurety * 100)} to ${Math.round(maximumSurety * 100)} at the active Sportybet odds.`,
   ].join(' ');
   return {
     status: 'ready',

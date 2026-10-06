@@ -5,11 +5,11 @@ A complete replacement of the previous multi-engine application. This repository
 ## The requested selection policy
 
 1. Discover daily football fixtures from Sportybet's Today **and** Upcoming books using its required 1X2 discovery parameter. Follow pagination and fetch each event's full market list without a market whitelist. Retain the original markets in a downloadable daily audit.
-2. Only active outcomes with decimal odds **from 1.20 to 1.50, inclusive** are prediction candidates. Suspended or stale odds never qualify.
+2. Active outcomes with a real decimal price above 1.00 are candidates. Suspended or stale odds never qualify. A market is published only when its surity is **from 90 to 100, inclusive**. The published odds are that market's Sportybet price. There is no 1.20–1.50 band.
 3. Compare candidates using the home team's home form, the away team's away form, league standings, recent H2H, venue-specific H2H, half-time/full-time transitions, scoring trends and available advanced statistics. Select one candidate per market category.
-4. Publish **one final tip per match**: the category winner with the highest estimated probability of a positive return. Expected return and risk break exact ties. Show loss probability, refund probability, uncertainty, expected return and conditional failure scenarios separately. Each match’s **Why this pick** button opens its explanation and market comparison in a popup, with Close, Escape and backdrop dismissal.
+4. Publish **one final tip per match**: the category winner with the highest surity inside 90 to 100. Expected return and risk break exact ties. Show loss probability, refund probability, uncertainty, expected return and conditional failure scenarios separately. Each match’s **Why this pick** button opens its explanation and market comparison in a popup, with Close, Escape and backdrop dismissal.
 5. Publish all matchups: no top/bottom-position, same-tier matchup, busy-day mismatch, competition-type, minimum-form or league-reliability exclusion. Reliability and small samples affect risk, not publication. Simulated Reality League fixtures are not real matches and are never analysed.
-6. Missing standings do not prevent analysis. If usable home/away history is missing, publish the highest implied-chance supported Sportybet outcome in the odds band and label it **odds based**. Do not present an odds-implied percentage as a statistical forecast or invent a risk score or expected return. Active prices, valid pre-match fixtures and freshness checks remain required. A pick that was already published stays on that day's board after kickoff, including its HT/FT card, so the settled result can be shown. It is not analysed again.
+6. Missing standings do not prevent analysis. If usable home/away history is missing, publish the highest implied-surity supported Sportybet outcome inside 90 to 100 and label it **odds based**. Do not present an odds-implied percentage as a statistical forecast or invent a risk score or expected return. Active prices, valid pre-match fixtures and freshness checks remain required. A pick that was already published stays on that day's board after kickoff, including its HT/FT card, so the settled result can be shown. It is not analysed again.
 
 The numerical data-quality and league-stability settings are visible in `config/policy.json`. They are implementation defaults, not extra rules attributed to the owner. Missing history produces a labelled odds-based selection rather than blocking the fixture.
 
@@ -31,7 +31,7 @@ The goal model blends recency-weighted home/away scoring and conceding, small op
 
 Advanced H2H reports venue alignment, BTTS and total-goal occurrences, HT/FT paths, lead retention and reversals. Corners/cards use their actual historical statistic fields, with conservative shrinkage toward the offered-odds prior; their method is labelled on the board.
 
-- **Model chance** is the estimated chance of any positive return (including a half-win), not the chance of avoiding a loss.
+- **Surity** is the estimated chance of any positive return (including a half-win), not the chance of avoiding a loss. Only 90 to 100 is published.
 - **Loss chance** includes full and half losses. A push is reported separately.
 - **Estimated return** = full/half-win profit probability × profit at the quoted odds, minus full/half-loss stake probability. Negative value is shown rather than silently removed.
 - **Risk score** (0–100) combines loss probability, model/history disagreement, small samples, missing H2H/xG and historical league instability. It is a heuristic index, not another probability.
@@ -71,7 +71,7 @@ If access fails, the pipeline publishes an unavailable/partial state rather than
 
 ## Verification and rollback
 
-`npm test` checks market settlement, odds boundaries, provider pagination, fixture identity, top/bottom exclusions, the 50-league boundary, freshness, probability mass and insufficient-data behavior. `npm run check` validates JavaScript syntax; `npm run build` creates the production site.
+`npm test` checks market settlement, the 90–100 surity gate, provider pagination, fixture identity, top/bottom exclusions, the 50-league boundary, freshness, probability mass and insufficient-data behavior. `npm run check` validates JavaScript syntax; `npm run build` creates the production site.
 
 The pre-rebuild source is available from commit `a6c5729890c98c7a9a4ff59b9ce34e301a9e6947`. Restore it through a normal revert or recovery branch; do not force-push away history.
 

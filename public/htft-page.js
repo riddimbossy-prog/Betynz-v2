@@ -42,7 +42,7 @@ function ticket(match) {
   const air = `${pick.label}${label ? ` · ${label}` : weak ? " · thin read" : ""}`;
   const home = badgeHtml(match.home, match.league) || esc(match.home.name.slice(0, 3).toUpperCase());
   const away = badgeHtml(match.away, match.league) || esc(match.away.name.slice(0, 3).toUpperCase());
-  return `<button type="button" class="ticket${weak ? " dim" : ""}${tone ? ` ${tone}` : ""}" data-id="${esc(match.id)}"><div class="ticket-top"><div><p class="t-big">${home}</p><p class="t-sub">${esc(match.home.name)}</p></div><p class="t-mid">${esc(clock(match.kickoff))}<br>${esc(match.league?.name || "League")}</p><div class="t-end"><p class="t-big">${away}</p><p class="t-sub">${esc(match.away.name)}</p></div></div><div class="ticket-bot"><p class="t-air">${esc(air)}</p><p class="t-price">${Number(pick.odds).toFixed(2)}</p></div><p class="t-sub">Table support ${esc(pct(pick.s))} · ${esc(match.htft.route || "no combo")}</p></button>`;
+  return `<button type="button" class="ticket${weak ? " dim" : ""}${tone ? ` ${tone}` : ""}" data-id="${esc(match.id)}"><div class="ticket-top"><div><p class="t-big">${home}</p><p class="t-sub">${esc(match.home.name)}</p></div><p class="t-mid">${esc(clock(match.kickoff))}<br>${esc(match.league?.name || "League")}</p><div class="t-end"><p class="t-big">${away}</p><p class="t-sub">${esc(match.away.name)}</p></div></div><div class="ticket-bot"><p class="t-air">${esc(air)}</p><p class="t-price">${Number(pick.odds).toFixed(2)}</p></div><p class="t-sub">Surity ${esc(pct(pick.s))} · ${esc(match.htft.route || "no combo")}</p></button>`;
 }
 
 function columnLine(column) {
@@ -55,7 +55,7 @@ function detail(match) {
   const label = resultLabel(card.settlement);
   const homeN = card.home?.N ?? 0;
   const awayN = card.away?.N ?? 0;
-  return `<p class="why-kicker">HT/FT CARD</p><h2 class="route-line"><span class="code">${Number(pick.odds).toFixed(2)}</span><span class="place">, ${esc(pick.label)}${label ? ` · ${esc(label)}` : ""}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)} · ${esc(match.league?.country || "")} ${esc(match.league?.name || "")}</p><div class="stat-row"><div><strong>${esc(pct(pick.s))}</strong><span>Table support</span></div><div><strong>${homeN}+${awayN}</strong><span>Home and away samples</span></div></div><h3>Nine counts</h3><p>Home column: ${esc(columnLine(card.home))}</p><p>Away column, in match codes: ${esc(columnLine(card.away))}</p><p>Home win ${pct(card.support?.homeWin)} · Draw ${pct(card.support?.draw)} · Away win ${pct(card.support?.awayWin)}</p><p>Over 1.5 ${pct(card.support?.over15)} · GG ${pct(card.support?.gg)} · Over 2.5 ${pct(card.support?.over25)}</p><p>Route: ${esc(card.route || "no combo")}. ${esc(card.caveat || "")}</p><p class="fine">${thin(match) ? "Thin read: the table supports this under 40%, so it is dimmed on the board. " : ""}Published only when the formula selection is an active price from 1.20 to 1.50. This is not a 1/1 scoreline call. Closed is not Under 2.5.</p>`;
+  return `<p class="why-kicker">HT/FT CARD</p><h2 class="route-line"><span class="code">${Number(pick.odds).toFixed(2)}</span><span class="place">, ${esc(pick.label)}${label ? ` · ${esc(label)}` : ""}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)} · ${esc(match.league?.country || "")} ${esc(match.league?.name || "")}</p><div class="stat-row"><div><strong>${esc(pct(pick.s))}</strong><span>Surity</span></div><div><strong>${homeN}+${awayN}</strong><span>Home and away samples</span></div></div><h3>Nine counts</h3><p>Home column: ${esc(columnLine(card.home))}</p><p>Away column, in match codes: ${esc(columnLine(card.away))}</p><p>Home win ${pct(card.support?.homeWin)} · Draw ${pct(card.support?.draw)} · Away win ${pct(card.support?.awayWin)}</p><p>Over 1.5 ${pct(card.support?.over15)} · GG ${pct(card.support?.gg)} · Over 2.5 ${pct(card.support?.over25)}</p><p>Route: ${esc(card.route || "no combo")}. ${esc(card.caveat || "")}</p><p class="fine">${thin(match) ? "Thin read: the table supports this under 40%, so it is dimmed on the board. " : ""}Published only when surity is 90 to 100 and Sportybet has an active price. The odds are that price. This is not a 1/1 scoreline call. Closed is not Under 2.5.</p>`;
 }
 
 function noteFor(day, rows, published) {
@@ -63,7 +63,7 @@ function noteFor(day, rows, published) {
   const weak = published.length - strong;
   const blocked = blockedCount(rows);
   if (!published.length && blocked > rows.length / 2) return `${day.date}: no card cleared. Most league tables were rate-limited on this scan.`;
-  if (!published.length) return `${day.date}: no HT/FT card cleared 1.20–1.50.`;
+  if (!published.length) return `${day.date}: no HT/FT card reached 90–100 surity.`;
   const thinNote = weak ? ` ${weak} ${weak === 1 ? "is a thin read" : "are thin reads"} under 40%.` : "";
   return `${published.length} card${published.length === 1 ? "" : "s"}. ${strong} supported at 40% or better.${thinNote} Kickoffs in UTC.`;
 }
@@ -95,7 +95,7 @@ async function openDate(date, button, days) {
       ].join("");
       $("results").innerHTML = published.length
         ? html
-        : `<div class="empty"><h3>No HT/FT card for ${esc(date.slice(8))}</h3><p>The formula ran. Nothing cleared an active 1.20–1.50 price.</p><a class="htft-nav" href="./index.html">Back to the shortlist</a></div>`;
+        : `<div class="empty"><h3>No HT/FT card for ${esc(date.slice(8))}</h3><p>The formula ran. Nothing reached 90–100 surity.</p><a class="htft-nav" href="./index.html">Back to the shortlist</a></div>`;
     };
     paint();
     await settleMatches(published);

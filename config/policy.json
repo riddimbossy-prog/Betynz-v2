@@ -1,6 +1,6 @@
 {
-  "minimumOdds": 1.2,
-  "maximumOdds": 1.5,
+  "minimumSurety": 0.9,
+  "maximumSurety": 1,
   "busyDayLeagueCount": 50,
   "topTeamCount": 4,
   "bottomTeamCount": 3,

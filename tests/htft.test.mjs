@@ -34,15 +34,25 @@ test('no comebacks and frequent HT-or-FT draws choose closed, not Under 2.5', ()
   assert.equal(combined.goals, null);
 });
 
-test('Sportybet gate blocks a formula pick outside 1.20-1.50', () => {
-  const card = applyHtft({
+test('sure markets publish at their Sportybet odds; 1.20-1.50 is not a gate', () => {
+  const sure = applyHtft({
     homeName: 'Chelsea', awayName: 'Bournemouth',
     homeRow: { 'W/W': 4, 'D/D': 1 },
     awayRow: { 'L/L': 4, 'D/D': 1 },
     markets: [{ desc: 'Double Chance', outcomes: [{ desc: 'Home or Draw', odds: '1.08', isActive: 1 }] }],
   });
-  assert.equal(card.pick, null);
-  assert.equal(card.gatedResult.gated, false);
+  assert.equal(sure.pick.gated, true);
+  assert.equal(sure.pick.odds, 1.08);
+  assert.ok(sure.pick.s >= 0.9);
+  const soft = applyHtft({
+    homeName: 'Chelsea', awayName: 'Bournemouth',
+    homeRow: { 'W/W': 6, 'D/D': 2, 'L/L': 2 },
+    awayRow: { 'L/L': 6, 'D/D': 2, 'W/W': 2 },
+    markets: [{ desc: 'Double Chance', outcomes: [{ desc: 'Home or Draw', odds: '1.35', isActive: 1 }] }],
+  });
+  assert.equal(soft.pick, null);
+  assert.equal(soft.gatedResult.gated, false);
+  assert.match(soft.gatedResult.gateReason, /90/);
 });
 
 test('parser reads the nine BetExplorer cells', () => {

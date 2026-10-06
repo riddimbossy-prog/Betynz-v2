@@ -1,6 +1,14 @@
 import { selections } from './markets.mjs';
 import { profile,modelFor,estimate,failureScenarios,leagueReliability,advancedH2H } from './model.mjs';
 import { clamp,round } from '../util.mjs';
+function sureBand(policy) {
+  const min=policy.minimumSurety??0.9, max=policy.maximumSurety??1;
+  return {min,max,label:`${Math.round(min*100)}–${Math.round(max*100)}`};
+}
+function isSure(probability,policy) {
+  const {min,max}=sureBand(policy);
+  return Number.isFinite(probability)&&probability>=min&&probability<=max;
+}
 export function isSimulated(league) {
   return /simulated reality|\bSRL\b/i.test(`${league?.country || ''} ${league?.name || ''}`);
 }
@@ -41,7 +49,8 @@ function explain(f,m,p,policy) {
   } else reasons.push('No recent H2H record was available; the risk assessment includes this gap.');
   if(home.xg!==null||away.xg!==null)reasons.push(`Available expected-goals averages: home ${home.xg===null?'unavailable':home.xg.toFixed(2)}, away ${away.xg===null?'unavailable':away.xg.toFixed(2)}. Finishing that differs from xG is partly pulled toward the chance-quality evidence.`);
   else reasons.push('Expected-goals data is unavailable. Advanced assessment uses score transitions and available shots/corners/cards.');
-  reasons.push(`${p.selection} in ${p.market} has the highest estimated chance among the eligible category winners at odds from ${(policy.minimumOdds??1.2).toFixed(2)} to ${policy.maximumOdds.toFixed(2)}.`);
+  const {label}=sureBand(policy);
+  reasons.push(`${p.selection} in ${p.market} is the highest surity among markets backed from ${label}, at Sportybet odds ${Number(p.odds).toFixed(2)}.`);
   if(p.evidence)for(const [source,e] of Object.entries(p.evidence))if(e.count)reasons.push(`For this particular market, the weighted positive-return rate in ${source} is ${(e.successRate*100).toFixed(0)}% across ${e.count} usable matches. Samples can overlap; they are deduplicated in the final estimate.`);
   if(p.expectedReturn<0)reasons.push('The estimated return at this price is negative despite the high chance of success.');
   if(p.disagreement>0.15)reasons.push('The matchup model and observed market history disagree; the risk rating is increased.');
@@ -49,7 +58,7 @@ function explain(f,m,p,policy) {
 }
 export function analyse(f,policy,{leagueCount=0,now=Date.now(),reliability}={}) {
   f={table:[],homeHistory:[],awayHistory:[],h2h:[],leagueHistory:[],...f};
-  const gate=eligibility(f,policy,leagueCount,now),book=selections(f,policy.maximumOdds,policy.minimumOdds);
+  const gate=eligibility(f,policy,leagueCount,now),book=selections(f);
   const basic={id:f.id,kickoff:f.kickoff,home:f.home,away:f.away,league:f.league,oddsFetchedAt:f.oddsFetchedAt,gate,coverage:book.counts,
     excludedMarkets:book.excluded,diagnostics:f.diagnostics||[],statsSource:f.statsSource,statsFetchedAt:f.statsFetchedAt,standings:{home:f.homeStanding?.rank,away:f.awayStanding?.rank,size:f.league.size}};
   if(!gate.eligible)return {...basic,status:'skipped',reasons:gate.reasons,categoryTips:[],tip:null};
@@ -66,13 +75,13 @@ export function analyse(f,policy,{leagueCount=0,now=Date.now(),reliability}={}) 
       factors:[...(!league.reliable?['Unproven or unstable league']:[]),...(estimation.disagreement>0.15?['Model/history disagreement']:[]),...(model.h2h.length<3?['Limited H2H sample']:[]),...(model.home.xg===null&&model.away.xg===null?['No xG coverage']:[]),...(estimation.sampleCount<10?['Small statistical sample']:[])]}});
   }
   // Highest estimated win probability first; value and risk break ties.
-  const ranked=candidates.sort((a,b)=>b.probability-a.probability||b.expectedReturn-a.expectedReturn||a.risk.score-b.risk.score);
+  const ranked=candidates.filter(c=>isSure(c.probability,policy)).sort((a,b)=>b.probability-a.probability||b.expectedReturn-a.expectedReturn||a.risk.score-b.risk.score);
   const categories=new Map();for(const c of ranked)if(!categories.has(c.category))categories.set(c.category,c);
   const categoryTips=[...categories.values()];let tip=categoryTips[0]||null;
   if(!tip&&policy.publishAllMatches)return oddsOnly(f,policy,basic,book,league);
   if(tip)tip={...tip,scenarios:failureScenarios(tip.compiled,model)};
   return {...basic,status:tip?'qualified':'skipped',leagueReliability:league,categoryTips,tip,
-    reasons:tip?explain(f,model,tip,policy):[`No supported market at odds ${(policy.minimumOdds??1.2).toFixed(2)}–${policy.maximumOdds.toFixed(2)} has sufficient data`],
+    reasons:tip?explain(f,model,tip,policy):[`No supported market is backed at ${sureBand(policy).label} surity`],
     form:{home:model.home,away:model.away},h2h:{...advancedH2H(f),sameVenue:model.h2h.filter(r=>r.venueMatch).length},
     expectedGoals:{home:round(model.lambdaHome),away:round(model.lambdaAway)},
     probabilityNotice:'Model estimates, not calibrated guarantees. The range is a sampling-uncertainty indicator and does not include every source of error.'};
@@ -80,11 +89,12 @@ export function analyse(f,policy,{leagueCount=0,now=Date.now(),reliability}={}) 
 function oddsOnly(f,policy,basic,book,league) {
   const ranked=book.candidates.map(c=>({...c,probability:1/c.odds,lossProbability:null,push:null,expectedReturn:null,
     probabilityRange:[null,null],sampleCount:0,method:'Sportybet implied odds; no statistical probability available',
-    probabilityBasis:'odds',scenarios:[],risk:{score:null,label:'Unrated',factors:['Historical evidence unavailable']}})).sort((a,b)=>b.probability-a.probability);
+    probabilityBasis:'odds',scenarios:[],risk:{score:null,label:'Unrated',factors:['Historical evidence unavailable']}})).filter(c=>isSure(c.probability,policy)).sort((a,b)=>b.probability-a.probability);
   const categories=new Map();for(const c of ranked)if(!categories.has(c.category))categories.set(c.category,c);
   const categoryTips=[...categories.values()],tip=categoryTips[0]||null;
+  const {label}=sureBand(policy);
   return {...basic,status:tip?'qualified':'skipped',leagueReliability:league,categoryTips,tip,
-    reasons:tip?[`${tip.selection} in ${tip.market} has the highest implied chance among supported active prices from ${policy.minimumOdds.toFixed(2)} to ${policy.maximumOdds.toFixed(2)}.`,
-      'Published from Sportybet odds because usable home/away history is missing. The displayed percentage is 1 divided by the odds, includes bookmaker margin and is not a statistical forecast.',...(f.diagnostics||[])]:['No supported active market in the requested odds range'],
+    reasons:tip?[`${tip.selection} in ${tip.market} is a sure market at Sportybet odds ${Number(tip.odds).toFixed(2)}. Implied surity is ${Math.round(tip.probability*100)}%, inside ${label}.`,
+      'Published from Sportybet odds because usable home/away history is missing. The displayed percentage is 1 divided by the odds, includes bookmaker margin and is not a statistical forecast.',...(f.diagnostics||[])]:[`No supported market is backed at ${label} surity`],
     probabilityNotice:'Odds-based selection; statistical probability, return and risk score are unavailable.'};
 }

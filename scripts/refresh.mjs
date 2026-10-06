@@ -110,7 +110,7 @@ export async function refresh({sporty=new Sportybet(),football=process.env.STATI
         diagnostics.push(`HT/FT ${row.league.name}: ${row.htft.caveat}`);
         continue;
       }
-      row.htft=applyHtft({homeRow:findTeam(table.home,row.home.name),awayRow:findTeam(table.away,row.away.name),homeName:row.home.name,awayName:row.away.name,markets:marketsById.get(row.id)||[],minimumOdds:policy.minimumOdds,maximumOdds:policy.maximumOdds,venueConfirmed:table.venueConfirmed});
+      row.htft=applyHtft({homeRow:findTeam(table.home,row.home.name),awayRow:findTeam(table.away,row.away.name),homeName:row.home.name,awayName:row.away.name,markets:marketsById.get(row.id)||[],minimumSurety:policy.minimumSurety,maximumSurety:policy.maximumSurety,venueConfirmed:table.venueConfirmed});
     }
     const qualified=results.filter(r=>r.tip).sort((a,b)=>b.tip.probability-a.tip.probability);
     const statisticsErrors=results.filter(r=>!r.kept && (r.tip?.probabilityBasis==='odds'||r.reasons.some(s=>s.startsWith('Analysis unavailable:')||s==='No verified statistics fixture match'))).length;

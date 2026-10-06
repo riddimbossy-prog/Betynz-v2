@@ -73,11 +73,6 @@ async function get(path) {
 }
 function effective(match) {
   if (!match.tip || !state.board) return match;
-  const min = state.board.policy?.minimumOdds ?? 1.2;
-  const maxOdds = state.board.policy?.maximumOdds ?? 1.5;
-  if (!Number.isFinite(match.tip.odds) || match.tip.odds < min || match.tip.odds > maxOdds) {
-    return { ...match, tip: null, reasons: [`Odds must be between ${min.toFixed(2)} and ${maxOdds.toFixed(2)}.`] };
-  }
   const started = Date.parse(match.kickoff) <= Date.now();
   return { ...match, started };
 }
@@ -186,7 +181,7 @@ function optionTicket(match, tip, index) {
   const [a, b] = marketLines(tip.market);
   const label = resultLabel(tip.settlement);
   return ticket(
-    `${side(esc(clock(match.kickoff)), "Kickoff")}<p class="t-mid">${esc(label || a)}${!label && b ? `<br>${esc(b)}` : ""}</p>${side(esc(pct(tip.probability)), tip.probabilityBasis === "odds" ? "Implied odds" : "Model", true)}`,
+    `${side(esc(clock(match.kickoff)), "Kickoff")}<p class="t-mid">${esc(label || a)}${!label && b ? `<br>${esc(b)}` : ""}</p>${side(esc(pct(tip.probability)), tip.probabilityBasis === "odds" ? "Implied surity" : "Surity", true)}`,
     esc(label ? `${carrier(tip)} · ${label}` : carrier(tip)),
     esc(oddsText(tip.odds)),
     `data-why="${index}"`,
@@ -249,8 +244,8 @@ function render() {
       const empty = state.model === "banker"
         ? ["No banker", "Both models have to select the same match."]
         : state.model === "htft"
-          ? ["No HT/FT card", "The table model ran. Nothing cleared 1.20–1.50."]
-          : [filtered ? "No matches for these filters" : "No matches qualify right now", filtered ? "Clear the team or league filter to see the shortlist." : "Open unavailable matches to see missing prices or data."];
+          ? ["No HT/FT card", "The table model ran. Nothing reached 90–100 surity."]
+          : [filtered ? "No matches for these filters" : "No sure markets right now", filtered ? "Clear the team or league filter to see the shortlist." : "A pick needs 90 to 100 surity. Open unavailable matches to see what missed."];
       const action = state.model === "shortlist" ? `<button type="button" id="empty-action">${filtered ? "Clear filters" : "View unavailable"}</button>` : "";
       $("results").innerHTML = `<div class="empty"><h3>${empty[0]}</h3><p>${empty[1]}</p>${action}</div>`;
       if ($("empty-action")) $("empty-action").onclick = () => {
@@ -323,7 +318,7 @@ function fillWhy(match, tip) {
   if (!tip) { $("why").hidden = true; state.whyKey = null; return; }
   const form = match.form || {};
   const letters = (sideName) => (form[sideName]?.form || []).slice(0, 5).map((letter) => `<span class="${esc(letter)}">${esc(letter)}</span>`).join("");
-  $("why-body").innerHTML = `<p class="why-kicker">WHY THIS PICK</p><h2 class="route-line"><span class="code">${esc(oddsText(tip.odds))}</span><span class="place">, ${esc(carrier(tip))}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)}</p>${optionTicket(match, tip, 0).replace("data-why=\"0\"", "disabled")}<div class="stat-row"><div><strong>${esc(pct(tip.probability))}</strong><span>${tip.probabilityBasis === "odds" ? "Implied odds" : "Model chance"}</span></div><div><strong>${esc(tip.risk?.score ?? "—")}</strong><span>${esc(tip.risk?.label || "Open")} risk / 100</span></div></div><h3>Why this price</h3><ul>${(match.reasons?.length ? match.reasons : ["No extra matchup note."]).slice(0, 6).map((reason) => `<li>${esc(reason)}</li>`).join("")}</ul><h3>Form</h3><div class="stat-row"><div><strong>${esc(teamCode(match.home.name))}</strong><span>home form</span><div class="form-row">${letters("home")}</div></div><div><strong>${esc(teamCode(match.away.name))}</strong><span>away form</span><div class="form-row">${letters("away")}</div></div></div>${match.h2h?.games ? `<p>${match.h2h.games} recent meetings. Both teams scored in ${esc(pct(match.h2h.bttsRate))}. Over 2.5 in ${esc(pct(match.h2h.over25Rate))}.</p>` : ""}<h3>If the match goes wrong</h3>${tip.scenarios?.length ? `<div class="stat-row">${tip.scenarios.slice(0, 4).map((scenario) => `<div><strong>${esc(pct(scenario.survivalProbability))}</strong><span>${esc(scenario.label)}</span></div>`).join("")}</div>` : "<p>No extra failure scenario for this market.</p>"}<p class="fine">${Number.isFinite(tip.expectedReturn) ? `Estimated return ${tip.expectedReturn >= 0 ? "+" : ""}${(tip.expectedReturn * 100).toFixed(1)}% per unit.` : "Estimated return unavailable."} Sample ${esc(tip.sampleCount)}. ${esc(tip.method)}</p>`;
+  $("why-body").innerHTML = `<p class="why-kicker">WHY THIS PICK</p><h2 class="route-line"><span class="code">${esc(oddsText(tip.odds))}</span><span class="place">, ${esc(carrier(tip))}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)}</p>${optionTicket(match, tip, 0).replace("data-why=\"0\"", "disabled")}<div class="stat-row"><div><strong>${esc(pct(tip.probability))}</strong><span>${tip.probabilityBasis === "odds" ? "Implied surity" : "Surity"}</span></div><div><strong>${esc(tip.risk?.score ?? "—")}</strong><span>${esc(tip.risk?.label || "Open")} risk / 100</span></div></div><h3>Why this price</h3><ul>${(match.reasons?.length ? match.reasons : ["No extra matchup note."]).slice(0, 6).map((reason) => `<li>${esc(reason)}</li>`).join("")}</ul><h3>Form</h3><div class="stat-row"><div><strong>${esc(teamCode(match.home.name))}</strong><span>home form</span><div class="form-row">${letters("home")}</div></div><div><strong>${esc(teamCode(match.away.name))}</strong><span>away form</span><div class="form-row">${letters("away")}</div></div></div>${match.h2h?.games ? `<p>${match.h2h.games} recent meetings. Both teams scored in ${esc(pct(match.h2h.bttsRate))}. Over 2.5 in ${esc(pct(match.h2h.over25Rate))}.</p>` : ""}<h3>If the match goes wrong</h3>${tip.scenarios?.length ? `<div class="stat-row">${tip.scenarios.slice(0, 4).map((scenario) => `<div><strong>${esc(pct(scenario.survivalProbability))}</strong><span>${esc(scenario.label)}</span></div>`).join("")}</div>` : "<p>No extra failure scenario for this market.</p>"}<p class="fine">${Number.isFinite(tip.expectedReturn) ? `Estimated return ${tip.expectedReturn >= 0 ? "+" : ""}${(tip.expectedReturn * 100).toFixed(1)}% per unit.` : "Estimated return unavailable."} Sample ${esc(tip.sampleCount)}. ${esc(tip.method)}</p>`;
   $("why").hidden = false;
 }
 function showHtftWhy(match) {
@@ -331,7 +326,7 @@ function showHtftWhy(match) {
   const pick = card?.pick;
   if (!pick) { $("why").hidden = true; state.whyKey = null; return; }
   const label = resultLabel(card.settlement);
-  $("why-body").innerHTML = `<p class="why-kicker">HT/FT</p><h2 class="route-line"><span class="code">${Number(pick.odds).toFixed(2)}</span><span class="place">, ${esc(pick.label)}${label ? ` · ${esc(label)}` : ""}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)}</p><div class="stat-row"><div><strong>${esc(pct(pick.s))}</strong><span>Table support</span></div><div><strong>${esc(card.route || "no combo")}</strong><span>Route</span></div></div><p>Home win ${esc(pct(card.support?.homeWin))} · Draw ${esc(pct(card.support?.draw))} · Away win ${esc(pct(card.support?.awayWin))}</p><p>Over 1.5 ${esc(pct(card.support?.over15))} · GG ${esc(pct(card.support?.gg))} · Over 2.5 ${esc(pct(card.support?.over25))}</p><p class="fine">${esc(card.caveat || "Published only when the formula has an active Sportybet price from 1.20 to 1.50.")}</p>`;
+  $("why-body").innerHTML = `<p class="why-kicker">HT/FT</p><h2 class="route-line"><span class="code">${Number(pick.odds).toFixed(2)}</span><span class="place">, ${esc(pick.label)}${label ? ` · ${esc(label)}` : ""}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)}</p><div class="stat-row"><div><strong>${esc(pct(pick.s))}</strong><span>Surity</span></div><div><strong>${esc(card.route || "no combo")}</strong><span>Route</span></div></div><p>Home win ${esc(pct(card.support?.homeWin))} · Draw ${esc(pct(card.support?.draw))} · Away win ${esc(pct(card.support?.awayWin))}</p><p>Over 1.5 ${esc(pct(card.support?.over15))} · GG ${esc(pct(card.support?.gg))} · Over 2.5 ${esc(pct(card.support?.over25))}</p><p class="fine">${esc(card.caveat || "Published only when surity is 90 to 100, at the active Sportybet odds.")}</p>`;
   $("why").hidden = false;
 }
 function snapshot() {
