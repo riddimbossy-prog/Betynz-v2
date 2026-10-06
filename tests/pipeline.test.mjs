@@ -51,6 +51,27 @@ test('a started match keeps the pick already published for that day',async()=>{
     assert.equal(board.summary.qualified,2);
   } finally {await rm(directory,{recursive:true,force:true});}
 });
+test('a failed market refetch keeps the pick already published',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'betynz-refetch-'));
+  try {
+    const upcoming=fixture(),date=addDays(day(),1);
+    upcoming.kickoff=`${date}T20:00:00Z`;
+    upcoming.oddsFetchedAt=new Date().toISOString();
+    upcoming.marketFetchStatus='complete';
+    await writeJSON(`${directory}/board-${date}.json`,{matches:[{...upcoming,status:'qualified',tip:{selection:'Home',market:'1X2',odds:1.4,probability:0.7},categoryTips:[],htft:{pick:{label:'Home 1X',odds:1.3,selection:'Home or Draw',market:'Double Chance'}},reasons:['Kept']}]});
+    let analysed=0;
+    const failed={...upcoming,markets:[],marketFetchStatus:'failed'};
+    const sporty={country:'test',dailyBooks:async()=>({fixtures:[failed],complete:false,diagnostics:['empty']})};
+    const football={fixtures:async()=>[],enrich:async()=>{analysed+=1;return upcoming;}};
+    const betexplorer={leagueTables:async()=>{analysed+=1;return {home:[],away:[],venueConfirmed:true};}};
+    await refresh({sporty,football,betexplorer,dataDir:directory,today:date,days:1});
+    const board=await readJSON(`${directory}/board-${date}.json`);
+    assert.equal(analysed,0);
+    assert.equal(board.matches[0].tip.selection,'Home');
+    assert.equal(board.matches[0].htft.pick.label,'Home 1X');
+    assert.equal(board.summary.qualified,1);
+  } finally {await rm(directory,{recursive:true,force:true});}
+});
 test('SRL fixtures are dropped before statistics or HT/FT lookups',async()=>{
   const directory=await mkdtemp(join(tmpdir(),'betynz-srl-'));
   try {

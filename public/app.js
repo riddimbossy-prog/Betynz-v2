@@ -79,11 +79,6 @@ function effective(match) {
     return { ...match, tip: null, reasons: [`Odds must be between ${min.toFixed(2)} and ${maxOdds.toFixed(2)}.`] };
   }
   const started = Date.parse(match.kickoff) <= Date.now();
-  if (!started) {
-    const age = Date.now() - Date.parse(match.oddsFetchedAt || "");
-    const max = state.board.policy?.maximumOddsAgeMinutes || 90;
-    if (!Number.isFinite(age) || age > max * 60000) return { ...match, tip: null, reasons: ["Odds snapshot has expired. Waiting for a fresh scan."] };
-  }
   return { ...match, started };
 }
 function fresh() {

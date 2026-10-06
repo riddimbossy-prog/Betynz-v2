@@ -11,20 +11,20 @@ export class HttpClient {
   async request(url,key,{ttl,headers,validate}) {
     const path=`${this.cacheDir}/${key}.json`;
     if(ttl) { const cached=await readJSON(path); if(cached && Date.now()-cached.at<ttl) {validate(cached.body);return cached.body;} }
-    for(let attempt=0;attempt<3;attempt++) {
+    for(let attempt=0;attempt<4;attempt++) {
       const slot=Math.max(Date.now(),this.next); this.next=slot+this.interval;
       if(slot>Date.now()) await sleep(slot-Date.now());
       let response;
       try {response=await this.fetchImpl(url,{headers:{accept:'application/json',...this.headers,...headers},signal:AbortSignal.timeout(25000)});}
-      catch(e) {if(attempt===2)throw e;await sleep(this.retryDelayMs*(attempt+1));continue;}
-      if((response.status===429 || response.status>=500) && attempt<2) {
+      catch(e) {if(attempt===3)throw e;await sleep(this.retryDelayMs*(attempt+1));continue;}
+      if((response.status===429 || response.status>=500) && attempt<3) {
         const retry=Number(response.headers.get('retry-after'))||3*(attempt+1);
         await sleep(Math.min(45000,retry*1000)); continue;
       }
       if(!response.ok) throw new Error(`${new URL(url).hostname}: HTTP ${response.status}`);
       let body;
       try {body=await response.json();}
-      catch {if(attempt===2)throw new Error(`${new URL(url).hostname}: empty or incomplete JSON after 3 attempts`);await sleep(this.retryDelayMs*(attempt+1));continue;}
+      catch {if(attempt===3)throw new Error(`${new URL(url).hostname}: empty or incomplete JSON after 4 attempts`);await sleep(1500*(attempt+1));continue;}
       validate(body);
       if(ttl) await writeJSON(path,{at:Date.now(),body});
       return body;
