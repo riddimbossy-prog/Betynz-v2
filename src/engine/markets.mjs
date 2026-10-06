@@ -11,6 +11,26 @@ function lineFrom(m,o) {
   const match=clean(o.desc||o.name).match(/(?:over|under)\s*([+-]?\d+(?:\.\d+)?)/);
   return match?Number(match[1]):null;
 }
+const teamTotalSide={19:'home',69:'home',91:'home',20:'away',70:'away',92:'away'};
+function teamLabel(side,fixture){
+  const value=fixture?.[side];
+  return clean(typeof value==='string'?value:value?.name);
+}
+function marketSide(name,marketId,fixture){
+  // Sportybet titles team totals with the club name ("Peru Over/Under"), not the word home/away.
+  const byId=teamTotalSide[String(marketId)];
+  if(byId) return byId;
+  if(/\bhome\b/.test(name)) return 'home';
+  if(/\baway\b/.test(name)) return 'away';
+  const named=[['home',teamLabel('home',fixture)],['away',teamLabel('away',fixture)]]
+    .filter(([,label])=>label.length>=3 && !/^(over|under|total|draw|both|goals|goal|half|corners|cards|btts)$/.test(label))
+    .sort((a,b)=>b[1].length-a[1].length);
+  for(const [side,label] of named){
+    const body=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    if(new RegExp(`(?:^|[^a-z0-9])${body}(?:[^a-z0-9]|$)`).test(name)) return side;
+  }
+  return null;
+}
 export function marketActive(m) { return !m.banned && !m.suspended && !m.isSuspended && (m.status===undefined || m.status===null || String(m.status)==='0' || clean(m.status)==='active'); }
 export function outcomeActive(o) { return !o.suspended && !o.isSuspended && o.isActive!==false && String(o.isActive)!=='0' && o.active!==false; }
 function booleanResult(value,want) { return Boolean(value)===want?1:-1; }
@@ -37,7 +57,7 @@ export function compileSelection(m,o,fixture={}) {
     return {kind:'htft',stat:'goals',period:'ft',parts};
   }
   name=name.replace(/1st half|first half|half time|halftime|2nd half|second half/g,'').replace(/^[\s:-]+|[\s:-]+$/g,'');
-  const team=/\bhome\b/.test(name)?'home':/\baway\b/.test(name)?'away':null;
+  const team=marketSide(name,m.id,fixture);
   const side=pickSide(outcome); const yn=yesNo(outcome);
   const line=lineFrom(m,o); const direction=/^over\b/.test(outcome)?'over':/^under\b/.test(outcome)?'under':null;
   const btts=/both teams (?:to )?score|\bbtts\b|\bgg\b/.test(name);
