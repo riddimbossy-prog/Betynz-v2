@@ -27,23 +27,25 @@ test('missing data, stale odds, started matches and unreliable leagues fail clos
   f=fixture();assert.equal(analyse(f,policy,{now,reliability:{reliable:false,reason:'Unstable'}}).tip,null);
   f.league.name='Club Friendlies';assert.equal(eligibility(f,policy,10,now).eligible,false);
 });
-test('one highest-surity final pick; only 90-100 markets publish, at their own odds',()=>{
-  const f=fixture();f.markets.push(market(18,'Over/Under',[['Under 6.5',1.12]],'total=6.5'));
+test('one highest-surity final pick; only 90-100 markets at 1.20 or higher publish',()=>{
+  const f=fixture();f.markets.push(market(18,'Over/Under',[['Under 6.5',1.20]],'total=6.5'));
   const r=analyse(f,policy,{now,leagueCount:50,reliability:stable});
   assert.ok(r.tip);assert.equal(r.categoryTips.length,new Set(r.categoryTips.map(x=>x.category)).size);
   assert.equal(r.tip.probability,Math.max(...r.categoryTips.map(x=>x.probability)));
-  assert.ok(r.categoryTips.every(x=>x.probability>=0.9&&x.probability<=1));
-  assert.ok(r.tip.odds>1);
+  assert.ok(r.categoryTips.every(x=>x.probability>=0.9&&x.probability<=1&&x.odds>=1.2));
   assert.ok(r.tip.risk.score>=0&&r.tip.risk.score<=100);assert.equal(r.tip.scenarios.length,3);
   assert.ok(r.reasons.join(' ').includes('Alpha FC'));assert.ok(r.tip.lossProbability>=0);
 });
-test('a market under 90 surity cannot become the pick; a short sure price can',()=>{
+test('a market under 90 surity or under 1.20 cannot become the pick; a longer sure price can',()=>{
   const f=fixture();f.markets=[market(1,'1X2',[['Home',1.40]])];
   const skipped=analyse(f,policy,{now,leagueCount:20,reliability:stable});
   assert.equal(skipped.tip,null);assert.match(skipped.reasons.join(' '),/90/);
   f.markets=[market(18,'Over/Under',[['Under 9.5',1.19]],'total=9.5')];
+  const short=analyse(f,policy,{now,leagueCount:20,reliability:stable});
+  assert.equal(short.tip,null);assert.match(short.reasons.join(' '),/1\.20/);
+  f.markets=[market(10,'Double Chance',[['Home or Draw',1.65]])];
   const accepted=analyse(f,policy,{now,leagueCount:20,reliability:stable});
-  assert.equal(accepted.tip.odds,1.19);assert.equal(accepted.tip.selection,'Under 9.5');
+  assert.equal(accepted.tip.odds,1.65);assert.equal(accepted.tip.selection,'Home or Draw');
   assert.ok(accepted.tip.probability>=0.9&&accepted.tip.probability<=1);
 });
 test('probability mass is normalized; Asian return calculation values pushes correctly',()=>{
@@ -81,12 +83,11 @@ test('simulated reality matches are never analysed, even in all-matches mode',()
   }
   const real=fixture();assert.ok(analyse(real,openPolicy,{now}).tip);
 });
-test('missing standings do not block history; missing form publishes an explicit odds-based pick',()=>{
+test('missing standings do not block history; missing form does not publish under 1.20',()=>{
   const f=fixture();f.homeStanding=null;f.awayStanding=null;f.table=[];
   assert.ok(analyse(f,openPolicy,{now}).tip);
   f.homeHistory=[];f.awayHistory=[];
-  const r=analyse(f,openPolicy,{now});assert.ok(r.tip);assert.equal(r.tip.probabilityBasis,'odds');
-  assert.equal(r.tip.sampleCount,0);assert.equal(r.tip.risk.score,null);assert.equal(r.tip.expectedReturn,null);
-  assert.match(r.reasons.join(' '),/not a statistical forecast/);
+  const r=analyse(f,openPolicy,{now});assert.equal(r.tip,null);
+  assert.match(r.reasons.join(' '),/1\.20/);
   f.oddsFetchedAt='2026-09-23T07:00:00Z';assert.equal(analyse(f,openPolicy,{now}).tip,null);
 });

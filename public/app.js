@@ -73,7 +73,11 @@ async function get(path) {
 }
 function effective(match) {
   if (!match.tip || !state.board) return match;
+  const min = state.board.policy?.minimumOdds ?? 1.2;
   const started = Date.parse(match.kickoff) <= Date.now();
+  if (!Number.isFinite(match.tip.odds) || match.tip.odds < min) {
+    return { ...match, tip: null, started, reasons: [`Odds must be at least ${min.toFixed(2)}.`] };
+  }
   return { ...match, started };
 }
 function fresh() {
@@ -83,7 +87,9 @@ function matches() {
   return (state.board?.matches || []).map(effective);
 }
 function hasHtft(match) {
-  return Boolean(match.htft?.pick);
+  const min = state.board?.policy?.minimumOdds ?? 1.2;
+  const odds = Number(match.htft?.pick?.odds);
+  return Boolean(match.htft?.pick) && odds >= min;
 }
 function isBanker(match) {
   return Boolean(match.tip && hasHtft(match));

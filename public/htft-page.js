@@ -23,7 +23,7 @@ function clock(iso) {
 }
 
 function cards(matches) {
-  return (matches || []).filter((match) => match.htft?.pick).sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff));
+  return (matches || []).filter((match) => Number(match.htft?.pick?.odds) >= 1.2).sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff));
 }
 
 function thin(match) {
@@ -55,7 +55,7 @@ function detail(match) {
   const label = resultLabel(card.settlement);
   const homeN = card.home?.N ?? 0;
   const awayN = card.away?.N ?? 0;
-  return `<p class="why-kicker">HT/FT CARD</p><h2 class="route-line"><span class="code">${Number(pick.odds).toFixed(2)}</span><span class="place">, ${esc(pick.label)}${label ? ` · ${esc(label)}` : ""}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)} · ${esc(match.league?.country || "")} ${esc(match.league?.name || "")}</p><div class="stat-row"><div><strong>${esc(pct(pick.s))}</strong><span>Surity</span></div><div><strong>${homeN}+${awayN}</strong><span>Home and away samples</span></div></div><h3>Nine counts</h3><p>Home column: ${esc(columnLine(card.home))}</p><p>Away column, in match codes: ${esc(columnLine(card.away))}</p><p>Home win ${pct(card.support?.homeWin)} · Draw ${pct(card.support?.draw)} · Away win ${pct(card.support?.awayWin)}</p><p>Over 1.5 ${pct(card.support?.over15)} · GG ${pct(card.support?.gg)} · Over 2.5 ${pct(card.support?.over25)}</p><p>Route: ${esc(card.route || "no combo")}. ${esc(card.caveat || "")}</p><p class="fine">${thin(match) ? "Thin read: the table supports this under 40%, so it is dimmed on the board. " : ""}Published only when surity is 90 to 100 and Sportybet has an active price. The odds are that price. This is not a 1/1 scoreline call. Closed is not Under 2.5.</p>`;
+  return `<p class="why-kicker">HT/FT CARD</p><h2 class="route-line"><span class="code">${Number(pick.odds).toFixed(2)}</span><span class="place">, ${esc(pick.label)}${label ? ` · ${esc(label)}` : ""}</span></h2><p class="note">${esc(match.home.name)} v ${esc(match.away.name)} · ${esc(match.league?.country || "")} ${esc(match.league?.name || "")}</p><div class="stat-row"><div><strong>${esc(pct(pick.s))}</strong><span>Surity</span></div><div><strong>${homeN}+${awayN}</strong><span>Home and away samples</span></div></div><h3>Nine counts</h3><p>Home column: ${esc(columnLine(card.home))}</p><p>Away column, in match codes: ${esc(columnLine(card.away))}</p><p>Home win ${pct(card.support?.homeWin)} · Draw ${pct(card.support?.draw)} · Away win ${pct(card.support?.awayWin)}</p><p>Over 1.5 ${pct(card.support?.over15)} · GG ${pct(card.support?.gg)} · Over 2.5 ${pct(card.support?.over25)}</p><p>Route: ${esc(card.route || "no combo")}. ${esc(card.caveat || "")}</p><p class="fine">${thin(match) ? "Thin read: the table supports this under 40%, so it is dimmed on the board. " : ""}Published only when surity is 90 to 100 and the Sportybet price is at least 1.20. This is not a 1/1 scoreline call. Closed is not Under 2.5.</p>`;
 }
 
 function noteFor(day, rows, published) {

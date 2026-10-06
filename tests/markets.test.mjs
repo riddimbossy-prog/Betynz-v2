@@ -1,10 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import { compileSelection,evaluate,lineResult,selections } from '../src/engine/markets.mjs';
 import { fixture,market } from './helpers.mjs';
-test('any active price above 1.00 is a candidate; the 1.20-1.50 band is not a gate',()=>{
-  for(const odds of [null,'',0,-1,1,1.01,1.19,1.20,1.35,1.50,1.51,2.4,8]) {
+test('prices from 1.20 upward are candidates; anything under 1.20 is not',()=>{
+  for(const odds of [null,'',0,-1,1,1.01,1.19,1.1999,1.20,1.35,1.50,1.51,2.4,8]) {
     const f=fixture();f.markets=[market(1,'1X2',[['Home',odds]])];
-    assert.equal(selections(f).candidates.length,Number(odds)>1?1:0,`odds ${odds}`);
+    assert.equal(selections(f).candidates.length,Number(odds)>=1.2?1:0,`odds ${odds}`);
   }
 });
 test('suspended markets and outcomes are excluded even at an eligible price',()=>{

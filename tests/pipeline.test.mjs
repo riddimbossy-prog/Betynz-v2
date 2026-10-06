@@ -14,7 +14,7 @@ test('full pipeline writes one prediction plus every raw market; statistics IDs 
     const index=await refresh({sporty,football,betexplorer:{leagueTables:async()=>({home:[],away:[],venueConfirmed:true})},dataDir:directory,today:date,days:1});
     const board=await readJSON(`${directory}/board-${date}.json`),raw=await readJSON(`${directory}/markets-${date}.json`);
     assert.equal(index.complete,true);assert.equal(board.summary.qualified,1);assert.equal(board.matches[0].id,'sr:match:1');
-    assert.ok(board.matches[0].tip.probability>=0.9&&board.matches[0].tip.probability<=1);assert.ok(board.matches[0].tip.odds>1);assert.deepEqual(raw.fixtures[0].markets,f.markets);
+    assert.ok(board.matches[0].tip.probability>=0.9&&board.matches[0].tip.probability<=1);assert.ok(board.matches[0].tip.odds>=1.2);assert.deepEqual(raw.fixtures[0].markets,f.markets);
   } finally {await rm(directory,{recursive:true,force:true});}
 });
 test('provider outage publishes explicit unavailable state with no synthetic or cached picks',async()=>{
@@ -91,14 +91,15 @@ test('SRL fixtures are dropped before statistics or HT/FT lookups',async()=>{
     assert.match((await readJSON(`${directory}/index.json`)).diagnostics.join(' '),/Skipped 1 simulated/);
   } finally {await rm(directory,{recursive:true,force:true});}
 });
-test('statistics outage still publishes a labelled odds pick in all-matches mode',async()=>{
+test('statistics outage does not publish a price under 1.20',async()=>{
   const directory=await mkdtemp(join(tmpdir(),'betynz-all-'));
   try {
     const f=fixture(),date=addDays(day(),1);f.kickoff=`${date}T20:00:00Z`;f.oddsFetchedAt=new Date().toISOString();f.marketFetchStatus='complete';f.league.name='U19 Friendly';
     const sporty={country:'test',dailyBooks:async()=>({fixtures:[f],complete:true,diagnostics:[]})};
     const football={matchFixture:async()=>{throw new Error('No history');}};
     await refresh({sporty,football,betexplorer:{leagueTables:async()=>({home:[],away:[],venueConfirmed:true})},dataDir:directory,today:date,days:1});
-    const board=await readJSON(`${directory}/board-${date}.json`);assert.equal(board.summary.qualified,1);assert.equal(board.matches[0].tip.probabilityBasis,'odds');
+    const board=await readJSON(`${directory}/board-${date}.json`);assert.equal(board.summary.qualified,0);assert.equal(board.matches[0].tip,null);
+    assert.match(board.matches[0].reasons.join(' '),/1\.20/);
     assert.equal(board.busyDay,false);assert.equal(board.statistics.unavailable,1);assert.equal(board.status,'partial');
   } finally {await rm(directory,{recursive:true,force:true});}
 });

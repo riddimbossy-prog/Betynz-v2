@@ -58,7 +58,7 @@ function explain(f,m,p,policy) {
 }
 export function analyse(f,policy,{leagueCount=0,now=Date.now(),reliability}={}) {
   f={table:[],homeHistory:[],awayHistory:[],h2h:[],leagueHistory:[],...f};
-  const gate=eligibility(f,policy,leagueCount,now),book=selections(f);
+  const gate=eligibility(f,policy,leagueCount,now),book=selections(f,policy.minimumOdds??1.2);
   const basic={id:f.id,kickoff:f.kickoff,home:f.home,away:f.away,league:f.league,oddsFetchedAt:f.oddsFetchedAt,gate,coverage:book.counts,
     excludedMarkets:book.excluded,diagnostics:f.diagnostics||[],statsSource:f.statsSource,statsFetchedAt:f.statsFetchedAt,standings:{home:f.homeStanding?.rank,away:f.awayStanding?.rank,size:f.league.size}};
   if(!gate.eligible)return {...basic,status:'skipped',reasons:gate.reasons,categoryTips:[],tip:null};
@@ -81,7 +81,7 @@ export function analyse(f,policy,{leagueCount=0,now=Date.now(),reliability}={}) 
   if(!tip&&policy.publishAllMatches)return oddsOnly(f,policy,basic,book,league);
   if(tip)tip={...tip,scenarios:failureScenarios(tip.compiled,model)};
   return {...basic,status:tip?'qualified':'skipped',leagueReliability:league,categoryTips,tip,
-    reasons:tip?explain(f,model,tip,policy):[`No supported market is backed at ${sureBand(policy).label} surity`],
+    reasons:tip?explain(f,model,tip,policy):[`No supported market at odds of at least ${(policy.minimumOdds??1.2).toFixed(2)} is backed at ${sureBand(policy).label} surity`],
     form:{home:model.home,away:model.away},h2h:{...advancedH2H(f),sameVenue:model.h2h.filter(r=>r.venueMatch).length},
     expectedGoals:{home:round(model.lambdaHome),away:round(model.lambdaAway)},
     probabilityNotice:'Model estimates, not calibrated guarantees. The range is a sampling-uncertainty indicator and does not include every source of error.'};
@@ -95,6 +95,6 @@ function oddsOnly(f,policy,basic,book,league) {
   const {label}=sureBand(policy);
   return {...basic,status:tip?'qualified':'skipped',leagueReliability:league,categoryTips,tip,
     reasons:tip?[`${tip.selection} in ${tip.market} is a sure market at Sportybet odds ${Number(tip.odds).toFixed(2)}. Implied surity is ${Math.round(tip.probability*100)}%, inside ${label}.`,
-      'Published from Sportybet odds because usable home/away history is missing. The displayed percentage is 1 divided by the odds, includes bookmaker margin and is not a statistical forecast.',...(f.diagnostics||[])]:[`No supported market is backed at ${label} surity`],
+      'Published from Sportybet odds because usable home/away history is missing. The displayed percentage is 1 divided by the odds, includes bookmaker margin and is not a statistical forecast.',...(f.diagnostics||[])]:[`No supported market at odds of at least ${(policy.minimumOdds??1.2).toFixed(2)} is backed at ${label} surity`,...(f.diagnostics||[])],
     probabilityNotice:'Odds-based selection; statistical probability, return and risk score are unavailable.'};
 }

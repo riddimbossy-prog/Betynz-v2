@@ -34,15 +34,23 @@ test('no comebacks and frequent HT-or-FT draws choose closed, not Under 2.5', ()
   assert.equal(combined.goals, null);
 });
 
-test('sure markets publish at their Sportybet odds; 1.20-1.50 is not a gate', () => {
-  const sure = applyHtft({
+test('sure markets publish from 1.20 up; a price under 1.20 is blocked', () => {
+  const blocked = applyHtft({
     homeName: 'Chelsea', awayName: 'Bournemouth',
     homeRow: { 'W/W': 4, 'D/D': 1 },
     awayRow: { 'L/L': 4, 'D/D': 1 },
     markets: [{ desc: 'Double Chance', outcomes: [{ desc: 'Home or Draw', odds: '1.08', isActive: 1 }] }],
   });
+  assert.equal(blocked.pick, null);
+  assert.match(blocked.gatedResult.gateReason, /1\.20/);
+  const sure = applyHtft({
+    homeName: 'Chelsea', awayName: 'Bournemouth',
+    homeRow: { 'W/W': 4, 'D/D': 1 },
+    awayRow: { 'L/L': 4, 'D/D': 1 },
+    markets: [{ desc: 'Double Chance', outcomes: [{ desc: 'Home or Draw', odds: '1.65', isActive: 1 }] }],
+  });
   assert.equal(sure.pick.gated, true);
-  assert.equal(sure.pick.odds, 1.08);
+  assert.equal(sure.pick.odds, 1.65);
   assert.ok(sure.pick.s >= 0.9);
   const soft = applyHtft({
     homeName: 'Chelsea', awayName: 'Bournemouth',

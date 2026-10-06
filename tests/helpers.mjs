@@ -6,6 +6,6 @@ export function fixture() {
   const table=Array.from({length:20},(_,i)=>standing(i+1,i+1));
   return {id:'sr:match:1',status:0,kickoff:'2026-09-23T20:00:00Z',oddsFetchedAt:'2026-09-23T09:59:00Z',home:{id:'s1',apiId:'1',name:'Alpha FC'},away:{id:'s18',apiId:'18',name:'Beta FC'},league:{id:'sr:tournament:1',apiId:'39',name:'Test League',country:'Test',size:20},
     table,homeStanding:table[0],awayStanding:table[17],homeHistory:Array.from({length:10},(_,i)=>record(i+10,1,i+2,3,i%2,i*7)),awayHistory:Array.from({length:10},(_,i)=>record(i+30,i+3,18,2,i%3===0?1:0,i*7)),h2h:[record(90,1,18,3,0,100),record(91,18,1,0,2,180)],leagueHistory:Array.from({length:100},(_,i)=>record(i+100,1,18,2,0,i*2)),
-    markets:[market(1,'1X2',[['Home',1.40],['Draw',4.8],['Away',8]]),market(18,'Over/Under',[['Over 1.5',1.25],['Under 1.5',3.9]],'total=1.5'),market(19,'Home Total Goals',[['Over 0.5',1.08],['Under 0.5',7]],'total=0.5'),market(10,'Double Chance',[['Home or Draw',1.10],['Draw or Away',2.5]])]};
+    markets:[market(1,'1X2',[['Home',1.40],['Draw',4.8],['Away',8]]),market(18,'Over/Under',[['Over 1.5',1.25],['Under 1.5',3.9]],'total=1.5'),market(19,'Home Total Goals',[['Over 0.5',1.20],['Under 0.5',7]],'total=0.5'),market(10,'Double Chance',[['Home or Draw',1.20],['Draw or Away',2.5]])]};
 }
 export const stable={reliable:true,score:80,sampleSize:200,forecastChecks:120,upsetRate:0.12};

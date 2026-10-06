@@ -10,7 +10,8 @@ async function get(path) {
 export function repairBoard(board) {
   const min = board.policy?.minimumSurety ?? 0.9;
   const max = board.policy?.maximumSurety ?? 1;
-  const sure = (tip) => Number.isFinite(tip?.probability) && tip.probability >= min && tip.probability <= max;
+  const minOdds = board.policy?.minimumOdds ?? 1.2;
+  const sure = (tip) => Number.isFinite(tip?.probability) && tip.probability >= min && tip.probability <= max && Number(tip.odds) >= minOdds;
   const eligible = (tip) => tip && (tip.probabilityBasis === 'odds' || !/\bfouls?\b/i.test(tip.market || '')) && sure(tip);
   for(const match of board.matches||[]) {
     const old=match.tip;

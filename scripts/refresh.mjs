@@ -110,10 +110,10 @@ export async function refresh({sporty=new Sportybet(),football=process.env.STATI
         diagnostics.push(`HT/FT ${row.league.name}: ${row.htft.caveat}`);
         continue;
       }
-      row.htft=applyHtft({homeRow:findTeam(table.home,row.home.name),awayRow:findTeam(table.away,row.away.name),homeName:row.home.name,awayName:row.away.name,markets:marketsById.get(row.id)||[],minimumSurety:policy.minimumSurety,maximumSurety:policy.maximumSurety,venueConfirmed:table.venueConfirmed});
+      row.htft=applyHtft({homeRow:findTeam(table.home,row.home.name),awayRow:findTeam(table.away,row.away.name),homeName:row.home.name,awayName:row.away.name,markets:marketsById.get(row.id)||[],minimumSurety:policy.minimumSurety,maximumSurety:policy.maximumSurety,minimumOdds:policy.minimumOdds,venueConfirmed:table.venueConfirmed});
     }
     const qualified=results.filter(r=>r.tip).sort((a,b)=>b.tip.probability-a.tip.probability);
-    const statisticsErrors=results.filter(r=>!r.kept && (r.tip?.probabilityBasis==='odds'||r.reasons.some(s=>s.startsWith('Analysis unavailable:')||s==='No verified statistics fixture match'))).length;
+    const statisticsErrors=results.filter(r=>!r.kept && (r.tip?.probabilityBasis==='odds'||[...(r.reasons||[]),...(r.diagnostics||[])].some(s=>/analysis unavailable|split form unavailable|no verified statistics fixture match/i.test(s)))).length;
     const scanComplete=books.complete&&statisticsErrors===0;
     const board={version:8,date,generatedAt:new Date().toISOString(),oddsSource:'Sportybet',statisticsSource:[...new Set(results.map(r=>r.statsSource).filter(Boolean))].join(' / ')||football.source||'API-Football',htftSource:'BetExplorer',
       statistics:{matched:matchedCount,analysed:analysisCount,unavailable:statisticsErrors},
