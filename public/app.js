@@ -9,7 +9,7 @@ const APOS = "&" + "#39;";
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": AMP, "<": LT, ">": GT, '"': QUOT, "'": APOS }[c]));
 const models = ["shortlist", "htft", "banker"];
 const openedModel = models.includes(location.hash.slice(1)) ? location.hash.slice(1) : "shortlist";
-const state = { index: null, board: null, date: null, request: 0, mode: "board", model: openedModel, matchId: null, whyKey: null };
+const state = { index: null, board: null, date: null, request: 0, mode: "board", model: openedModel, matchId: null, whyKey: null, status: "upcoming" };
 const STOP = new Set(["fc","cf","cd","sc","ac","afc","wfc","fk","sk","bk","if","de","da","do","del","la","el","the","of","and","w","women","club"]);
 
 function wordsOf(name) {
@@ -94,19 +94,36 @@ function hasHtft(match) {
 function isBanker(match) {
   return Boolean(match.tip && hasHtft(match));
 }
-function visible() {
+function phase(match, now = Date.now()) {
+  const kickoff = Date.parse(match?.kickoff || "");
+  if (!Number.isFinite(kickoff) || kickoff > now) return "upcoming";
+  const done = (settlement) => settlement && ["won", "lost", "push", "void"].includes(settlement.verdict);
+  if (done(match.tip?.settlement) || done(match.htft?.settlement)) return "settled";
+  return "live";
+}
+function listed() {
   const needle = $("search").value.trim().toLowerCase();
   const league = $("league").value;
   const skipped = $("show-skipped").checked && state.model === "shortlist";
-  const rows = matches().filter((match) => {
+  return matches().filter((match) => {
     const shown = state.model === "htft" ? hasHtft(match) : state.model === "banker" ? isBanker(match) : Boolean(match.tip);
     if (!skipped && !shown) return false;
     if (league && match.league.id !== league) return false;
     if (!needle) return true;
     return `${match.home.name} ${match.away.name} ${match.league.name}`.toLowerCase().includes(needle);
   });
+}
+function visible() {
+  const status = state.status || "upcoming";
+  const rows = listed().filter((match) => phase(match) === status);
   const sort = $("sort").value;
-  rows.sort((a, b) => sort === "kickoff" ? Date.parse(a.kickoff) - Date.parse(b.kickoff) : sort === "risk" ? (a.tip?.risk.score ?? 100) - (b.tip?.risk.score ?? 100) : sort === "value" ? (b.tip?.expectedReturn ?? -9) - (a.tip?.expectedReturn ?? -9) : (b.tip?.probability ?? -1) - (a.tip?.probability ?? -1));
+  const kickoff = (a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff);
+  if (status === "upcoming" || sort === "kickoff") rows.sort(kickoff);
+  else if (status === "live" && sort === "probability") rows.sort(kickoff);
+  else if (status === "settled" && sort === "probability") rows.sort((a, b) => Date.parse(b.kickoff) - Date.parse(a.kickoff));
+  else if (sort === "risk") rows.sort((a, b) => (a.tip?.risk.score ?? 100) - (b.tip?.risk.score ?? 100));
+  else if (sort === "value") rows.sort((a, b) => (b.tip?.expectedReturn ?? -9) - (a.tip?.expectedReturn ?? -9));
+  else rows.sort((a, b) => (b.tip?.probability ?? -1) - (a.tip?.probability ?? -1));
   return rows;
 }
 function current() {
@@ -243,23 +260,38 @@ function render() {
   const rows = visible();
   const match = current();
   const labels = { shortlist: "Shortlist", htft: "HT/FT", banker: "Banker" };
+  const counts = { upcoming: 0, live: 0, settled: 0 };
+  for (const row of listed()) counts[phase(row)] += 1;
+  document.querySelectorAll("#status [data-status]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.status === state.status);
+    const small = button.querySelector("small");
+    if (small) small.textContent = String(counts[button.dataset.status] ?? 0);
+  });
   $("board-label").textContent = state.mode === "route" ? "Match" : labels[state.model] || "Shortlist";
   if (state.mode === "board") {
     if (!rows.length) {
       const filtered = Boolean($("search").value || $("league").value);
-      const empty = state.model === "banker"
-        ? ["No banker", "Both models have to select the same match."]
-        : state.model === "htft"
-          ? ["No HT/FT card", "The table model ran. Nothing reached 90–100 surity."]
-          : [filtered ? "No matches for these filters" : "No sure markets right now", filtered ? "Clear the team or league filter to see the shortlist." : "A pick needs 90 to 100 surity. Open unavailable matches to see what missed."];
-      const action = state.model === "shortlist" ? `<button type="button" id="empty-action">${filtered ? "Clear filters" : "View unavailable"}</button>` : "";
+      const statusCopy = {
+        upcoming: ["No upcoming matches", "Nothing left to kick off on this day."],
+        live: ["No live matches", "Nothing is in play right now."],
+        settled: ["No settled matches", "No full-time result on this day yet."],
+      };
+      const modelEmpty = !listed().length;
+      const empty = !modelEmpty || filtered
+        ? [filtered ? "No matches for these filters" : statusCopy[state.status][0], filtered ? "Clear the team or league filter to see the shortlist." : statusCopy[state.status][1]]
+        : state.model === "banker"
+          ? ["No banker", "Both models have to select the same match."]
+          : state.model === "htft"
+            ? ["No HT/FT card", "The table model ran. Nothing reached 90–100 surity."]
+            : ["No sure markets right now", "A pick needs 90 to 100 surity. Open unavailable matches to see what missed."];
+      const action = state.model === "shortlist" && (filtered || modelEmpty) ? `<button type="button" id="empty-action">${filtered ? "Clear filters" : "View unavailable"}</button>` : "";
       $("results").innerHTML = `<div class="empty"><h3>${empty[0]}</h3><p>${empty[1]}</p>${action}</div>`;
       if ($("empty-action")) $("empty-action").onclick = () => {
         if (filtered) { $("search").value = ""; $("league").value = ""; }
         else $("show-skipped").checked = true;
         render();
       };
-    } else $("results").innerHTML = boardList(rows);
+    } else $("results").innerHTML = rows.map(listTicket).join("");
   } else if (!match) {
     $("results").innerHTML = `<div class="empty"><h3>Match unavailable</h3><p>This matchup is no longer on the board.</p></div>`;
   } else if (state.model === "htft" && hasHtft(match)) {
@@ -274,17 +306,6 @@ function render() {
   else if (state.whyKey === "htft" && match && hasHtft(match)) showHtftWhy(match);
   syncBack();
   if (!settling) queueSettle();
-}
-function boardList(rows) {
-  const now = Date.now();
-  const upcoming = [];
-  const settled = [];
-  for (const row of rows) (Date.parse(row.kickoff) <= now ? settled : upcoming).push(row);
-  settled.sort((a, b) => Date.parse(b.kickoff) - Date.parse(a.kickoff));
-  const blocks = [];
-  if (upcoming.length) blocks.push(upcoming.map(listTicket).join(""));
-  if (settled.length) blocks.push(`<h3 class="group-label">Settled</h3>${settled.map(listTicket).join("")}`);
-  return blocks.join("");
 }
 function paintModels() {
   const rows = matches();
@@ -472,6 +493,12 @@ window.addEventListener("popstate", (event) => {
 document.querySelector(".models").addEventListener("click", (event) => {
   const button = event.target.closest("[data-model]");
   if (button) setModel(button.dataset.model);
+});
+$("status").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-status]");
+  if (!button || button.dataset.status === state.status) return;
+  state.status = button.dataset.status;
+  render();
 });
 $("menu").onclick = () => {
   if ($("sheet").hidden) go(() => setSheet(true));

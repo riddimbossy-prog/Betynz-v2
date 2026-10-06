@@ -13,6 +13,16 @@ const THIN = 0.4;
 const $ = (id) => document.getElementById(id);
 let activeDate = "";
 let currentRows = [];
+let status = "upcoming";
+let repaint = () => {};
+
+function phase(match, now = Date.now()) {
+  const kickoff = Date.parse(match?.kickoff || "");
+  if (!Number.isFinite(kickoff) || kickoff > now) return "upcoming";
+  const settlement = match.htft?.settlement;
+  if (settlement && ["won", "lost", "push", "void"].includes(settlement.verdict)) return "settled";
+  return "live";
+}
 
 function pct(value) {
   return Number.isFinite(value) ? `${Math.round(value * 100)}%` : "—";
@@ -86,18 +96,28 @@ async function openDate(date, button, days) {
     $("note").textContent = noteFor(day, rows, published);
     const paint = () => {
       if (activeDate !== date) return;
-      const now = Date.now();
-      const upcoming = published.filter((match) => Date.parse(match.kickoff) > now);
-      const settled = published.filter((match) => Date.parse(match.kickoff) <= now);
-      const html = [
-        upcoming.map(ticket).join(""),
-        settled.length ? `<h3 class="group-label">Settled</h3>${settled.map(ticket).join("")}` : "",
-      ].join("");
-      $("results").innerHTML = published.length
-        ? html
-        : `<div class="empty"><h3>No HT/FT card for ${esc(date.slice(8))}</h3><p>The formula ran. Nothing reached 90–100 surity.</p><a class="htft-nav" href="./index.html">Back to the shortlist</a></div>`;
+      const counts = { upcoming: 0, live: 0, settled: 0 };
+      for (const match of published) counts[phase(match)] += 1;
+      document.querySelectorAll("#status [data-status]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.status === status);
+        const small = button.querySelector("small");
+        if (small) small.textContent = String(counts[button.dataset.status] ?? 0);
+      });
+      const rows = published.filter((match) => phase(match) === status);
+      rows.sort((a, b) => status === "settled" ? Date.parse(b.kickoff) - Date.parse(a.kickoff) : Date.parse(a.kickoff) - Date.parse(b.kickoff));
+      const copy = {
+        upcoming: ["No upcoming cards", "Nothing left to kick off on this day."],
+        live: ["No live cards", "Nothing is in play right now."],
+        settled: ["No settled cards", "No full-time result on this day yet."],
+      };
+      $("results").innerHTML = rows.length
+        ? rows.map(ticket).join("")
+        : published.length
+          ? `<div class="empty"><h3>${copy[status][0]}</h3><p>${copy[status][1]}</p></div>`
+          : `<div class="empty"><h3>No HT/FT card for ${esc(date.slice(8))}</h3><p>The formula ran. Nothing reached 90–100 surity.</p><a class="htft-nav" href="./index.html">Back to the shortlist</a></div>`;
     };
     paint();
+    repaint = paint;
     await settleMatches(published);
     paint();
   } catch (error) {
@@ -139,6 +159,12 @@ $("results").addEventListener("click", (event) => {
 });
 
 $("why-close").onclick = () => { $("why").hidden = true; };
+$("status").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-status]");
+  if (!button || button.dataset.status === status) return;
+  status = button.dataset.status;
+  repaint();
+});
 bindBadges();
 
 start().catch((error) => {
